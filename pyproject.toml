@@ -13,6 +13,7 @@ dependencies = ["SQLAlchemy>=2.0,<2.1", "psycopg[binary]>=3.2,<4", "fastapi>=0.1
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
+eval = ["pandas==3.0.6", "numpy==2.5.3"]
 browser-test = ["playwright>=1.50,<2"]
 dev = ["ruff==0.16.8"]
 
@@ -32,7 +33,7 @@ include = ["sdd*"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-sdd = ["web/*", "operators/manifest.json", "operators/examples.json"]
+sdd = ["web/*", "operators/manifest.json", "operators/examples.json", "postgres/*.sql", "postgres/*.control"]
 
 [tool.ruff]
 line-length = 100

@@ -8,11 +8,14 @@ from .schema import metadata
 class Database:
     def __init__(self, url):
         self._transaction_lock = RLock()
-        options = {}
-        if url.startswith("sqlite"):
+        options = {"pool_pre_ping": True, "hide_parameters": True}
+        url_text = str(url)
+        if url_text.startswith("sqlite"):
             options["connect_args"] = {"check_same_thread": False, "timeout": 30}
-            if ":memory:" in url:
+            if ":memory:" in url_text:
                 options["poolclass"] = StaticPool
+        elif url_text.startswith("postgresql"):
+            options["connect_args"] = {"connect_timeout": 10}
         self.engine = create_engine(url, **options)
         if self.engine.dialect.name == "sqlite":
 

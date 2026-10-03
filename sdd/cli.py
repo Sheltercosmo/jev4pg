@@ -13,6 +13,26 @@ def main():
     sub.add_parser("demo")
     serve = sub.add_parser("serve")
     serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--host", default="127.0.0.1")
+    migration = sub.add_parser(
+        "migrate", help="Install schema and tenant policies as an administrator"
+    )
+    migration.add_argument("--sql-interface", action="store_true")
+    grant = sub.add_parser("sql-grant", help="Map an existing SQL login to a JEV identity")
+    grant.add_argument("login")
+    grant.add_argument("--tenant", required=True)
+    grant.add_argument("--actor", required=True)
+    grant.add_argument("--role", choices=("reader", "reviewer"), default="reader")
+    extension = sub.add_parser(
+        "extension-files", help="Copy SQL extension files for server installation"
+    )
+    extension.add_argument("destination")
+    sql_worker = sub.add_parser("sql-worker", help="Execute durable PostgreSQL operator jobs")
+    sql_worker.add_argument("--concurrency", type=int, default=2)
+    sql_worker.add_argument("--once", action="store_true")
+    sql_worker.add_argument("--heartbeat-file", default="/tmp/jev-sql-worker.heartbeat")
+    ready = sub.add_parser("ready", help="Check database configuration without calling a model")
+    ready.add_argument("--worker-heartbeat")
     worker = sub.add_parser("worker")
     worker.add_argument("--tenant", required=True)
     worker.add_argument("--once", action="store_true")
@@ -40,10 +60,73 @@ def main():
     if args.command == "serve":
         import uvicorn
 
-        uvicorn.run("sdd.api:create_app", factory=True, host="127.0.0.1", port=args.port)
+        uvicorn.run("sdd.api:create_app", factory=True, host=args.host, port=args.port)
+        return
+    if args.command in {"migrate", "sql-grant", "extension-files", "ready"}:
+        from .config import load_env, database_url, secret
+        from .bootstrap import migrate, grant_client, extension_files
+
+        load_env()
+        try:
+            if args.command == "migrate":
+                result = migrate(
+                    database_url(admin=True),
+                    os.getenv("SDD_DB_USER", "sdd_app"),
+                    secret("SDD_DB_PASSWORD"),
+                    args.sql_interface,
+                )
+            elif args.command == "sql-grant":
+                grant_client(
+                    database_url(admin=True), args.login, args.tenant, args.actor, args.role
+                )
+                result = {"login": args.login, "tenant": args.tenant, "role": args.role}
+            elif args.command == "extension-files":
+                destination = Path(args.destination)
+                destination.mkdir(parents=True, exist_ok=True)
+                for source in extension_files().iterdir():
+                    if source.name.endswith((".control", ".sql")):
+                        (destination / source.name).write_bytes(source.read_bytes())
+                result = {"extension_files": str(destination)}
+            else:
+                from .db import Database
+                from .deployment import check_database
+
+                db = Database(database_url())
+                try:
+                    result = check_database(db)
+                    if (
+                        args.worker_heartbeat
+                        and time.time() - Path(args.worker_heartbeat).stat().st_mtime > 90
+                    ):
+                        raise ValueError("SQL worker heartbeat has expired")
+                finally:
+                    db.engine.dispose()
+        except Exception as exc:
+            parser.exit(
+                1,
+                f"{args.command} failed ({type(exc).__name__}). Check configuration, database permissions and server logs.\n",
+            )
+        print(json.dumps(result))
         return
     db, executor = runtime()
-    if args.command == "init":
+    if args.command == "sql-worker":
+        from .deployment import check_database
+        from .generic.api import services
+        from .sql_worker import run
+
+        check_database(db, sql_interface=True)
+        _, service, _ = services(executor)
+        try:
+            run(
+                db,
+                service.decisions,
+                concurrency=args.concurrency,
+                once=args.once,
+                heartbeat_path=args.heartbeat_file,
+            )
+        finally:
+            db.engine.dispose()
+    elif args.command == "init":
         db.initialize()
         print("Database initialized.")
     elif args.command == "demo":

@@ -1,17 +1,119 @@
+name: jevsd-pg
+
+x-database: &database
+  SDD_DB_HOST: postgres
+  SDD_DB_PORT: "5432"
+  SDD_DB_NAME: sdd
+  SDD_DB_USER: sdd_app
+  SDD_DB_PASSWORD_FILE: /run/secrets/app_password
+  SDD_SQL_INTERFACE: "1"
+
+x-runtime: &runtime
+  <<: *database
+  SDD_ENV: production
+  SDD_JEV_TRANSPORT: ${SDD_JEV_TRANSPORT:-systemone}
+  SDD_JEV_MODEL: ${SDD_JEV_MODEL:-jev-1.13.0}
+  SDD_JEV_ENDPOINT: ${SDD_JEV_ENDPOINT:-}
+  SDD_JEV_REVISION: ${SDD_JEV_REVISION:-}
+  SDD_JEV_CONCURRENCY: ${SDD_JEV_CONCURRENCY:-4}
+  SDD_DAILY_EVALUATIONS: ${SDD_DAILY_EVALUATIONS:-1000}
+  TYPESAFE_API_KEY_FILE: /run/secrets/typesafe_api_key
+  SDD_JEV_API_KEY_FILE: /run/secrets/jev_api_key
+  OPENAI_API_KEY_FILE: /run/secrets/llm_api_key
+  SDD_LLM_TRANSPORT: ${SDD_LLM_TRANSPORT:-openai}
+  SDD_LLM_MODEL: ${SDD_LLM_MODEL:-}
+  SDD_HYBRID_CONCEPTS: ${SDD_HYBRID_CONCEPTS:-off}
+  SDD_HYBRID_REPAIR: ${SDD_HYBRID_REPAIR:-on}
+
 services:
   postgres:
-    image: postgres:17
+    build:
+      context: .
+      dockerfile: deploy/postgres.Dockerfile
     environment:
       POSTGRES_DB: sdd
       POSTGRES_USER: sdd_admin
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-    ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - sdd_pg:/var/lib/postgresql/data
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [postgres_password]
+    ports: ["127.0.0.1:${SDD_POSTGRES_PORT:-5432}:5432"]
+    volumes: [sdd_pg:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sdd_admin -d sdd"]
       interval: 5s
-      retries: 10
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    build: .
+    image: jevsd-pg:local
+    command: ["migrate", "--sql-interface"]
+    environment:
+      <<: *database
+      SDD_ADMIN_DB_USER: sdd_admin
+      SDD_ADMIN_DB_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, app_password]
+    depends_on:
+      postgres: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+
+  app:
+    image: jevsd-pg:local
+    command: ["serve", "--host", "0.0.0.0"]
+    environment:
+      <<: *runtime
+      SDD_API_TOKENS_FILE: /run/secrets/api_tokens
+      SDD_FEATURE_MAINTENANCE: ${SDD_FEATURE_MAINTENANCE:-1}
+    secrets: [app_password, api_tokens, typesafe_api_key, jev_api_key, llm_api_key]
+    ports: ["127.0.0.1:${SDD_HTTP_PORT:-8000}:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 120s
+
+  sql-worker:
+    image: jevsd-pg:local
+    command: ["sql-worker", "--concurrency", "${SDD_SQL_WORKERS:-2}"]
+    environment: *runtime
+    secrets: [app_password, typesafe_api_key, jev_api_key, llm_api_key]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "jevsd-pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
+      interval: 15s
+      timeout: 12s
+      retries: 4
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 120s
+
 volumes:
   sdd_pg:
+
+secrets:
+  postgres_password:
+    file: ${SDD_SECRETS_DIR:-.secrets}/postgres_password
+  app_password:
+    file: ${SDD_SECRETS_DIR:-.secrets}/app_password
+  api_tokens:
+    file: ${SDD_SECRETS_DIR:-.secrets}/api_tokens.json
+  typesafe_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/typesafe_api_key
+  jev_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/jev_api_key
+  llm_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/llm_api_key

@@ -1,0 +1,53 @@
+name: Deployment
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SDD_HTTP_PORT: "18000"
+      SDD_POSTGRES_PORT: "15432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install release and run unit tests
+        run: |
+          python -m pip install -r requirements.lock.txt
+          python -m pip install --no-deps .
+          python -m pytest -q --tb=short
+      - name: Create disposable credentials
+        run: python deploy/configure.py --no-prompt
+      - name: Build and start deployment
+        run: |
+          docker compose -f compose.yaml -f deploy/compose.test.yaml build
+          docker compose -f compose.yaml -f deploy/compose.test.yaml up -d --wait --wait-timeout 180
+      - name: Test PostgreSQL security and installation
+        run: |
+          python - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          from sqlalchemy import URL
+          password = Path('.secrets/postgres_password').read_text().strip()
+          url = URL.create('postgresql+psycopg', username='sdd_admin', password=password,
+                           host='127.0.0.1', port=15432, database='sdd')
+          subprocess.run(['python', '-m', 'pytest', 'tests/test_deployment_postgres.py', '-q', '--tb=no'],
+                         env={**os.environ, 'SDD_TEST_ADMIN_URL': url.render_as_string(hide_password=False)}, check=True)
+          PY
+      - name: Exercise deployed API and SQL clients
+        run: python deploy/smoke.py
+      - name: Service diagnostics
+        if: failure()
+        run: docker compose -f compose.yaml -f deploy/compose.test.yaml logs --tail=100
+      - name: Stop disposable deployment
+        if: always()
+        run: docker compose -f compose.yaml -f deploy/compose.test.yaml down -v

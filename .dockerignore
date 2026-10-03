@@ -1,0 +1,12 @@
+**
+!Dockerfile
+!pyproject.toml
+!requirements.lock.txt
+!LICENSE
+!NOTICE
+!sdd/
+!sdd/**
+!deploy/
+!deploy/postgres.Dockerfile
+**/__pycache__/
+**/*.pyc

@@ -1,6 +1,5 @@
 """Authenticated local service; interactive query and review API at /docs."""
 
-import json
 import os
 import secrets
 import asyncio
@@ -10,7 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from .ir import Strict, Plan
-from .config import runtime
+from .config import runtime, api_tokens
 from . import schema as s
 from .planner import preview
 from .natural import ask
@@ -92,7 +91,7 @@ def create_app(executor=None, tokens=None):
     if executor is None:
         _, executor = runtime()
     ledger = executor.ledger
-    tokens = tokens if tokens is not None else json.loads(os.getenv("SDD_API_TOKENS", "{}"))
+    tokens = tokens if tokens is not None else api_tokens()
 
     @asynccontextmanager
     async def lifespan(app):
@@ -176,6 +175,21 @@ def create_app(executor=None, tokens=None):
     @app.get("/health")
     def health():
         return {"status": "ok", "version": "0.5.0"}
+
+    @app.get("/ready")
+    def ready():
+        from sqlalchemy import text
+        from .deployment import check_database
+
+        try:
+            if os.getenv("SDD_ENV") == "production":
+                check_database(executor.db)
+            else:
+                with executor.db.engine.connect() as connection:
+                    connection.execute(text("SELECT 1"))
+        except Exception:
+            raise HTTPException(503, "Database is not ready") from None
+        return {"status": "ready"}
 
     @app.get("/catalog")
     def catalog(p=Depends(identity)):

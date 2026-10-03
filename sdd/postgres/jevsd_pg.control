@@ -1,0 +1,5 @@
+comment = 'Durable JEV operator jobs for PostgreSQL clients'
+default_version = '0.1.0'
+relocatable = false
+schema = 'jev'
+superuser = true
