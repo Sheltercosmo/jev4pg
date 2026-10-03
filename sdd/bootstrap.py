@@ -49,10 +49,15 @@ def ensure_login(connection, role, password=None):
     literal = connection.execute(
         text("SELECT quote_literal(:value)"), {"value": password}
     ).scalar_one()
-    connection.exec_driver_sql(
-        f"CREATE ROLE {quoted} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-        f"NOREPLICATION NOBYPASSRLS PASSWORD {literal}"
-    )
+    try:
+        connection.exec_driver_sql(
+            f"CREATE ROLE {quoted} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+            f"NOREPLICATION NOBYPASSRLS PASSWORD {literal}"
+        )
+    except Exception:
+        raise ValueError(
+            "Could not create the database login; check administrator permissions"
+        ) from None
     return True
 
 

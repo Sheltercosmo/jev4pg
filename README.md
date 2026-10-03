@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.5.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Version 0.5.0" /></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.6.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Version 0.6.0" /></a>
   <a href="docs/INSTALLATION.md"><img src="https://img.shields.io/badge/Python-3.11%2B-18181b?style=flat-square&amp;labelColor=52525b" alt="Python 3.11 or newer" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
@@ -19,7 +19,7 @@
   <a href="docs/JEV_FUNCTION_REFERENCE.md">Operator reference</a>
 </p>
 
-Ask questions in plain language, inspect the SQL, and turn useful semantic decisions into reusable database features. jevsd-pg brings together 41 semantic operators, parallel JEV evaluation, cached evidence and optional LLM planning in a web workspace and HTTP API.
+Ask questions in plain language, inspect the SQL, and turn useful semantic decisions into reusable database features. jevsd-pg brings together 41 semantic operators, parallel JEV evaluation, cached evidence and optional LLM planning through a web workspace, HTTP API and PostgreSQL SQL interface.
 
 The operators combine JEV's native Noul, Choice and Score primitives with database and workflow logic. The default JEV service is provided by TypeSafe. You can also connect a compatible third-party endpoint or a local model adapter. PostgreSQL handles storage, joins and arithmetic.
 
@@ -60,29 +60,21 @@ See [verified examples](docs/NL2SQL_EXAMPLES.md) for filtering, averages and the
 
 ## Getting started
 
-You need Python 3.11 or newer, PostgreSQL and a configured JEV provider. TypeSafe requires an API key; a local provider can run without one. Python 3.13 and PostgreSQL 17 are the verified configuration. Hybrid mode also requires a configured LLM provider.
+With Python 3.11 or newer and Docker Compose v2:
 
 ```bash
 git clone https://github.com/Sheltercosmo/jevsd-pg.git
 cd jevsd-pg
-python -m venv .venv
+python deploy/configure.py
+docker compose build
+docker compose up -d --wait
 ```
 
-Activate the environment with `.venv\Scripts\Activate.ps1` in PowerShell or `source .venv/bin/activate` in Bash, then install:
+Configuration creates local credentials and asks for your TypeSafe key. You can instead configure a [compatible endpoint or local model](docs/PROVIDERS.md). Hybrid mode also needs an LLM provider.
 
-```bash
-python -m pip install -r requirements.lock.txt
-python -m pip install --no-deps -e .
-```
+Open the [English workspace](http://127.0.0.1:8000/ask/en) or [Simplified Chinese workspace](http://127.0.0.1:8000/ask/zh). Run `python deploy/configure.py --show-token` to retrieve your workspace token, then import data through Manage data.
 
-Copy `.env.example` to `.env` and follow the [database setup](docs/INSTALLATION.md#postgresql) to create the application role and configure credentials. Then run:
-
-```bash
-python -m scripts.migrate_generic
-python -m sdd.cli serve
-```
-
-Open the [English workspace](http://127.0.0.1:8000/ask/en) or [Simplified Chinese workspace](http://127.0.0.1:8000/ask/zh). Connect with your database access token and import data through Manage data.
+The stack includes PostgreSQL 17, schema migration, the API and a durable SQL worker. See [installation](docs/INSTALLATION.md) for an existing PostgreSQL server, upgrades and backups. [SQL client examples](docs/POSTGRESQL_INTERFACE.md) show how to submit JEV operators directly from `psql`.
 
 ## Query your data
 

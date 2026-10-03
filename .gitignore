@@ -22,3 +22,6 @@ __pycache__/
 build/
 dist/
 node_modules/
+
+.secrets/
+backups/

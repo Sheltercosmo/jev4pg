@@ -130,7 +130,7 @@ def create_app(executor=None, tokens=None):
 
     app = FastAPI(
         title="jevsd-pg",
-        version="0.5.0",
+        version="0.6.0",
         lifespan=lifespan,
         description="Query, inspect evidence, review decisions, and govern reusable concepts. Tenant is bound to the bearer token.",
     )
@@ -174,7 +174,7 @@ def create_app(executor=None, tokens=None):
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": "0.5.0"}
+        return {"status": "ok", "version": "0.6.0"}
 
     @app.get("/ready")
     def ready():

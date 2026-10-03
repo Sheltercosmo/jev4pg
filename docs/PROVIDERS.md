@@ -138,3 +138,9 @@ python examples/providers/check_provider.py
 This sends one batch containing Noul, Choice and Score questions to the configured provider. It checks the response contract and incurs provider usage. Add `--text "货物已经送达。"` to check a Chinese payload.
 
 Contract compatibility does not establish semantic accuracy. Validate your model on your data, languages and uncertainty thresholds before relying on its decisions. Configure `SDD_JEV_INPUT_USD_PER_MILLION` for the provider's input-token rate; setting it to zero records no provider token charge and does not account for local hardware cost.
+
+## Container deployment
+
+Compose reads endpoint, model, revision and concurrency from `.env`. Store provider keys in the files created under `.secrets/`: `typesafe_api_key`, `jev_api_key` and `llm_api_key`. Restart `app` and `sql-worker` after changes.
+
+A model in another container must be reachable by its service name; `127.0.0.1` inside the app refers to the app container. For a model on the Docker host, configure a reachable host address and its firewall rules. A Python adapter must be installed into a derived application image and selected with `SDD_JEV_TRANSPORT=python`, `SDD_JEV_ADAPTER`, `SDD_JEV_MODEL` and `SDD_JEV_REVISION` for both services.

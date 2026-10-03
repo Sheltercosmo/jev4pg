@@ -1,105 +1,112 @@
 # Installation
 
-jevsd-pg runs as a Python service backed by PostgreSQL. The verified environment uses Python 3.13 and PostgreSQL 17. SQLite is used by the deterministic test suite.
+jevsd-pg runs a Python service and worker beside PostgreSQL. The SQL extension exposes durable operator jobs to PostgreSQL clients. Model calls run in the worker; PostgreSQL performs storage, joins, arithmetic and transactions.
 
-## Python environment
+## Docker Compose
+
+Install Docker with Compose v2 and Python 3.11 or newer. From a fresh checkout:
 
 ```bash
-git clone https://github.com/Sheltercosmo/jevsd-pg.git
-cd jevsd-pg
+python deploy/configure.py
+docker compose build
+docker compose up -d --wait
+```
+
+The configuration command creates `.secrets/` and asks for a TypeSafe key. It preserves existing files when rerun. For another provider, leave that prompt empty and follow [provider configuration](PROVIDERS.md). Provider keys are separate from the workspace token.
+
+Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh). Retrieve your workspace token locally:
+
+```bash
+python deploy/configure.py --show-token
+```
+
+The stack starts PostgreSQL, runs an idempotent migration, then starts the API and SQL worker. Source data, evidence and queued jobs live in the `sdd_pg` volume. The API and worker run as an unprivileged user with a read-only container filesystem. Administrator credentials are available only to PostgreSQL and migration.
+
+HTTP and PostgreSQL bind to localhost. Set `SDD_HTTP_PORT` or `SDD_POSTGRES_PORT` in `.env` to change their host ports. For remote access, place the API behind a TLS reverse proxy and configure firewall and PostgreSQL TLS rules for your environment. Keep `.secrets/` private; on Windows restrict its inherited file permissions to the deployment account.
+
+Use `docker compose ps` to inspect health. `/health` is process liveness; `/ready` checks database connectivity, schema version and runtime permissions. Neither endpoint calls a model or verifies provider availability.
+
+## Existing PostgreSQL server
+
+Use PostgreSQL 17 and a dedicated database. Install the Python package:
+
+```bash
 python -m venv .venv
-```
-
-In PowerShell, activate with `.venv\Scripts\Activate.ps1`. In Bash, use `source .venv/bin/activate`. Then install the verified dependencies and the local package:
-
-```bash
+# Bash: source .venv/bin/activate
+# PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.lock.txt
-python -m pip install --no-deps -e .
+python -m pip install --no-deps .
 ```
 
-Copy `.env.example` to `.env`. The examples below use placeholders; choose your own credentials. URL-encode special characters when putting a password in a database connection URL.
+Copy `.env.example` to `.env` and configure the runtime database URL, provider and API token map. For setup, provide `SDD_ADMIN_DATABASE_URL` and `SDD_DB_PASSWORD` or their `_FILE` variants. The administrator must be able to create roles and schema objects. The new runtime password must contain at least 24 characters.
 
-## PostgreSQL
-
-You can use an existing PostgreSQL 17 installation or the included Docker Compose service. The service binds PostgreSQL to localhost and stores data in a named volume.
-
-For Docker, add `POSTGRES_PASSWORD=<admin-password>` to `.env`, then run:
+For the SQL interface, export the packaged extension files:
 
 ```bash
-docker compose up -d
-docker compose exec postgres psql -U sdd_admin -d sdd
+jevsd-pg extension-files ./extension-files
 ```
 
-At the `psql` prompt, create the restricted runtime role:
-
-```sql
-CREATE ROLE sdd_app LOGIN NOSUPERUSER NOBYPASSRLS;
-\password sdd_app
-GRANT CONNECT ON DATABASE sdd TO sdd_app;
-GRANT USAGE ON SCHEMA public TO sdd_app;
-\q
-```
-
-The password prompt avoids putting the application password in a command or SQL history. For an existing installation, connect as its administrator, create the `sdd` database if needed, and apply the same role setup. Run `CREATE ROLE` only when the role does not already exist.
-
-## Server configuration
-
-Set these values in `.env`:
-
-```dotenv
-DATABASE_URL=postgresql+psycopg://sdd_app:<app-password>@127.0.0.1:5432/sdd
-SDD_ADMIN_DATABASE_URL=postgresql+psycopg://sdd_admin:<admin-password>@127.0.0.1:5432/sdd
-TYPESAFE_API_KEY=<your-jev-provider-key>
-SDD_API_TOKENS={"<your-database-token>":{"tenant":"demo","name":"owner","role":"reviewer"}}
-```
-
-The database token authenticates a person or client to jevsd-pg. The JEV provider key authenticates the server to TypeSafe. They are different credentials. Generate a database token with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and use that value as the JSON key in `SDD_API_TOKENS`.
-
-Apply the schema and tenant policies:
+On the PostgreSQL server, copy the resulting `.control` and `.sql` files into the directory printed by `pg_config --sharedir`, under `extension/`. Then run:
 
 ```bash
-python -m scripts.migrate_generic
+jevsd-pg migrate --sql-interface
 ```
 
-Complete the runtime grants as the database administrator. With Docker, open `psql` again using the command above:
+This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jevsd-pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
 
-```sql
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA public TO sdd_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sdd_app;
-REVOKE UPDATE ON source_versions, evaluator_revisions,
-  decision_policy_revisions, observations, human_assertions FROM sdd_app;
-REVOKE ALL ON FUNCTION sdd_reject_evidence_update() FROM PUBLIC;
-\q
-```
-
-The migration creates the generic data schema, row-level security policies and immutable evidence guards. Run the service with `DATABASE_URL` pointing to `sdd_app`, never the administrator. `SDD_ADMIN_DATABASE_URL` is for setup and can be removed from the service environment afterward.
-
-## Start the workspace
+Remove administrator credentials from the service environment. Set `SDD_ENV=production`, `SDD_SQL_INTERFACE=1`, and start the services under your process supervisor:
 
 ```bash
-python -m sdd.cli serve
+jevsd-pg serve --host 127.0.0.1 --port 8000
+jevsd-pg sql-worker --concurrency 2 --heartbeat-file /tmp/jev-sql-worker.heartbeat
 ```
 
-Open [English](http://127.0.0.1:8000/ask/en), [简体中文](http://127.0.0.1:8000/ask/zh), or the [API reference](http://127.0.0.1:8000/docs). Enter the database token in the connection settings. Import a dataset before asking a question about it.
+Run these as separate processes. On Windows choose a writable heartbeat path, such as `.runtime/sql-worker.heartbeat`. Production startup rejects SQLite, administrative runtime roles, missing migration state and invalid API token mappings. Use a separate PostgreSQL login for each SQL client; follow [SQL access setup](POSTGRESQL_INTERFACE.md#grant-access).
 
-Existing process environment variables take precedence over `.env`. The supplied `.env.example` is a template, not an active credential file. The repository excludes `.env`, runtime databases and local artifacts.
+## Credentials and providers
 
-## Choose a JEV provider
+A runtime connection can use `DATABASE_URL`, or `SDD_DB_HOST`, `SDD_DB_PORT`, `SDD_DB_NAME`, `SDD_DB_USER` and `SDD_DB_PASSWORD_FILE`. Structured settings handle special characters in passwords. Setup uses `SDD_ADMIN_DATABASE_URL` or `SDD_ADMIN_DB_USER` with `SDD_ADMIN_DB_PASSWORD_FILE` and the same host/database settings.
 
-The configuration above uses TypeSafe. To use a compatible third-party service or a local model, follow [provider setup](PROVIDERS.md). A custom HTTP endpoint uses its own optional key; Python adapters need no TypeSafe key.
+`SDD_API_TOKENS_FILE` contains a JSON map from random tokens to tenant, name and role. Roles are `reader` and `reviewer`; production tokens need at least 32 characters. Provider secrets support `TYPESAFE_API_KEY_FILE`, `SDD_JEV_API_KEY_FILE` and `OPENAI_API_KEY_FILE`. A file setting takes precedence over its corresponding value.
 
-## Optional hybrid mode
+Compose reads provider settings from `.env` and mounts key files from `.secrets/`. It does not pass the entire `.env` to services. Edit `typesafe_api_key`, `jev_api_key` or `llm_api_key` for the selected provider. Restart the API and SQL worker after changing credentials. Configure `SDD_JEV_ENDPOINT`, model and revision for a compatible HTTP endpoint. An in-process Python adapter requires a derived app image containing that adapter; see [providers](PROVIDERS.md).
 
-Add `OPENAI_API_KEY`, set `SDD_LLM_TRANSPORT=openai`, and select an available structured-output model with `SDD_LLM_MODEL`. JEV remains responsible for context selection and review. See [hybrid configuration](HYBRID_QUERY.md#configuration) for the supported transports and call controls.
+Hybrid queries require `SDD_LLM_TRANSPORT`, `SDD_LLM_MODEL` and the corresponding LLM credential. See [hybrid setup](HYBRID_QUERY.md).
 
-## Verify your installation
+## Upgrade
+
+Back up the database and retain its role credentials first. Check out the desired release, then run:
 
 ```bash
-python -m pip install -e ".[test]"
-python -m pytest -q
+docker compose stop app sql-worker
+docker compose build
+docker compose run --rm migrate
+docker compose up -d --wait
 ```
 
-The tests do not call model providers. PostgreSQL checks require `SDD_TEST_POSTGRES_URL`; `python -m scripts.run_tests` reads the configured database connection and enables them. Use a dedicated local test database for this check.
+The current migration is additive and preserves source data and evidence. It does not rotate passwords. Never run two migration versions against the same database at once. Before adopting this deployment on an existing installation, test migration and restore on a database copy. Do not repoint Compose at an unrelated database volume.
 
-If schema setup reports a missing `sdd_app` role, finish the role-creation step first. If it tries to read `.runtime/credentials.json`, set `SDD_ADMIN_DATABASE_URL` explicitly. That fallback supports an existing portable Windows installation and is not needed for a fresh Docker setup.
+## Backup and restore
+
+The database contains datasets, evidence, role mappings and SQL jobs. Save a custom-format backup without shell binary redirection:
+
+```bash
+docker compose exec postgres pg_dump -U sdd_admin -d sdd -Fc -f /tmp/sdd.dump
+docker compose cp postgres:/tmp/sdd.dump ./sdd.dump
+```
+
+Back up PostgreSQL login roles and `.secrets/` separately in protected storage; database dumps do not include cluster roles. To test restoration into a fresh database on the same server:
+
+```bash
+docker compose exec postgres createdb -U sdd_admin sdd_restore
+docker compose cp ./sdd.dump postgres:/tmp/sdd.dump
+docker compose exec postgres pg_restore -U sdd_admin -d sdd_restore --exit-on-error /tmp/sdd.dump
+```
+
+On a new server, install the extension files and recreate the original roles first. Restore into an empty database, without running migration first. Then run the matching migration and readiness checks. Keep API and workers stopped until the restored database has been checked. Jobs running at backup time can expire after restore; inspect their operator records before resubmitting.
+
+`docker compose down` preserves the database volume. `docker compose down -v` deletes it.
+
+## Deployment tests
+
+The [deployment workflow](../.github/workflows/deployment.yml) builds the images and checks fresh installation, SQL authorization, worker recovery, HTTP and `psql` calls, batching, repeat migration, restart persistence and backup restoration. Its explicit synthetic provider tests integration, not language accuracy. The default stack never enables this fixture.

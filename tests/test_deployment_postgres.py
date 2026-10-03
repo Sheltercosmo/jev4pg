@@ -184,6 +184,42 @@ def test_idempotency_and_invalid_requests(installation):
     assert response["job_state"] == "FAILED" and response["value"] is None
 
 
+def test_reader_cannot_promote_itself_through_operator_dispatch(installation):
+    env = installation
+    with env["alice"].engine.begin() as connection:
+        job = str(
+            connection.execute(
+                text("SELECT jev.submit('REVIEW', '{\"observations\":[]}')")
+            ).scalar_one()
+        )
+    assert SQLWorker(env["app"], Model()).work_one()
+    response = result(env["alice"], job)
+    assert response["job_state"] == "FAILED" and response["error_type"] == "PermissionError"
+
+
+def test_security_definer_ignores_client_search_path(installation):
+    env = installation
+    with env["alice"].engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TEMP TABLE client_roles(login name, tenant text, actor text, access text)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO client_roles VALUES(session_user, 'tenant-b', 'forged', 'reviewer')"
+        )
+        connection.exec_driver_sql("SET LOCAL search_path=pg_temp,public")
+        job = str(
+            connection.execute(
+                text('SELECT jev.submit(\'NOUL\', \'{"state":"record","proposition":"yes"}\')')
+            ).scalar_one()
+        )
+    worker = SQLWorker(env["app"], Model())
+    claimed = worker.claim()
+    assert claimed["id"] == job and claimed["tenant"] == "tenant-a" and claimed["role"] == "reader"
+    assert worker.finish(
+        job, {"output_state": "UNKNOWN", "operation_state": "SUCCEEDED", "value": None}
+    )
+
+
 def test_parallel_claims_and_lease_loss(installation):
     env = installation
     jobs = {submit(env["alice"], state=str(i)) for i in range(6)}

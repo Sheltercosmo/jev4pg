@@ -1,6 +1,6 @@
 # JEV operator guide
 
-Use `POST /jev/call` to run the 41 database operators or a conditional WORKFLOW. Noul, Choice and Score are the provider primitives; the other operators compose them with database operations. These are API interfaces, not SQL function names.
+Use `POST /jev/call` to run the 41 database operators or a conditional WORKFLOW. Noul, Choice and Score are the provider primitives; the other operators compose them with database operations. PostgreSQL clients can dispatch the same operators through `jev.submit`; see the [SQL interface](POSTGRESQL_INTERFACE.md).
 
 [Function reference](JEV_FUNCTION_REFERENCE.md) · [Runnable examples](../examples/operators/README.md)
 

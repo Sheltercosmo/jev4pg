@@ -53,3 +53,13 @@ Provider transport sits below the typed stage DAG. Each dispatch receives one co
 The HTTP and Python adapters return the same Noul, Choice and Score envelope. Validation occurs before evidence is stored. Failed or malformed responses remain operational failures, and skipped branches remain NOT_EVALUATED.
 
 Cache identity includes endpoint or adapter, configured revision and model. Reviews, operator approvals and automatic refresh bind to that identity, so changing a provider cannot silently reuse its model judgments. Local predictors must support concurrent calls or serialize access internally when their runtime requires it.
+
+## PostgreSQL jobs and deployment
+
+The optional `jevsd_pg` SQL extension owns a private queue and login-to-tenant mappings. Its public security-definer functions use a fixed search path and the authenticated `session_user`. SQL clients receive function execution rights, not runtime table grants. An administrator installs the schema; the API and worker use a separate restricted role.
+
+Submission must commit before a worker claims the job. After claiming, the worker releases its queue transaction and calls the existing OperatorService. Independent jobs run concurrently, and each operator retains its shared stage DAG, batching and budget controls. Queueing adds no dependency between unrelated semantic stages. Only result publication waits for the operator result and a valid lease.
+
+Heartbeats run separately from inference. Expired work becomes FAILED / NOT_EVALUATED without automatic replay; a stale worker cannot publish success. Job state describes queue progress, while operator output and execution states retain their existing meanings. Durable evidence can survive an interrupted job and must be inspected before retrying side effects.
+
+Packaged migrations create roles, grants, row-level security and immutable evidence guards transactionally. Compose starts API and worker only after migration succeeds. The [SQL interface guide](POSTGRESQL_INTERFACE.md) describes client access, states and recovery.
