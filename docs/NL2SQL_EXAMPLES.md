@@ -1,6 +1,6 @@
 # Natural language to SQL examples
 
-These queries were generated and executed with jevsd-pg 0.5.0 and JEV 1.13.0. Each result matched the fixed tutorial reference. The application held these proposals for review; the evaluation executed them to check the answers. Generated SQL is shown unchanged.
+These queries were generated with jevsd-pg 0.5.0 and JEV 1.13.0, then checked against the [tutorial data](../examples/nl2sql/README.md). Each proposal required user review.
 
 ## Total deliveries by supplier
 
@@ -17,24 +17,11 @@ ORDER BY
   SUM("r0"."quantity") DESC NULLS LAST
 ```
 
-Result:
-
-```json
-[
-  {
-    "result_1": 36,
-    "result_2": "Birch"
-  },
-  {
-    "result_1": 30,
-    "result_2": "Aster"
-  },
-  {
-    "result_1": 8,
-    "result_2": "Cedar"
-  }
-]
-```
+| Quantity | Supplier |
+| ---: | --- |
+| 36 | Birch |
+| 30 | Aster |
+| 8 | Cedar |
 
 ## Filter and sort exam results
 
@@ -51,24 +38,11 @@ ORDER BY
   "r0"."student" ASC
 ```
 
-Result:
-
-```json
-[
-  {
-    "result_1": "Ada",
-    "result_2": 92
-  },
-  {
-    "result_1": "Chen",
-    "result_2": 88
-  },
-  {
-    "result_1": "Emil",
-    "result_2": 92
-  }
-]
-```
+| Student | Score |
+| --- | ---: |
+| Ada | 92 |
+| Chen | 88 |
+| Emil | 92 |
 
 ## Average quantity with missing data
 
@@ -82,18 +56,8 @@ WHERE
   NOT "r0"."quantity" IS NULL
 ```
 
-Result:
+Result: `14.8`.
 
-```json
-[
-  {
-    "result_1": 14.8
-  }
-]
-```
+## Try it
 
-## Try the same data
-
-The [tutorial package](../examples/nl2sql/README.md) includes both tables, the requests, expected results and a comparison runner. To use the web workspace, import the dataset objects from `cases.json`, then submit the matching request.
-
-A [Simplified Chinese example](zh/USER_GUIDE.md#sql-示例) uses the same exam data. The paired schema check also recovered the total quantity after the delivery table and every column were renamed, using their descriptions. This is one checked rename, not a claim about all schemas.
+Import the [tutorial datasets](../examples/nl2sql/cases.json), select the relevant table and submit a question. See the [tutorial instructions](../examples/nl2sql/README.md) or the [Simplified Chinese example](zh/USER_GUIDE.md#sql-示例).

@@ -7,6 +7,7 @@ Start with installation, then use the workspace guide or API examples for your t
 | [Installation](INSTALLATION.md) | Python, PostgreSQL, credentials and service setup. |
 | [Workspace](USER_GUIDE.md) | Queries, corrections, history and data changes. |
 | [简体中文指南](zh/USER_GUIDE.md) | 简体中文工作区使用说明。 |
+| [SQL examples](NL2SQL_EXAMPLES.md) | Verified queries, results and a runnable tutorial. |
 | [Query API](NATURAL_LANGUAGE.md) | Planning, review, confirmation and saved queries. |
 | [JEV providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
@@ -20,7 +21,3 @@ Start with installation, then use the workspace guide or API examples for your t
 | [Dependencies](DEPENDENCIES.md) | Libraries and external services. |
 
 The running service exposes OpenAPI documentation at `/docs`. Runnable operator clients are in [examples/operators](../examples/operators/README.md). See [contribution guidance](../CONTRIBUTING.md) to change the code or documentation.
-
-## Examples
-
-[Verified natural language to SQL](NL2SQL_EXAMPLES.md) includes generated queries and results. The [simple-query tutorial](../examples/nl2sql/README.md) provides data and a reproducible comparison with GPT-5.6 Terra.

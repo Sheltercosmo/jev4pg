@@ -45,7 +45,7 @@ ORDER BY
   SUM("r0"."quantity") DESC NULLS LAST
 ```
 
-The result is Birch: 36, Aster: 30, Cedar: 8. The query groups repeated suppliers and ignores the unknown quantity when summing. SQL performs the calculation; JEV selects the meaning and structure.
+Result: Birch: 36, Aster: 30, Cedar: 8. JEV selects the query structure; SQL performs the calculation.
 
 See [verified examples](docs/NL2SQL_EXAMPLES.md) for filtering, averages and the runnable dataset. Preview a proposal, inspect its decisions, and approve it when it matches your intent.
 
@@ -77,11 +77,7 @@ Open the [English workspace](http://127.0.0.1:8000/ask/en) or [Simplified Chines
 
 ## Query your data
 
-Select a dataset and enter a question such as:
-
-> For each supplier, show the total quantity delivered, largest total first.
-
-Choose Preview plan to inspect the SQL. You can edit a planning decision, select an alternative interpretation or edit the SQL directly. Run the query when the proposal matches your intent. Data changes require a separate commit.
+Select a dataset, enter your question and choose Preview plan to inspect the SQL. You can edit a planning decision, select an alternative interpretation or edit the SQL directly. Run the query when the proposal matches your intent. Data changes require a separate commit.
 
 The same workflow is available through `POST /ask`:
 
@@ -117,19 +113,17 @@ Use the [operator guide](docs/JEV_OPERATORS.md) to select an operator and set bu
 
 ## Simple-query performance
 
-On the version 0.5.0 tutorial check, JEV-only planning matched GPT-5.6 Terra's SQL answer agreement: 11/11 proposals, with no LLM generation calls. Hybrid planning also matched all 11.
+JEV matched GPT-5.6 Terra's results on the version 0.5.0 tutorial without LLM generation.
 
-| Method | Matching SQL proposals | Median time | LLM calls |
-| --- | ---: | ---: | ---: |
-| JEV | 11/11 | 5.51 s | 0 |
-| GPT-5.6 Terra | 11/11 | 4.94 s | 11 |
-| JEV + GPT-5.6 Terra | 11/11 | 7.21 s | 11 |
+| Method | Matching SQL proposals | Median time |
+| --- | ---: | ---: |
+| JEV | 11/11 | 5.51 s |
+| GPT-5.6 Terra | 11/11 | 4.94 s |
+| JEV + GPT-5.6 Terra | 11/11 | 7.21 s |
 
-The check contains eight basic objectives and three paired variations across two small synthetic datasets. All JEV and hybrid proposals were held for review and scored by executing their SQL in the evaluation. These results describe proposed answers, not automatic execution accuracy. Terra timing includes local CLI startup.
+The sample contains eight basic objectives and three paired variations on small synthetic datasets. All JEV and hybrid proposals required review and were scored through execution. Terra timing includes CLI startup. Complex queries require a separate evaluation.
 
-The [data, runner and results](examples/nl2sql/README.md) are included. See [performance and cost](docs/PERFORMANCE_AND_COST.md) for token usage, scoring and scope. Complex queries and new domains require their own evaluation.
-
-Independent JEV decisions can run in parallel, and compatible evidence can be reused. [Local and hosted providers](docs/PROVIDERS.md) use the same operator interface, with cached judgments isolated by provider and revision.
+See [performance and cost](docs/PERFORMANCE_AND_COST.md) for measurement details and the [runnable tutorial](examples/nl2sql/README.md) to reproduce the check.
 
 ## Documentation and contributions
 
