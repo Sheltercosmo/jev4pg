@@ -1,9 +1,11 @@
 //! Typed semantic evaluation. PostgreSQL owns source selection and arithmetic.
 
 pub mod evidence;
+pub mod registry;
 pub mod source;
 
-use evidence::{Observation, Policy};
+use evidence::{Observation, Policy, request_identity};
+use registry::{Registry, RegistryConfig, SavedObservation};
 
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
@@ -169,12 +171,21 @@ pub struct Usage {
     pub judgments: usize,
     pub input_bytes: usize,
     pub reused_rows: usize,
+    pub durable_reused_rows: usize,
+    pub stored_observations: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Receipt {
+    pub attempt_id: String,
+    pub storage_state: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Evaluation {
     pub decisions: Decisions,
     pub observation: Option<Observation>,
+    pub receipt: Option<Receipt>,
 }
 
 pub struct EvaluationInput<'a> {
@@ -187,6 +198,7 @@ impl Evaluation {
         Self {
             decisions: unexecuted(questions, state, reason),
             observation: None,
+            receipt: None,
         }
     }
 }
@@ -199,6 +211,7 @@ pub struct Executor {
     cache: HashMap<String, Evaluation>,
     cache_bytes: usize,
     pub usage: Usage,
+    registry: Option<Registry>,
 }
 
 impl Executor {
@@ -235,7 +248,20 @@ impl Executor {
             cache: HashMap::new(),
             cache_bytes: 0,
             usage: Usage::default(),
+            registry: None,
         })
+    }
+
+    pub fn enable_registry(
+        &mut self,
+        config: RegistryConfig,
+        scope: String,
+    ) -> Result<(), &'static str> {
+        let identity = evidence::EvaluatorIdentity::from(&self.provider);
+        let capacity = config.max_active as usize;
+        self.registry = Some(Registry::new(config, scope, identity.endpoint_sha256)?);
+        self.limits.concurrency = self.limits.concurrency.min(capacity);
+        Ok(())
     }
 
     pub fn evaluate(
@@ -263,6 +289,26 @@ impl Executor {
         for input in inputs {
             validate_questions(input.questions)?;
         }
+        let mut identities = HashMap::new();
+        if self.registry.is_some() {
+            for (index, input) in inputs.iter().enumerate() {
+                let (active, _) = applicable_questions(input.source, input.questions)?;
+                if !active.is_empty() {
+                    identities.insert(
+                        index,
+                        request_identity(input.source, &active, &self.provider)?,
+                    );
+                }
+            }
+        }
+        let durable = if let Some(registry) = &mut self.registry {
+            let mut keys: Vec<_> = identities.values().cloned().collect();
+            keys.sort_unstable();
+            keys.dedup();
+            block_on_checked(&self.runtime, registry.lookup(&keys), &mut check_interrupt)
+        } else {
+            Ok(HashMap::new())
+        };
         let mut results: Vec<Option<Evaluation>> = vec![None; inputs.len()];
         let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
         let mut requests = Vec::new();
@@ -275,6 +321,7 @@ impl Executor {
                 results[index] = Some(Evaluation {
                     decisions: skipped,
                     observation: None,
+                    receipt: None,
                 });
                 continue;
             }
@@ -292,11 +339,48 @@ impl Executor {
                 continue;
             }
             if let Some(indices) = aliases.get_mut(&key) {
+                if let Some(result) = &results[indices[0]] {
+                    output_bytes += serde_json::to_vec(result)
+                        .map_err(|_| "Invalid reused result")?
+                        .len();
+                    if output_bytes > 8_000_000 {
+                        return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
+                    }
+                }
                 indices.push(index);
                 self.usage.reused_rows += 1;
                 continue;
             }
             aliases.insert(key.clone(), vec![index]);
+            if self.registry.is_some() {
+                match &durable {
+                    Ok(saved) => {
+                        if let Some(observation) = saved.get(&identities[&index]) {
+                            let mut evaluation =
+                                replay(observation, row, &active, &self.provider, &self.limits);
+                            evaluation.decisions.extend(skipped);
+                            output_bytes += serde_json::to_vec(&evaluation)
+                                .map_err(|_| "Invalid stored result")?
+                                .len();
+                            if output_bytes > 8_000_000 {
+                                return Err(
+                                    "Semantic result batch exceeds 8 MB; reduce batch_rows",
+                                );
+                            }
+                            results[index] = Some(evaluation);
+                            self.usage.reused_rows += 1;
+                            continue;
+                        }
+                    }
+                    Err(reason) => {
+                        let mut evaluation =
+                            Evaluation::unexecuted(&active, "COORDINATION_UNAVAILABLE", reason);
+                        evaluation.decisions.extend(skipped);
+                        results[index] = Some(evaluation);
+                        continue;
+                    }
+                }
+            }
             let mut provider_questions =
                 serde_json::to_value(&active).map_err(|_| "Invalid questions")?;
             for question in provider_questions.as_object_mut().unwrap().values_mut() {
@@ -309,65 +393,92 @@ impl Executor {
             if bytes > 1_000_000 {
                 return Err("One semantic input exceeds the 1 MB context limit");
             }
-            if self.usage.judgments + active.len() > self.limits.max_judgments
-                || self.usage.requests + 1 > self.limits.max_requests
-                || self.usage.input_bytes + bytes > self.limits.max_input_bytes
-            {
-                let mut held = Evaluation::unexecuted(
-                    &active,
-                    "BLOCKED_BY_BUDGET",
-                    "Native query budget exhausted",
-                );
-                held.decisions.extend(skipped);
-                results[index] = Some(held);
-                continue;
-            }
-            self.usage.judgments += active.len();
-            self.usage.requests += 1;
-            self.usage.input_bytes += bytes;
-            requests.push((key, payload, row, active, skipped));
+            requests.push((
+                key,
+                payload,
+                row,
+                active,
+                skipped,
+                identities.get(&index).cloned(),
+                bytes,
+            ));
         }
         let provider = &self.provider;
         let client = &self.client;
         let limits = &self.limits;
         let cache = &mut self.cache;
         let cache_bytes = &mut self.cache_bytes;
+        let registry = self.registry.as_ref();
+        let usage = &mut self.usage;
+        let budget = tokio::sync::Mutex::new(RequestBudget {
+            requests: usage.requests,
+            judgments: usage.judgments,
+            input_bytes: usage.input_bytes,
+        });
+        let context = RequestContext {
+            client,
+            provider,
+            limits,
+            registry,
+            budget: &budget,
+        };
         self.runtime.block_on(async {
-            let pending = stream::iter(requests.into_iter().map(|(key, payload, row, active, skipped)| async move {
-                let response = send(client, provider, payload).await.and_then(|value| {
-                    let observation = Observation::capture(row, &active, provider, value)?;
-                    let decisions = observation.decide(row, Policy { accept: limits.accept, reject: limits.reject })?;
-                    Ok(Evaluation { decisions, observation: Some(observation) })
-                });
-                let mut evaluation = response.unwrap_or_else(|reason| Evaluation::unexecuted(&active, "FAILED", reason));
-                evaluation.decisions.extend(skipped);
-                (key, evaluation)
-            })).buffer_unordered(limits.concurrency);
+            let pending = stream::iter(requests.into_iter().map(
+                |(key, payload, row, active, skipped, identity, bytes)| async move {
+                    let mut evaluation = context
+                        .evaluate(identity.as_deref(), row, &active, payload, bytes)
+                        .await;
+                    evaluation.decisions.extend(skipped);
+                    (key, evaluation)
+                },
+            ))
+            .buffer_unordered(limits.concurrency);
             futures_util::pin_mut!(pending);
             let mut tick = tokio::time::interval(Duration::from_millis(25));
             loop {
-                tokio::select! {
-                    item = pending.next() => {
-                        let Some((key, decisions)) = item else { break; };
-                        let bytes = serde_json::to_vec(&decisions).map_err(|_| "Invalid result")?.len();
-                        output_bytes += bytes * aliases[&key].len();
-                        if output_bytes > 8_000_000 {
-                            return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
-                        }
-                        if decisions.observation.is_some() {
-                            let entry_bytes = key.len() + bytes;
-                            if *cache_bytes + entry_bytes > 8_000_000 { cache.clear(); *cache_bytes = 0; }
-                            if entry_bytes <= 8_000_000 {
-                                cache.insert(key.clone(), decisions.clone()); *cache_bytes += entry_bytes;
-                            }
-                        }
-                        for index in &aliases[&key] { results[*index] = Some(decisions.clone()); }
+                let item = tokio::select! {
+                    item = pending.next() => item,
+                    _ = tick.tick() => {
+                        check_interrupt();
+                        continue;
                     },
-                    _ = tick.tick() => check_interrupt(),
+                };
+                let Some((key, evaluation)) = item else { break };
+                if let Some(receipt) = &evaluation.receipt {
+                    match receipt.storage_state.as_str() {
+                        "STORED" => usage.stored_observations += 1,
+                        "REUSED" => usage.reused_rows += 1,
+                        _ => {}
+                    }
+                }
+                let bytes = serde_json::to_vec(&evaluation)
+                    .map_err(|_| "Invalid result")?
+                    .len();
+                output_bytes += bytes * aliases[&key].len();
+                if output_bytes > 8_000_000 {
+                    return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
+                }
+                if evaluation.observation.is_some() {
+                    let entry_bytes = key.len() + bytes;
+                    if *cache_bytes + entry_bytes > 8_000_000 {
+                        cache.clear();
+                        *cache_bytes = 0;
+                    }
+                    if entry_bytes <= 8_000_000 {
+                        cache.insert(key.clone(), evaluation.clone());
+                        *cache_bytes += entry_bytes;
+                    }
+                }
+                for index in &aliases[&key] {
+                    results[*index] = Some(evaluation.clone());
                 }
             }
             Ok::<_, &'static str>(())
         })?;
+        let budget = budget.into_inner();
+        self.usage.requests = budget.requests;
+        self.usage.judgments = budget.judgments;
+        self.usage.input_bytes = budget.input_bytes;
         for indices in aliases.values() {
             if let Some(result) = results[indices[0]].clone() {
                 for index in indices {
@@ -375,10 +486,223 @@ impl Executor {
                 }
             }
         }
+        self.usage.durable_reused_rows += results
+            .iter()
+            .flatten()
+            .filter(|evaluation| {
+                evaluation
+                    .receipt
+                    .as_ref()
+                    .is_some_and(|receipt| receipt.storage_state == "REUSED")
+            })
+            .count();
         results
             .into_iter()
             .map(|v| v.ok_or("Native execution lost a result identity"))
             .collect()
+    }
+}
+
+fn block_on_checked<T>(
+    runtime: &tokio::runtime::Runtime,
+    future: impl std::future::Future<Output = T>,
+    check_interrupt: &mut impl FnMut(),
+) -> T {
+    runtime.block_on(async {
+        futures_util::pin_mut!(future);
+        let mut tick = tokio::time::interval(Duration::from_millis(25));
+        loop {
+            tokio::select! {
+                result = &mut future => return result,
+                _ = tick.tick() => check_interrupt(),
+            }
+        }
+    })
+}
+
+fn replay(
+    saved: &SavedObservation,
+    row: &Value,
+    questions: &Questions,
+    provider: &Provider,
+    limits: &Limits,
+) -> Evaluation {
+    let policy = Policy {
+        accept: limits.accept,
+        reject: limits.reject,
+    };
+    match saved
+        .observation
+        .decide_for(row, questions, provider, policy)
+    {
+        Ok(decisions) => Evaluation {
+            decisions,
+            observation: Some(saved.observation.clone()),
+            receipt: Some(Receipt {
+                attempt_id: saved.attempt.clone(),
+                storage_state: "REUSED".into(),
+            }),
+        },
+        Err(reason) => {
+            let mut result = Evaluation::unexecuted(questions, "FAILED", reason);
+            result.receipt = Some(Receipt {
+                attempt_id: saved.attempt.clone(),
+                storage_state: "REJECTED".into(),
+            });
+            result
+        }
+    }
+}
+
+struct RequestBudget {
+    requests: usize,
+    judgments: usize,
+    input_bytes: usize,
+}
+
+#[derive(Clone, Copy)]
+struct RequestContext<'a> {
+    client: &'a reqwest::Client,
+    provider: &'a Provider,
+    limits: &'a Limits,
+    registry: Option<&'a Registry>,
+    budget: &'a tokio::sync::Mutex<RequestBudget>,
+}
+
+impl RequestContext<'_> {
+    async fn evaluate(
+        &self,
+        identity: Option<&str>,
+        row: &Value,
+        questions: &Questions,
+        payload: Value,
+        input_bytes: usize,
+    ) -> Evaluation {
+        // Serialize admission only; provider requests remain concurrent.
+        let mut budget = self.budget.lock().await;
+        if budget.requests + 1 > self.limits.max_requests
+            || budget.judgments + questions.len() > self.limits.max_judgments
+            || budget.input_bytes + input_bytes > self.limits.max_input_bytes
+        {
+            return Evaluation::unexecuted(
+                questions,
+                "BLOCKED_BY_BUDGET",
+                "Native query budget exhausted",
+            );
+        }
+        let mut attempt = None;
+        if let Some(registry) = self.registry {
+            let claim = match registry
+                .claim(
+                    identity.expect("Registered requests have an identity"),
+                    self.limits.timeout_ms,
+                )
+                .await
+            {
+                Ok(claim) => claim,
+                Err(reason) => {
+                    return Evaluation::unexecuted(questions, "COORDINATION_UNAVAILABLE", reason);
+                }
+            };
+            if claim.state == "READY" {
+                if let (Some(attempt), Some(observation)) = (claim.attempt, claim.observation) {
+                    return replay(
+                        &SavedObservation {
+                            attempt,
+                            observation,
+                        },
+                        row,
+                        questions,
+                        self.provider,
+                        self.limits,
+                    );
+                }
+                return Evaluation::unexecuted(
+                    questions,
+                    "FAILED",
+                    "Incomplete stored evidence receipt",
+                );
+            }
+            if claim.state != "CLAIMED" {
+                let status = match claim.state.as_str() {
+                    "DISPATCHING" => "BLOCKED_BY_CONCURRENCY",
+                    "SATURATED" => "COORDINATION_SATURATED",
+                    "BLOCKED_BY_BUDGET" => "BLOCKED_BY_BUDGET",
+                    "UNCERTAIN" => "UNCERTAIN",
+                    "FAILED" => "FAILED",
+                    "CLOSED" => "BLOCKED_BY_REVIEW",
+                    _ => "COORDINATION_UNAVAILABLE",
+                };
+                let mut result = Evaluation::unexecuted(
+                    questions,
+                    status,
+                    "Native request was not admitted; inspect its durable attempt before retrying",
+                );
+                result.receipt = claim.attempt.map(|id| Receipt {
+                    attempt_id: id,
+                    storage_state: claim.state,
+                });
+                return result;
+            }
+            attempt = claim.attempt;
+            if attempt.is_none() {
+                return Evaluation::unexecuted(
+                    questions,
+                    "COORDINATION_UNAVAILABLE",
+                    "Missing dispatch receipt",
+                );
+            }
+        }
+        budget.requests += 1;
+        budget.judgments += questions.len();
+        budget.input_bytes += input_bytes;
+        drop(budget);
+        let response = send(self.client, self.provider, payload).await;
+        let transport_failed = response.is_err();
+        let evaluated = response.and_then(|value| {
+            let observation = Observation::capture(row, questions, self.provider, value)?;
+            let decisions = observation.decide_for(
+                row,
+                questions,
+                self.provider,
+                Policy {
+                    accept: self.limits.accept,
+                    reject: self.limits.reject,
+                },
+            )?;
+            Ok(Evaluation {
+                decisions,
+                observation: Some(observation),
+                receipt: None,
+            })
+        });
+        let failure = if transport_failed && self.registry.is_some() {
+            "UNCERTAIN"
+        } else {
+            "FAILED"
+        };
+        let mut evaluation =
+            evaluated.unwrap_or_else(|reason| Evaluation::unexecuted(questions, failure, reason));
+        if let (Some(registry), Some(attempt)) = (self.registry, attempt) {
+            let state = match registry
+                .finish(
+                    &attempt,
+                    evaluation.observation.as_ref(),
+                    evaluation.observation.is_none().then_some(failure),
+                )
+                .await
+            {
+                Ok(true) if evaluation.observation.is_some() => "STORED",
+                Ok(true) => failure,
+                Ok(false) => "FENCED",
+                Err(_) => "UNCONFIRMED",
+            };
+            evaluation.receipt = Some(Receipt {
+                attempt_id: attempt,
+                storage_state: state.into(),
+            });
+        }
+        evaluation
     }
 }
 

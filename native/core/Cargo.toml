@@ -9,6 +9,7 @@ publish.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "hickory-dns"] }
-tokio = { version = "1", features = ["rt", "net", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "net", "time", "macros", "sync"] }
+tokio-postgres = { version = "0.7.18", features = ["with-serde_json-1"] }
 futures-util = "0.3"
 sha2 = "0.10"

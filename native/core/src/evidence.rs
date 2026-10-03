@@ -83,14 +83,48 @@ impl Observation {
     }
 
     pub fn decide(&self, source: &Value, policy: Policy) -> Result<Decisions, &'static str> {
-        if self.format_version != 1 {
-            return Err("Unsupported observation format");
-        }
+        self.validate_envelope()?;
         if self.context_sha256 != context_identity(source)? {
             return Err("Observation context does not match the supplied source");
         }
+        policy.validate()?;
+        resolve(
+            &self.response,
+            &self.questions,
+            &self.evaluator.model,
+            policy.accept,
+            policy.reject,
+        )
+    }
+
+    pub fn decide_for(
+        &self,
+        source: &Value,
+        questions: &Questions,
+        provider: &Provider,
+        policy: Policy,
+    ) -> Result<Decisions, &'static str> {
+        if self.identity()? != request_identity(source, questions, provider)? {
+            return Err(
+                "Observation does not match the requested context, questions and evaluator",
+            );
+        }
+        self.decide(source, policy)
+    }
+
+    pub fn identity(&self) -> Result<String, &'static str> {
+        self.validate_envelope()?;
+        evidence_identity(&self.context_sha256, &self.questions, &self.evaluator)
+    }
+
+    fn validate_envelope(&self) -> Result<(), &'static str> {
+        if self.format_version != 1 {
+            return Err("Unsupported observation format");
+        }
         if self.evaluator.model.is_empty()
             || self.evaluator.revision.is_empty()
+            || self.context_sha256.len() != 64
+            || !self.context_sha256.bytes().all(|c| c.is_ascii_hexdigit())
             || self.evaluator.endpoint_sha256.len() != 64
             || !self
                 .evaluator
@@ -100,16 +134,33 @@ impl Observation {
         {
             return Err("Incomplete evaluator identity");
         }
-        policy.validate()?;
         validate_questions(&self.questions)?;
-        resolve(
-            &self.response,
-            &self.questions,
-            &self.evaluator.model,
-            policy.accept,
-            policy.reject,
-        )
+        Ok(())
     }
+}
+
+pub fn request_identity(
+    source: &Value,
+    questions: &Questions,
+    provider: &Provider,
+) -> Result<String, &'static str> {
+    validate_questions(questions)?;
+    evidence_identity(&context_identity(source)?, questions, &provider.into())
+}
+
+fn evidence_identity(
+    context: &str,
+    questions: &Questions,
+    evaluator: &EvaluatorIdentity,
+) -> Result<String, &'static str> {
+    let mut hash = Sha256::new();
+    hash.update(b"jev-evidence-v1");
+    hash_bytes(&mut hash, context.as_bytes());
+    hash_value(
+        &mut hash,
+        &serde_json::to_value((questions, evaluator)).map_err(|_| "Invalid evidence identity")?,
+    )?;
+    Ok(format!("{:x}", hash.finalize()))
 }
 
 pub fn context_identity(source: &Value) -> Result<String, &'static str> {

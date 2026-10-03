@@ -76,7 +76,7 @@ def must_fail(operation, fragment=None):
     raise AssertionError("Expected PostgreSQL to reject the operation")
 
 
-def verify(connection):
+def verify(connection, config):
     global peak
     checks = []
 
@@ -326,6 +326,12 @@ def verify(connection):
     multi_checks, multi_metrics = verify_multi_source(connection, observations, gates, must_fail)
     checks.extend(multi_checks)
     checks.extend(verify_application(connection, observations))
+    from registry import verify_registry
+
+    checks.extend(verify_registry(connection))
+    from registry_runtime import verify_registry_runtime
+
+    checks.extend(verify_registry_runtime(connection, observations, gates, config))
     return {
         "checks": checks,
         "passed": len(checks),
@@ -393,7 +399,7 @@ def main():
                 with psycopg.connect(
                     host="127.0.0.1", port=port, dbname="postgres", autocommit=True
                 ) as connection:
-                    result = verify(connection)
+                    result = verify(connection, config)
                 (ROOT / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
                 print(json.dumps(result, indent=2))
             except BaseException:

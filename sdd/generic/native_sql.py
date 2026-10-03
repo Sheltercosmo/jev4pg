@@ -203,7 +203,9 @@ def _usage(connection, relation):
                coalesce(max((usage->>'requests')::bigint),0) AS requests,
                coalesce(max((usage->>'judgments')::bigint),0) AS new_evaluations,
                coalesce(max((usage->>'input_bytes')::bigint),0) AS input_bytes,
-               coalesce(max((usage->>'reused_rows')::bigint),0) AS reused_rows
+               coalesce(max((usage->>'reused_rows')::bigint),0) AS reused_rows,
+               coalesce(max((usage->>'durable_reused_rows')::bigint),0) AS durable_reused_rows,
+               coalesce(max((usage->>'stored_observations')::bigint),0) AS stored_observations
         FROM {relation}
     """)
         )
@@ -340,6 +342,7 @@ def execute_native(
         name = "_jev_" + uid()
         relation = 'pg_temp."' + name + '"'
         options = {
+            "evidence_scope": tenant,
             "max_rows": max_rows,
             "max_judgments": max_evaluations,
             "max_requests": admission.reserved,
@@ -396,6 +399,12 @@ def execute_native(
             )
         ):
             evaluators.append(row[0])
+        receipts = [
+            row[0]
+            for row in connection.execute(
+                text(f"SELECT DISTINCT receipt FROM {relation} WHERE receipt IS NOT NULL")
+            )
+        ]
         complete = not totals["unresolved"]
         if not complete and not partial_allowed:
             raise ValueError(
@@ -425,7 +434,10 @@ def execute_native(
             "semantic_snapshot_state": "NOT_EVALUATED",
             "semantic_coverage": dict(totals),
             "evidence": details,
-            "evidence_retention": "coverage_summary",
+            "evidence_retention": "native_registry"
+            if totals["stored_observations"] or totals["durable_reused_rows"]
+            else "coverage_summary",
+            "evidence_receipts": receipts,
             "evaluator": evaluators,
             "decision_policy": {"accept": accept, "reject": reject},
             "complete": complete,

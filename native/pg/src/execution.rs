@@ -1,3 +1,4 @@
+use jev_executor::registry::RegistryConfig;
 use jev_executor::source::{MAX_CONTEXT_BYTES, parse_source};
 use jev_executor::{EvaluationInput, Executor, Limits, Provider, Questions, validate_questions};
 use pgrx::JsonB;
@@ -6,7 +7,15 @@ use serde_json::Value;
 use std::collections::{HashSet, VecDeque};
 use std::ffi::CString;
 
-pub type ResultRow = (String, i64, JsonB, JsonB, Option<JsonB>, JsonB);
+pub type ResultRow = (
+    String,
+    i64,
+    JsonB,
+    JsonB,
+    Option<JsonB>,
+    JsonB,
+    Option<JsonB>,
+);
 
 pub struct SourceSpec {
     id: String,
@@ -201,7 +210,22 @@ pub struct SemanticScan {
 }
 
 impl SemanticScan {
-    pub fn new(sources: Vec<SourceSpec>, options: Value, fcinfo: pg_sys::FunctionCallInfo) -> Self {
+    pub fn new(
+        sources: Vec<SourceSpec>,
+        mut options: Value,
+        fcinfo: pg_sys::FunctionCallInfo,
+    ) -> Self {
+        let settings = options
+            .as_object_mut()
+            .unwrap_or_else(|| error!("Execution options must be an object"));
+        let scope = settings
+            .remove("evidence_scope")
+            .unwrap_or_else(|| Value::String(String::new()));
+        let scope = scope
+            .as_str()
+            .filter(|scope| scope.len() <= 200)
+            .unwrap_or_else(|| error!("Evidence scope must be at most 200 bytes of text"));
+        let max_age = settings.remove("evidence_max_age_seconds");
         let limits: Limits = serde_json::from_value(options)
             .unwrap_or_else(|_| error!("Invalid native execution options"));
         limits
@@ -212,10 +236,47 @@ impl SemanticScan {
         });
         let config = std::fs::read_to_string(config_path)
             .unwrap_or_else(|_| error!("Cannot read native provider configuration"));
-        let provider: Provider = serde_json::from_str(&config)
+        let mut config: Value = serde_json::from_str(&config)
             .unwrap_or_else(|_| error!("Invalid native provider configuration"));
-        let executor =
+        let registry = config
+            .as_object_mut()
+            .unwrap_or_else(|| error!("Invalid native provider configuration"))
+            .remove("registry");
+        let provider: Provider = serde_json::from_value(config)
+            .unwrap_or_else(|_| error!("Invalid native provider configuration"));
+        let mut executor =
             Executor::new(provider, limits).unwrap_or_else(|message| error!("{}", message));
+        if let Some(registry) = registry {
+            let mut registry: RegistryConfig = serde_json::from_value(registry)
+                .unwrap_or_else(|_| error!("Invalid native registry configuration"));
+            if let Some(max_age) = max_age {
+                let age = max_age
+                    .as_u64()
+                    .filter(|age| {
+                        (0..=31_536_000).contains(&registry.max_age_seconds)
+                            && *age <= registry.max_age_seconds as u64
+                    })
+                    .unwrap_or_else(|| {
+                        error!("Evidence age must not exceed the administrator's configured limit")
+                    });
+                registry.max_age_seconds = age as i32;
+            }
+            let database = unsafe { pg_sys::MyDatabaseId };
+            let identity = unsafe {
+                serde_json::json!({
+                    "cluster": pg_sys::GetSystemIdentifier().to_string(),
+                    "database": database.to_string(),
+                    "role": pg_sys::GetUserId().to_string(),
+                    "scope": scope,
+                })
+            }
+            .to_string();
+            executor
+                .enable_registry(registry, identity)
+                .unwrap_or_else(|message| error!("{}", message));
+        } else if max_age.is_some() {
+            error!("Evidence age requires an administrator-configured registry");
+        }
         let sources = sources
             .into_iter()
             .map(|source| SourceCursor::open(source, fcinfo))
@@ -315,6 +376,9 @@ impl Iterator for SemanticScan {
                     JsonB(serde_json::to_value(observation).expect("Observations serialize"))
                 }),
                 JsonB(serde_json::to_value(&self.executor.usage).expect("Usage serializes")),
+                evaluation.receipt.map(|receipt| {
+                    JsonB(serde_json::to_value(receipt).expect("Receipt serializes"))
+                }),
             ));
         }
         self.pending.pop_front()

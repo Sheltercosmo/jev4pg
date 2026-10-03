@@ -22,6 +22,7 @@ fn scan(
         name!(decisions, JsonB),
         name!(observation, Option<JsonB>),
         name!(usage, JsonB),
+        name!(receipt, Option<JsonB>),
     ),
 > {
     let source_sql = source_sql.unwrap_or_else(|| error!("Source SELECT is required"));
@@ -29,8 +30,8 @@ fn scan(
     let options = options.unwrap_or_else(|| error!("Execution options are required"));
     let source = SourceSpec::new("source".into(), source_sql.into(), questions.0);
     TableIterator::new(SemanticScan::new(vec![source], options.0, fcinfo).map(
-        |(_, ordinal, source, decisions, observation, usage)| {
-            (ordinal, source, decisions, observation, usage)
+        |(_, ordinal, source, decisions, observation, usage, receipt)| {
+            (ordinal, source, decisions, observation, usage, receipt)
         },
     ))
 }
@@ -49,6 +50,7 @@ fn scan_many(
         name!(decisions, JsonB),
         name!(observation, Option<JsonB>),
         name!(usage, JsonB),
+        name!(receipt, Option<JsonB>),
     ),
 > {
     let sources = sources.unwrap_or_else(|| error!("Independent source declarations are required"));
@@ -114,3 +116,5 @@ COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS
     name = "native_permissions",
     requires = [scan, scan_many, require_bool, decide]
 );
+
+extension_sql_file!("../sql/registry.sql", name = "native_registry");

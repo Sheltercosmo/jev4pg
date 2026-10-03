@@ -63,7 +63,7 @@ FROM jev_native.scan(
 
 Put exact filters and required columns inside the source SELECT. An outer `WHERE` or `LIMIT` does not promise to reduce semantic work. Source rows retain PostgreSQL JSON representations, including NULLs, Unicode and numeric values. Include a stable key when results need to identify individual rows.
 
-The result has `ordinal`, `source`, `decisions`, `observation` and `usage` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
+The result has `ordinal`, `source`, `decisions`, `observation`, `usage` and `receipt` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
 
 `usage` contains cumulative admitted requests, judgments, input bytes and reused rows. Take the maximum of each field across a completed scan, rather than adding the repeated counters. A request may fail after admission; these counters measure admission for dispatch, not provider billing.
 
@@ -106,6 +106,8 @@ The result adds `source_id` to the single-source columns. `ordinal` starts at 1 
 `usage` is cumulative for the entire invocation. Take its maximum once over the complete result; summing per-source maxima would count requests more than once. This interface accepts an independent frontier only. A question that needs another stage's output belongs in a subsequent stage.
 
 ## Save and reconsider evidence
+
+For automatic reuse and request coordination across queries, configure the [native evidence registry](../docs/NATIVE_EVIDENCE.md). It stores observations independently of the source transaction and returns request receipts. The examples below remain useful for explicit evidence tables.
 
 An observation contains the model response, question definitions, evaluator revision, receipt time and a SHA-256 identity of the projected context. The provider URL and API key are not exported. Observations are separate from decisions: a valid uncertain answer has an observation; skipped or failed work has SQL NULL in `observation`.
 
@@ -189,12 +191,12 @@ Incomplete evidence permits only a proven partial read: direct semantic projecti
 
 One native invocation evaluates the query's independent source populations, sharing question-context reuse, concurrency and query allowances. Database reservations share `SDD_DAILY_EVALUATIONS` with existing Python model calls. Completed scans settle their request count once and return unused allowance. Cancellation or a crash with an unknown dispatch count retains the reserved allowance; it does not assume the request was free. Direct SQL clients using `scan` or `scan_many` have their own explicit scan limits and are outside this application quota.
 
-`SDD_NATIVE_CONCURRENCY` sets concurrent requests across the query's source populations (default 4). `SDD_NATIVE_MAX_ROWS` bounds their combined row count (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). Shared limits on simultaneous requests across PostgreSQL sessions are still planned.
+`SDD_NATIVE_CONCURRENCY` sets concurrent requests across the query's source populations (default 4). `SDD_NATIVE_MAX_ROWS` bounds their combined row count (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). The optional native registry adds provider admission across PostgreSQL sessions.
 
-Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still require `SDD_SEMANTIC_ENGINE=python`, the default. Native mode reports these unsupported paths explicitly. Ordinary relational mutations retain the existing preview and confirmation flow. The query service currently retains coverage summaries; use explicit saved observation tables when raw evidence must survive the query.
+Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still require `SDD_SEMANTIC_ENGINE=python`, the default. Native mode reports these unsupported paths explicitly. Ordinary relational mutations retain the existing preview and confirmation flow. With the registry configured, the query service retains durable receipts; otherwise it retains coverage summaries and explicit saved observation tables remain available.
 
 ## Remaining integration
 
-Automatic observation reuse currently belongs to one scan invocation. Saved observations support explicit replay across sessions, and the application coordinates query and daily request admission. Automatic evidence lookup, concurrent claims, shared in-flight concurrency, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
+The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Reuse across differently packed question batches, dependent native stages, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
 
 Model calls are external effects: transaction rollback cannot undo provider usage. Synchronous scans hold a PostgreSQL backend while inference runs. Restrict execution grants during development and use the released queue interface where its asynchronous behavior is required.

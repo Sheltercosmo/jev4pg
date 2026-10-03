@@ -1,4 +1,4 @@
-use jev_executor::evidence::{Observation, Policy, context_identity};
+use jev_executor::evidence::{Observation, Policy, context_identity, request_identity};
 use jev_executor::{Decision, Provider};
 use serde_json::{Value, json};
 
@@ -115,4 +115,72 @@ fn changed_context_and_invalid_evidence_cannot_be_replayed() {
     ] {
         assert!(evidence.decide(&source, policy).is_err());
     }
+}
+
+#[test]
+fn automatic_reuse_requires_the_expected_question_and_pinned_evaluator() {
+    let source = json!({"说明":"完成", "amount":null});
+    let evidence = capture(&source, "任务完成了吗？");
+    let provider = Provider {
+        endpoint: "https://provider.example/v1/systemone".into(),
+        model: "test-v1".into(),
+        revision: "revision-3".into(),
+        api_key: "rotated-credential".into(),
+    };
+    let expected = request_identity(&source, &evidence.questions, &provider).unwrap();
+    assert_eq!(evidence.identity().unwrap(), expected);
+    assert!(
+        evidence
+            .decide_for(&source, &evidence.questions, &provider, Policy::default())
+            .is_ok()
+    );
+    for (field, value) in [
+        ("endpoint", "https://other.example/v1/systemone"),
+        ("model", "v2"),
+        ("revision", "revision-4"),
+    ] {
+        let mut changed = provider.clone();
+        match field {
+            "endpoint" => changed.endpoint = value.into(),
+            "model" => changed.model = value.into(),
+            _ => changed.revision = value.into(),
+        }
+        assert_ne!(
+            request_identity(&source, &evidence.questions, &changed).unwrap(),
+            expected
+        );
+        assert!(
+            evidence
+                .decide_for(&source, &evidence.questions, &changed, Policy::default())
+                .is_err()
+        );
+    }
+    let mut questions = evidence.questions.clone();
+    questions.get_mut("q").unwrap().instructions = json!("Has the work started?");
+    assert!(
+        evidence
+            .decide_for(&source, &questions, &provider, Policy::default())
+            .is_err()
+    );
+    questions = evidence.questions.clone();
+    questions.get_mut("q").unwrap().subject_column = Some("说明".into());
+    assert!(
+        evidence
+            .decide_for(&source, &questions, &provider, Policy::default())
+            .is_err()
+    );
+    let renamed = json!({"description":"完成", "amount":null});
+    assert!(
+        evidence
+            .decide_for(&renamed, &evidence.questions, &provider, Policy::default())
+            .is_err()
+    );
+    let mut corrupt = evidence;
+    corrupt.response["answers"]["q"]["noul"] = json!(true);
+    assert_eq!(corrupt.identity().unwrap(), expected);
+    assert!(
+        corrupt
+            .decide_for(&source, &corrupt.questions, &provider, Policy::default())
+            .is_err()
+    );
 }

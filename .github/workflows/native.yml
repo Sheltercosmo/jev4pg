@@ -74,5 +74,6 @@ jobs:
             native/core/src/
             native/core/tests/
             native/pg/src/
+            native/pg/sql/
             native/verification.json
           retention-days: 7
