@@ -6,26 +6,49 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Policy {
+    pub revision: String,
     pub accept: f64,
     pub reject: f64,
+    pub choice_min: f64,
+    pub score_confidence_min: f64,
+    pub unknown_options: Vec<String>,
 }
 
 impl Default for Policy {
     fn default() -> Self {
         Self {
+            revision: "unvalidated-default-v1".into(),
             accept: 0.8,
             reject: 0.2,
+            choice_min: 0.55,
+            score_confidence_min: 0.0,
+            unknown_options: Vec::new(),
         }
     }
 }
 
 impl Policy {
-    pub fn validate(self) -> Result<(), &'static str> {
-        if !(0.0 <= self.reject && self.reject < self.accept && self.accept <= 1.0) {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        let valid_thresholds = 0.0 <= self.reject
+            && self.reject < self.accept
+            && self.accept <= 1.0
+            && (0.0..=1.0).contains(&self.choice_min)
+            && (0.0..=1.0).contains(&self.score_confidence_min);
+        if !valid_thresholds {
             return Err("Invalid decision thresholds");
+        }
+        if self.revision.trim().is_empty()
+            || self.revision.len() > 200
+            || self.unknown_options.len() > 255
+            || self
+                .unknown_options
+                .iter()
+                .any(|id| id.is_empty() || id.len() > 200)
+        {
+            return Err("Invalid decision policy identity or uncertainty options");
         }
         Ok(())
     }
@@ -68,7 +91,7 @@ impl Observation {
         response: Value,
     ) -> Result<Self, &'static str> {
         validate_questions(questions)?;
-        resolve(&response, questions, &provider.model, 0.8, 0.2)?;
+        resolve(&response, questions, &provider.model, &Policy::default())?;
         Ok(Self {
             format_version: 1,
             context_sha256: context_identity(source)?,
@@ -92,8 +115,7 @@ impl Observation {
             &self.response,
             &self.questions,
             &self.evaluator.model,
-            policy.accept,
-            policy.reject,
+            &policy,
         )
     }
 

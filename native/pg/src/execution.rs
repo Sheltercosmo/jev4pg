@@ -15,6 +15,7 @@ pub type ResultRow = (
     Option<JsonB>,
     JsonB,
     Option<JsonB>,
+    JsonB,
 );
 
 pub struct SourceSpec {
@@ -379,6 +380,9 @@ impl Iterator for SemanticScan {
                 evaluation.receipt.map(|receipt| {
                     JsonB(serde_json::to_value(receipt).expect("Receipt serializes"))
                 }),
+                JsonB(
+                    serde_json::to_value(self.executor.limits.policy()).expect("Policy serializes"),
+                ),
             ));
         }
         self.pending.pop_front()

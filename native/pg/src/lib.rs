@@ -23,6 +23,7 @@ fn scan(
         name!(observation, Option<JsonB>),
         name!(usage, JsonB),
         name!(receipt, Option<JsonB>),
+        name!(policy, JsonB),
     ),
 > {
     let source_sql = source_sql.unwrap_or_else(|| error!("Source SELECT is required"));
@@ -30,8 +31,16 @@ fn scan(
     let options = options.unwrap_or_else(|| error!("Execution options are required"));
     let source = SourceSpec::new("source".into(), source_sql.into(), questions.0);
     TableIterator::new(SemanticScan::new(vec![source], options.0, fcinfo).map(
-        |(_, ordinal, source, decisions, observation, usage, receipt)| {
-            (ordinal, source, decisions, observation, usage, receipt)
+        |(_, ordinal, source, decisions, observation, usage, receipt, policy)| {
+            (
+                ordinal,
+                source,
+                decisions,
+                observation,
+                usage,
+                receipt,
+                policy,
+            )
         },
     ))
 }
@@ -51,6 +60,7 @@ fn scan_many(
         name!(observation, Option<JsonB>),
         name!(usage, JsonB),
         name!(receipt, Option<JsonB>),
+        name!(policy, JsonB),
     ),
 > {
     let sources = sources.unwrap_or_else(|| error!("Independent source declarations are required"));

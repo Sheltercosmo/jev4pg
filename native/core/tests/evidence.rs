@@ -41,7 +41,8 @@ fn policy_replay_preserves_raw_evidence_and_provider_identity() {
                     &source,
                     Policy {
                         accept: 0.65,
-                        reject: 0.2
+                        reject: 0.2,
+                        ..Policy::default()
                     }
                 )
                 .unwrap()["q"]
@@ -107,10 +108,12 @@ fn changed_context_and_invalid_evidence_cannot_be_replayed() {
         Policy {
             accept: 0.1,
             reject: 0.2,
+            ..Policy::default()
         },
         Policy {
             accept: f64::NAN,
             reject: 0.2,
+            ..Policy::default()
         },
     ] {
         assert!(evidence.decide(&source, policy).is_err());

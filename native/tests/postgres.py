@@ -45,7 +45,8 @@ class Model(BaseHTTPRequestHandler):
             if isinstance(probability, Decimal):
                 probability = float(probability)
             answers = {name: {"type": "noul", "noul": probability} for name in payload["questions"]}
-            body = json.dumps({"model": "fixture-v1", "answers": answers}).encode()
+            answers.update(payload["state"].get("fixture_answers", {}))
+            body = json.dumps({"model": "fixture-v1", "answers": answers}, default=float).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -145,6 +146,10 @@ def verify(connection, config):
     assert invalid[0][2]["done"]["operation_state"] == "FAILED"
     assert invalid[0][2]["done"]["output_state"] == "NOT_EVALUATED"
     checks.append("malformed provider results remain operational failures")
+
+    from policy import verify_policy
+
+    checks.extend(verify_policy(connection, observations))
 
     connection.execute(
         "CREATE TABLE evidence_source AS SELECT 1 AS id,'完成'::text AS note,0.7::numeric AS p"

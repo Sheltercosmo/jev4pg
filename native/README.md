@@ -63,7 +63,7 @@ FROM jev_native.scan(
 
 Put exact filters and required columns inside the source SELECT. An outer `WHERE` or `LIMIT` does not promise to reduce semantic work. Source rows retain PostgreSQL JSON representations, including NULLs, Unicode and numeric values. Include a stable key when results need to identify individual rows.
 
-The result has `ordinal`, `source`, `decisions`, `observation`, `usage` and `receipt` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
+The result has `ordinal`, `source`, `decisions`, `observation`, `usage`, `receipt` and `policy` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
 
 `usage` contains cumulative admitted requests, judgments, input bytes and reused rows. Take the maximum of each field across a completed scan, rather than adding the repeated counters. A request may fail after admission; these counters measure admission for dispatch, not provider billing.
 
@@ -147,7 +147,23 @@ This table is a saved population, not an automatically refreshed view of `messag
 
 Operational status is separate: successful observations carry `SUCCEEDED`; exhausted admission carries `BLOCKED_BY_BUDGET`; transport or response-validation errors carry `FAILED`. No skipped or failed judgment becomes false.
 
-Noul uses configurable `accept` and `reject` thresholds, defaulting to 0.8 and 0.2. Choice requires probability at least 0.55 for its selected option; option names have no reserved meaning. Score validates the declared rubric and numeric range. Raw answers accompany successful observations.
+Noul uses configurable `accept` and `reject` thresholds, defaulting to 0.8 and 0.2. Choice uses `choice_min` (default 0.55). Declare uncertainty category IDs with `unknown_options`; their selection yields UNKNOWN even at high confidence. Native option names have no reserved meaning by default: `none` can describe a real category. Supply the same explicit policy when moving a workflow between executors, including its uncertainty IDs.
+
+Score validates the rubric, distribution and numeric range, then applies `score_confidence_min` (default 0). Missing confidence counts as zero. The returned `policy` records all thresholds, uncertainty IDs and its revision. `policy_revision` names the applied scan policy; `decide` accepts the returned policy object directly with its `revision` field. Revision names describe configuration and do not imply validated accuracy.
+
+For a routing question with an explicit uncertainty option:
+
+```sql
+SELECT decisions, policy
+FROM jev_native.scan(
+    'SELECT id, body FROM messages',
+    '{"route":{"type":"choice","instructions":"Which team should handle this message?",
+       "criteria":{"support":"Product support","sales":"Purchase enquiry","unknown":"Insufficient evidence"}}}',
+    '{"choice_min":0.8,"unknown_options":["unknown"],"policy_revision":"routing-v1"}'
+);
+```
+
+Policy changes reuse compatible raw observations without a new provider call. Save the policy alongside the resulting decisions when later stages or reviewers need their meaning.
 
 | Option | Default | Scope |
 | --- | ---: | --- |

@@ -127,10 +127,15 @@ pub struct Limits {
     pub timeout_ms: u64,
     pub accept: f64,
     pub reject: f64,
+    pub choice_min: f64,
+    pub score_confidence_min: f64,
+    pub unknown_options: Vec<String>,
+    pub policy_revision: String,
 }
 
 impl Default for Limits {
     fn default() -> Self {
+        let policy = Policy::default();
         Self {
             max_rows: 10_000,
             max_judgments: 1_000,
@@ -139,14 +144,30 @@ impl Default for Limits {
             batch_rows: 32,
             concurrency: 4,
             timeout_ms: 45_000,
-            accept: 0.8,
-            reject: 0.2,
+            accept: policy.accept,
+            reject: policy.reject,
+            choice_min: policy.choice_min,
+            score_confidence_min: policy.score_confidence_min,
+            unknown_options: policy.unknown_options,
+            policy_revision: policy.revision,
         }
     }
 }
 
 impl Limits {
+    pub fn policy(&self) -> Policy {
+        Policy {
+            revision: self.policy_revision.clone(),
+            accept: self.accept,
+            reject: self.reject,
+            choice_min: self.choice_min,
+            score_confidence_min: self.score_confidence_min,
+            unknown_options: self.unknown_options.clone(),
+        }
+    }
+
     pub fn validate(&self) -> Result<(), &'static str> {
+        self.policy().validate()?;
         if self.max_rows == 0
             || self.max_rows > 1_000_000
             || self.max_judgments > 1_000_000
@@ -155,9 +176,6 @@ impl Limits {
             || !(1..=32).contains(&self.batch_rows)
             || !(1..=16).contains(&self.concurrency)
             || !(1..=120_000).contains(&self.timeout_ms)
-            || !self.accept.is_finite()
-            || !self.reject.is_finite()
-            || !(0.0 <= self.reject && self.reject < self.accept && self.accept <= 1.0)
         {
             return Err("Invalid native execution limits");
         }
@@ -527,10 +545,7 @@ fn replay(
     provider: &Provider,
     limits: &Limits,
 ) -> Evaluation {
-    let policy = Policy {
-        accept: limits.accept,
-        reject: limits.reject,
-    };
+    let policy = limits.policy();
     match saved
         .observation
         .decide_for(row, questions, provider, policy)
@@ -661,15 +676,8 @@ impl RequestContext<'_> {
         let transport_failed = response.is_err();
         let evaluated = response.and_then(|value| {
             let observation = Observation::capture(row, questions, self.provider, value)?;
-            let decisions = observation.decide_for(
-                row,
-                questions,
-                self.provider,
-                Policy {
-                    accept: self.limits.accept,
-                    reject: self.limits.reject,
-                },
-            )?;
+            let decisions =
+                observation.decide_for(row, questions, self.provider, self.limits.policy())?;
             Ok(Evaluation {
                 decisions,
                 observation: Some(observation),
@@ -781,10 +789,9 @@ pub fn resolve(
     response: &Value,
     questions: &Questions,
     model: &str,
-    accept: f64,
-    reject: f64,
+    policy: &Policy,
 ) -> Result<Decisions, &'static str> {
-    Policy { accept, reject }.validate()?;
+    policy.validate()?;
     validate_questions(questions)?;
     if response["model"] != model {
         return Err("Response model does not match");
@@ -813,9 +820,9 @@ pub fn resolve(
             let value = match q.kind.as_str() {
                 "noul" => {
                     let p = probability(&raw["noul"])?;
-                    if p >= accept {
+                    if p >= policy.accept {
                         Some(json!(true))
-                    } else if p <= reject {
+                    } else if p <= policy.reject {
                         Some(json!(false))
                     } else {
                         None
@@ -862,7 +869,9 @@ pub fn resolve(
                         if !ps.contains_key(selected) {
                             return Err("Selected option is outside criteria");
                         }
-                        if probability(&ps[selected])? < 0.55 {
+                        if policy.unknown_options.iter().any(|id| id == selected)
+                            || probability(&ps[selected])? < policy.choice_min
+                        {
                             None
                         } else {
                             Some(json!(selected))
@@ -884,7 +893,12 @@ pub fn resolve(
                         {
                             return Err("Score legend changed");
                         }
-                        Some(json!(score))
+                        let confidence = raw
+                            .get("confidence")
+                            .map(probability)
+                            .transpose()?
+                            .unwrap_or(0.0);
+                        (confidence >= policy.score_confidence_min).then(|| json!(score))
                     }
                 }
                 _ => return Err("Unsupported primitive"),
@@ -915,10 +929,10 @@ mod tests {
             serde_json::from_value(json!({"q":{"type":"noul","instructions":"完成了吗？"}}))
                 .unwrap();
         let response = |p: Value| json!({"model":"m1","answers":{"q":{"type":"noul","noul":p}}});
-        let no = resolve(&response(json!(0.05)), &questions, "m1", 0.8, 0.2).unwrap();
+        let no = resolve(&response(json!(0.05)), &questions, "m1", &Policy::default()).unwrap();
         assert_eq!(no["q"].require_bool(), Ok(false));
         assert!(
-            resolve(&response(json!(0.5)), &questions, "m1", 0.8, 0.2).unwrap()["q"]
+            resolve(&response(json!(0.5)), &questions, "m1", &Policy::default()).unwrap()["q"]
                 .require_bool()
                 .is_err()
         );
@@ -927,6 +941,6 @@ mod tests {
                 .require_bool()
                 .is_err()
         );
-        assert!(resolve(&response(json!(true)), &questions, "m1", 0.8, 0.2).is_err());
+        assert!(resolve(&response(json!(true)), &questions, "m1", &Policy::default()).is_err());
     }
 }
