@@ -70,7 +70,8 @@ def test_budget_failure_and_unknown_mutation(sem):
     result = sql.execute("a", q, max_evaluations=0)
     assert (
         result["result"] == []
-        and result["manifest"]["semantic_coverage"]["unknown"] == 3
+        and result["manifest"]["semantic_coverage"]["not_evaluated"] == 3
+        and result["manifest"]["semantic_coverage"]["unknown"] == 0
         and model.calls == 0
     )
     model.values["yes"] = ProviderError("HTTP_429", True)

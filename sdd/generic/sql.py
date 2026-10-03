@@ -690,7 +690,7 @@ class SQLService:
             and semantic_snapshot != expected_semantic_snapshot
         ):
             raise ValueError("Semantic evidence or review changed; inspect a new mutation preview")
-        complete = not coverage.get("unknown", 0)
+        complete = not coverage.get("unresolved", 0)
         if not complete and (
             tree.find(exp.Subquery)
             or tree.find(exp.Exists)
@@ -737,13 +737,7 @@ class SQLService:
                     connection.exec_driver_sql("BEGIN")
                     source_hash = "transaction:" + uid()
                     snapshot_mode = "sqlite_transaction"
-                source_rows = 0
-                for dataset in datasets:
-                    table = self.catalog.table(dataset, connection)
-                    quoted = connection.dialect.identifier_preparer.format_table(table)
-                    source_rows += connection.execute(
-                        text("SELECT COUNT(*) FROM " + quoted)
-                    ).scalar_one()
+                source_rows = None
             else:
                 current = self.snapshots(tenant, datasets, connection)
                 if digest(serial(current)) != source_hash:
@@ -754,6 +748,7 @@ class SQLService:
                 "source_snapshot": source_hash,
                 "semantic_snapshot": semantic_snapshot,
                 "source_rows": source_rows,
+                "source_rows_state": "NOT_EVALUATED" if source_rows is None else "VALUE",
                 "snapshot_mode": snapshot_mode if native_read else "content_hash",
                 "complete": complete,
                 "semantic_coverage": coverage,

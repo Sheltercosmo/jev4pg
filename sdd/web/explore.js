@@ -201,10 +201,12 @@ function show(data) {
       [manifest.semantic_coverage?.reused, "reused"],
       [manifest.semantic_coverage?.evaluated, "evaluated"],
       [manifest.semantic_coverage?.unknown, "unknown"],
+      [manifest.semantic_coverage?.not_evaluated, "notEvaluated"],
     ]) {
+      if (value == null) continue;
       const metric = text($("metrics"), "div", "");
       metric.className = "metric";
-      text(metric, "strong", String(value ?? 0));
+      text(metric, "strong", String(value));
       text(metric, "span", t(label));
     }
   }

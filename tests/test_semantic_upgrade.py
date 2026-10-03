@@ -140,7 +140,9 @@ def test_repeated_operator_and_budget_are_not_double_charged(system):
     )
     assert len(model.calls) == 3
     assert result["manifest"]["semantic_coverage"]["evaluated"] == 3
-    assert result["manifest"]["semantic_coverage"]["unknown"] == 5
+    assert result["manifest"]["semantic_coverage"]["unknown"] == 0
+    assert result["manifest"]["semantic_coverage"]["not_evaluated"] == 5
+    assert not result["manifest"]["complete"]
 
 
 def test_missing_batch_answer_rejects_all_results(system):
@@ -150,7 +152,9 @@ def test_missing_batch_answer_rejects_all_results(system):
         "a", "SELECT id FROM records WHERE SEMANTIC(body,'A') OR SEMANTIC(body,'B')"
     )
     assert result["result"] == []
-    assert result["manifest"]["semantic_coverage"]["unknown"] == 16
+    assert result["manifest"]["semantic_coverage"]["unknown"] == 0
+    assert result["manifest"]["semantic_coverage"]["not_evaluated"] == 16
+    assert not result["manifest"]["complete"]
     with db.transaction("a") as connection:
         assert not connection.execute(select(schema.payloads)).all()
 
@@ -164,6 +168,42 @@ def test_concurrent_queries_share_leases(system):
     assert sql.execute("a", query)["manifest"]["complete"]
     with db.transaction("a") as connection:
         assert len(connection.execute(select(schema.payloads)).all()) == 8
+
+
+def test_uncertainty_stays_unknown_when_reused_and_budget_skips_stay_unexecuted(system):
+    _, _, _, model, sql, _ = system
+    ask = model.ask
+
+    def uncertain(tenant, state, questions):
+        response = ask(tenant, state, questions)
+        for answer in response["answers"].values():
+            answer["noul"] = 0.5
+        return response
+
+    model.ask = uncertain
+    query = "SELECT id FROM records WHERE SEMANTIC(body,'Uncertain completion')"
+    for _ in range(2):
+        result = sql.execute("a", query, max_evaluations=2 if not model.calls else 0)
+        coverage = result["manifest"]["semantic_coverage"]
+        assert coverage["unknown"] == 2
+        assert coverage["not_evaluated"] == 6
+        assert coverage["unresolved"] == 8
+        assert not result["manifest"]["complete"]
+    assert len(model.calls) == 2
+
+
+def test_budget_hold_still_blocks_mutation_and_absence_queries(system):
+    _, _, _, _, sql, _ = system
+    with pytest.raises(ValueError, match="membership is unresolved"):
+        sql.execute(
+            "a", "DELETE FROM records WHERE SEMANTIC(body,'A')", max_evaluations=0, actor="r"
+        )
+    with pytest.raises(ValueError, match="Unresolved semantic decisions"):
+        sql.execute(
+            "a",
+            "SELECT id FROM records WHERE NOT EXISTS (SELECT id FROM records r WHERE SEMANTIC(r.body,'A'))",
+            max_evaluations=0,
+        )
 
 
 def test_typed_features_share_context_and_use_sql(system):

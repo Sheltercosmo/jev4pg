@@ -235,7 +235,8 @@ def test_native_reads_exceed_previous_limit_without_python_snapshots(pgdata, mon
     monkeypatch.setattr(service, "snapshots", forbidden)
     result = service.execute(tenant, "SELECT COUNT(*) AS n, SUM(id) AS total FROM large_readings")
     assert result["result"] == [{"n": 50002, "total": "1250125003"}]
-    assert result["manifest"]["source_rows"] == 50002
+    assert result["manifest"]["source_rows"] is None
+    assert result["manifest"]["source_rows_state"] == "NOT_EVALUATED"
     assert result["manifest"]["snapshot_mode"] == "postgres_repeatable_read"
     assert result["manifest"]["complete"]
     limited = service.execute(tenant, "SELECT id FROM large_readings ORDER BY id")
@@ -252,7 +253,7 @@ def test_native_snapshot_stays_consistent_during_concurrent_insert(pgdata):
 
     def concurrent_insert(connection, cursor, statement, parameters, context, executemany):
         nonlocal inserted
-        if "SELECT COUNT(*) FROM" in statement and not inserted:
+        if "pg_current_snapshot()" in statement and not inserted:
             inserted = True
             with db.transaction(tenant) as other:
                 other.execute(
@@ -263,11 +264,30 @@ def test_native_snapshot_stays_consistent_during_concurrent_insert(pgdata):
     event.listen(db.engine, "after_cursor_execute", concurrent_insert)
     try:
         result = service.execute(tenant, 'SELECT COUNT(*) AS n FROM "账户"')
-        assert result["manifest"]["source_rows"] == 2
+        assert inserted
+        assert result["manifest"]["source_rows"] is None
         assert result["result"] == [{"n": 2}]
     finally:
         event.remove(db.engine, "after_cursor_execute", concurrent_insert)
     assert service.execute(tenant, 'SELECT COUNT(*) AS n FROM "账户"')["result"] == [{"n": 3}]
+
+
+def test_selective_native_read_does_not_count_its_entire_source(pgdata):
+    from sqlalchemy import event
+
+    db, tenant, _, service, _ = pgdata
+    statements = []
+
+    def capture(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", capture)
+    try:
+        result = service.execute(tenant, 'SELECT "编号" FROM "账户" WHERE "编号"=1')
+    finally:
+        event.remove(db.engine, "before_cursor_execute", capture)
+    assert result["result"] == [{"编号": 1}]
+    assert not any("COUNT(" in statement.upper() for statement in statements)
 
 
 def test_ordered_set_percentiles_are_guarded_and_executable(pgdata):
@@ -426,3 +446,51 @@ def test_mixed_population_windows_share_row_identity_on_postgres(pgdata):
     assert [float(row["rank"]) for row in rows] == [0, 1]
     assert rows[0]["mean"] is None
     assert float(rows[1]["mean"]) == pytest.approx(12.3)
+
+
+@pytest.mark.parametrize(
+    "names", [("readings", "id", "bucket", "value"), ("测量", "编号", "分组", "数值")]
+)
+@pytest.mark.parametrize("aggregate", ["AVG", "SUM", "MIN", "MAX"])
+@pytest.mark.parametrize("predicate", ["empty_sum", "count", "not_exists", "ordinary"])
+def test_scalar_optimization_preserves_sibling_queries_on_postgres(
+    pgdata, names, aggregate, predicate
+):
+    from decimal import Decimal
+    from sqlalchemy import text
+
+    db, tenant, catalog, service, _ = pgdata
+    table_name, key, group, amount = names
+    dataset = catalog.create(
+        tenant,
+        table_name,
+        [
+            dict(zip((key, group, amount), row))
+            for row in [(1, 1, 2), (2, 1, 8), (3, 2, 30), (4, None, 5), (5, 3, None), (6, 1, 8)]
+        ],
+        columns=[
+            {"name": key, "type": "integer"},
+            {"name": group, "type": "integer"},
+            {"name": amount, "type": "number"},
+        ],
+        primary_key=[key],
+    )
+    predicates = {
+        "empty_sum": f'EXISTS(SELECT SUM(c."{amount}") FROM "{table_name}" c WHERE c."{group}"=a."{group}" AND c."{amount}">999)',
+        "count": f'EXISTS(SELECT COUNT(*) FROM "{table_name}" c WHERE c."{group}"=a."{group}")',
+        "not_exists": f'NOT EXISTS(SELECT SUM(c."{amount}") FROM "{table_name}" c WHERE c."{group}"=a."{group}")',
+        "ordinary": f'EXISTS(SELECT c."{amount}" FROM "{table_name}" c WHERE c."{group}"=a."{group}" AND c."{amount}">5)',
+    }
+    query = (
+        f'SELECT a."{key}" AS id, (SELECT {aggregate}(b."{amount}") '
+        f'FROM "{table_name}" b WHERE b."{group}"=a."{group}") AS x '
+        f'FROM "{table_name}" a WHERE {predicates[predicate]} ORDER BY a."{key}"'
+    )
+    with db.transaction(tenant) as connection:
+        table = catalog.table(dataset, connection)
+        physical_name = connection.dialect.identifier_preparer.format_table(table)
+        expected = connection.execute(text(query.replace(f'"{table_name}"', physical_name))).all()
+    actual = service.execute(tenant, query)["result"]
+    assert [
+        (row["id"], None if row["x"] is None else Decimal(str(row["x"]))) for row in actual
+    ] == expected
