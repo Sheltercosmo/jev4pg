@@ -1,18 +1,27 @@
-<h1 align="center">jevsd-pg</h1>
-
 <p align="center">
-  <img src="sdd/web/mascot.png" width="480" alt="jevsd-pg pangolin mascot with three parallel data paths" />
+  <img src="docs/assets/readme-banner.png" width="1000" alt="jevsd-pg — Natural language. Semantic SQL. Pangolin mascot with three parallel data paths." />
 </p>
 
 <p align="center">
   <strong>A self-developing SQL database with JEV based semantic operators and natural language queries</strong>
 </p>
 
+<p align="center">
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/version-0.5.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Version 0.5.0" /></a>
+  <a href="docs/INSTALLATION.md"><img src="https://img.shields.io/badge/Python-3.11%2B-18181b?style=flat-square&amp;labelColor=52525b" alt="Python 3.11 or newer" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
+</p>
+
+<p align="center">
+  <a href="docs/INSTALLATION.md">Installation</a> ·
+  <a href="docs/USER_GUIDE.md">User guide</a> ·
+  <a href="docs/zh/USER_GUIDE.md">简体中文</a> ·
+  <a href="docs/JEV_FUNCTION_REFERENCE.md">Operator reference</a>
+</p>
+
 Ask questions in plain language, inspect the SQL, and turn useful semantic decisions into reusable database features. jevsd-pg brings together 41 semantic operators, parallel JEV evaluation, cached evidence and optional LLM planning in a web workspace and HTTP API.
 
 The operators combine JEV's native Noul, Choice and Score primitives with database and workflow logic. The default JEV service is provided by TypeSafe. You can also connect a compatible third-party endpoint or a local model adapter. PostgreSQL handles storage, joins and arithmetic.
-
-[Installation](docs/INSTALLATION.md) · [User guide](docs/USER_GUIDE.md) · [简体中文](docs/zh/USER_GUIDE.md) · [Operator reference](docs/JEV_FUNCTION_REFERENCE.md)
 
 ## Why jevsd-pg
 
