@@ -1,6 +1,7 @@
 """Observed values, backend checks and concrete feedback for one bounded repair."""
 
 from copy import deepcopy
+import os
 
 from sqlalchemy import select, func, text
 from sqlalchemy.exc import DBAPIError
@@ -15,14 +16,36 @@ from .sql import FUNCTIONS
 
 def backend_contract(catalog):
     sqlite = catalog.db.engine.dialect.name == "sqlite"
+    engine = os.getenv("SDD_SEMANTIC_ENGINE", "python")
+    semantic_rules = [
+        "SEMANTIC(column, literal_definition) tests text meaning. Use exact SQL for known codes, categories, dates and quantities.",
+        "Never use semantic evaluation to compensate for not inspecting a category's stored representation.",
+    ]
+    if engine == "native" and not sqlite:
+        semantic_rules.extend(
+            [
+                "SEMANTIC can read a named column of an uncorrelated CTE or derived table. Put required calculations or text aggregation in that relation first, then judge its actual output. Project only the context needed for the judgment.",
+                "Native dependent stages share one DAG and budget. Independent branches run concurrently; exact consumers wait for resolved input decisions. A held result is NOT_EVALUATED, never a zero count.",
+                "Dependent semantic plans do not support recursive CTEs, correlated or scalar subqueries, SEMANTIC_FEATURE, or semantic writes. Base-column scans require registered primary keys; derived relations retain row multiplicity without requiring a key.",
+            ]
+        )
+    else:
+        semantic_rules.append(
+            "SEMANTIC requires a base text column and a registered nonempty primary key."
+        )
+        if engine == "native":
+            semantic_rules.append(
+                "Native semantic execution requires PostgreSQL; it cannot run on SQLite."
+            )
     return {
         "input_dialect": "PostgreSQL, restricted to the registered calculation catalog",
         "execution_backend": catalog.db.engine.dialect.name,
+        "semantic_engine": engine,
+        "semantic_rules": semantic_rules,
         "allowed_functions": sorted(FUNCTIONS),
         "construction_rules": [
             "Use only listed functions. AGE and regular-expression predicates are not registered.",
             "Use exact SQL comparisons for codes, named categories, dates and quantities. SEMANTIC is for meanings that cannot be represented by known values and explicit predicates.",
-            "SEMANTIC requires a base text column and a registered nonempty primary key. Never use it to compensate for not inspecting a category's stored representation.",
             "A value sample is not a closed vocabulary or a population filter. Do not infer absence from an omitted sample value.",
             *(
                 [
@@ -103,6 +126,24 @@ def checked_candidate(service, tenant, candidate, allowed):
         semantic = any(
             n.name.upper() in ("SEMANTIC", "SEMANTIC_FEATURE") for n in tree.find_all(exp.Anonymous)
         )
+        derived = False
+        if semantic and service.semantic_engine == "native":
+            from .native_relational import compile_relational_plan, needs_relational_plan
+            from .native_sql import _validate_semantic_lineage
+
+            if service.db.engine.dialect.name != "postgresql":
+                raise ValueError("Native semantic execution requires PostgreSQL")
+            if mutation is not None or any(
+                node.name.upper() == "SEMANTIC_FEATURE" for node in tree.find_all(exp.Anonymous)
+            ):
+                raise ValueError("Native semantic writes and maintained features are not supported")
+            derived = needs_relational_plan(tree)
+            if derived:
+                compile_relational_plan(tree, bindings, lambda query: query.sql(dialect="postgres"))
+            else:
+                _validate_semantic_lineage(service.semantic_operators(tenant, tree, bindings))
+        elif semantic:
+            service.semantic_operators(tenant, tree, bindings)
         unkeyed_semantic = any(
             not bindings[id(source)]["primary_key"]
             for scope in traverse_scope(tree)
@@ -113,7 +154,7 @@ def checked_candidate(service, tenant, candidate, allowed):
             for _, source in [scope.selected_sources.get(node.expressions[0].table, (None, None))]
             if isinstance(source, exp.Table) and id(source) in bindings
         )
-        if unkeyed_semantic:
+        if unkeyed_semantic and not derived:
             raise ValueError(
                 "Semantic row evaluation requires registered primary keys; use observed category values and ordinary SQL when the condition is categorical"
             )
@@ -238,7 +279,9 @@ def output_review_jobs(packet, candidates, noul, choice):
 def review_context(packet):
     """Keep structural evidence and short value examples; avoid repeated profiling payloads."""
     output = deepcopy(packet)
-    output.pop("backend_contract", None)
+    contract = output.pop("backend_contract", {})
+    if contract.get("semantic_rules"):
+        output["semantic_rules"] = contract["semantic_rules"]
     for table in output.get("catalog", []):
         for column in table["columns"]:
             evidence = column.pop("value_evidence", None)

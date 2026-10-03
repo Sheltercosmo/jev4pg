@@ -291,6 +291,26 @@ def execute_native(
         raise ValueError(
             "Native mutation review is not available yet; use the python semantic engine"
         )
+    from .native_relational import needs_relational_plan
+
+    if needs_relational_plan(tree):
+        from .native_relational_execution import execute_relational
+
+        return execute_relational(
+            service,
+            tenant,
+            sql,
+            tree,
+            bindings,
+            datasets,
+            request=request,
+            plan=plan,
+            max_evaluations=max_evaluations,
+            accept=accept,
+            reject=reject,
+            started=started,
+            progress=progress,
+        )
     operators = service.semantic_operators(tenant, tree, bindings)
     if any(spec.feature_id for _, _, _, spec, _ in operators):
         raise ValueError(

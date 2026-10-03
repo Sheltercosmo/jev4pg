@@ -57,7 +57,9 @@ Saved history does not restore a mutation commit token. Rerunning a write create
 
 ## Semantic queries and writes
 
-Use `SEMANTIC(source_column, 'definition')` for a semantic predicate or `SEMANTIC_FEATURE(source_column, 'feature_name')` for an active [reviewed feature](SEMANTIC_FEATURES.md). The source must resolve to a registered base-table column.
+Use `SEMANTIC(source_column, 'definition')` for a semantic predicate or `SEMANTIC_FEATURE(source_column, 'feature_name')` for an active [reviewed feature](SEMANTIC_FEATURES.md). The default Python engine requires a registered base-table column.
+
+The development [native engine](NATIVE_PLANS.md#use-generated-or-handwritten-sql) also evaluates named columns from uncorrelated CTEs and derived tables. It can aggregate text in PostgreSQL, judge the resulting descriptions, then use resolved decisions in another calculation. Enable it with `SDD_SEMANTIC_ENGINE=native` after installing the Rust extension. Generated and edited SQL use the same compiler. Held stages remain visible in query history; they are not empty answers. Maintained features and semantic writes still require the Python engine.
 
 Uncertain decisions retain `UNKNOWN`; unexecuted work retains `NOT_EVALUATED`. Neither becomes false. Check the result manifest for completeness before interpreting counts or absence.
 

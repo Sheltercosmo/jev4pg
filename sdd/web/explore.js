@@ -171,11 +171,13 @@ function show(data) {
   $("output-empty").hidden = true;
   $("sql").textContent = data.logical_sql || data.plan?.logical_sql || t("noSql");
   $("details").textContent = JSON.stringify(data, null, 2);
-  renderTable(data.result || data.before_sample || [], !data.manifest);
+  const held = data.manifest?.result_output_state === "NOT_EVALUATED";
+  renderTable(data.result || data.before_sample || [], !data.manifest || held);
+  if (held) $("table").firstElementChild.textContent = t("heldResultHint");
   $("review-sql").hidden = !(data.review_required && (data.logical_sql || data.plan?.logical_sql));
   renderPlanningReview(data);
   const manifest = data.manifest;
-  selectResultTab(!manifest || data.review_required ? "sql" : "table");
+  selectResultTab(!manifest || data.review_required || held ? "sql" : "table");
   document.dispatchEvent(new CustomEvent("sdd:result", { detail: data }));
   $("status").className = manifest?.complete === false ? "incomplete" : "success";
   if (data.mutation_preview) {
@@ -188,6 +190,9 @@ function show(data) {
     $("status").textContent = t("planReady");
   } else if (manifest.committed) {
     $("status").textContent = t("committed", { count: manifest.affected_rows });
+  } else if (held) {
+    $("status").textContent = t("notEvaluated");
+    $("answer").textContent = t("heldResultHint");
   } else {
     $("status").textContent = t(manifest.complete ? "complete" : "partial");
     $("answer").textContent =

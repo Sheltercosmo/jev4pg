@@ -318,6 +318,7 @@ const messages = {
     evaluated: "New evaluations",
     unknown: "Unknown decisions",
     notEvaluated: "Not evaluated",
+    heldResultHint: "A required stage could not complete. The result was not calculated. Inspect the query and its evidence before running it again.",
     mutationTitle: "Review this change",
     mutationDescription:
       "Affected rows: {count}. This preview expires in 10 minutes. Source or review changes require a new preview.",
@@ -678,6 +679,7 @@ const messages = {
     evaluated: "新增评估",
     unknown: "未确定判断",
     notEvaluated: "尚未评估",
+    heldResultHint: "必要步骤未能完成，因此尚未计算结果。请检查查询和判断依据后再运行。",
     mutationTitle: "审核本次修改",
     mutationDescription:
       "将修改 {count} 条记录。预览在 10 分钟后失效；原始数据或审核结果发生变化时，需要重新预览。",

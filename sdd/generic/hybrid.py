@@ -33,7 +33,7 @@ A likely typo may have a plausible catalog interpretation; label that assumption
 Follow backend_contract. Inspect actual value evidence before choosing categories. Never infer a complete
 vocabulary or eligible population from samples. When the request requires recorded/available values, check blank strings as well as NULL.
 Do not add missing-value exclusions or completeness rules to otherwise unrestricted requests. Prefer exact predicates for codes and categories; reserve SEMANTIC
-for genuine text meanings on keyed source columns. A quoted concrete word normally supports an exact value
+for genuine text meanings at a supported evaluation site in backend_contract. A quoted concrete word normally supports an exact value
 or substring predicate; do not classify every row semantically when a literal condition expresses the request.
 SQL performs exact calculations.
 Return the smallest complete answer: requested fields, grain, duplicates, ordering and tie policy. Keep helper

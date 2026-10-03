@@ -1,10 +1,60 @@
 """Small reproductions of executable-candidate and missing-evidence failures."""
 
 from copy import deepcopy
+from types import SimpleNamespace
+
+import pytest
 
 from test_hybrid_planner import LLM, Reviewer, system as system, plan_or_hold
 from sdd.generic.planner import Planner
 from sdd.generic.sql import SQLService
+from sdd.generic.hybrid_feedback import backend_contract, checked_candidate, review_context
+
+
+def test_native_contract_reaches_generation_and_independent_review(monkeypatch):
+    catalog = SimpleNamespace(
+        db=SimpleNamespace(engine=SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
+    )
+    monkeypatch.setenv("SDD_SEMANTIC_ENGINE", "native")
+    contract = backend_contract(catalog)
+    assert contract["semantic_engine"] == "native"
+    assert "derived table" in " ".join(contract["semantic_rules"])
+    compact = review_context({"backend_contract": contract, "catalog": []})
+    assert compact["semantic_rules"] == contract["semantic_rules"]
+    assert "backend_contract" not in compact
+    monkeypatch.setenv("SDD_SEMANTIC_ENGINE", "python")
+    assert "derived table" not in " ".join(backend_contract(catalog)["semantic_rules"])
+
+
+@pytest.mark.parametrize("engine", ["python", "native"])
+def test_candidate_compilation_respects_configured_semantic_engine(system, monkeypatch, engine):
+    db, catalog = system
+    dataset = catalog.create("a", "notes", [{"body": "finished"}])
+    service = SQLService(db, semantic_engine=engine)
+    candidate = {
+        "sql": "WITH q AS (SELECT body FROM notes) SELECT COUNT(*) FROM q WHERE SEMANTIC(body,'Complete?')"
+    }
+    prepared = service.prepare("a", candidate["sql"])
+    monkeypatch.setattr(service, "prepare", lambda *_: prepared)
+    monkeypatch.setattr(db.engine.dialect, "name", "postgresql")
+    checked = checked_candidate(service, "a", candidate, {dataset["id"]})
+    assert checked["valid"] is (engine == "native")
+    assert checked["backend_probe"]["output_state"] == "NOT_EVALUATED"
+
+
+def test_native_candidate_rejects_unimplemented_dependency_without_dispatch(system, monkeypatch):
+    db, catalog = system
+    dataset = catalog.create("a", "notes", [{"id": 1, "body": "finished"}], primary_key=["id"])
+    service = SQLService(db, semantic_engine="native")
+    candidate = {
+        "sql": "WITH q AS (SELECT id,body FROM notes) SELECT id FROM q WHERE SEMANTIC(body,'Complete?') AND EXISTS(SELECT 1 FROM notes n WHERE n.id=q.id)"
+    }
+    prepared = service.prepare("a", candidate["sql"])
+    monkeypatch.setattr(service, "prepare", lambda *_: prepared)
+    monkeypatch.setattr(db.engine.dialect, "name", "postgresql")
+    checked = checked_candidate(service, "a", candidate, {dataset["id"]})
+    assert not checked["valid"]
+    assert "uncorrelated" in checked["error"]
 
 
 def test_backend_probe_prevents_selecting_unexecutable_alternative(system):

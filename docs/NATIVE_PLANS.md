@@ -14,6 +14,31 @@ The result contains target `rows`, separate `stages` receipts, shared `usage`, t
 
 Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
 
+## Use generated or handwritten SQL
+
+With the native extension installed and `SDD_SEMANTIC_ENGINE=native`, the query service lowers `SEMANTIC` on CTE and derived-table columns into the same DAG. SQL authorization and catalog binding happen before compilation. This applies to SQL submitted directly, produced by the natural-language planner or edited from query history.
+
+For a registered table `messages(account_id, body)`, judge each account's combined messages:
+
+```sql
+WITH account_text AS (
+    SELECT account_id, STRING_AGG(body, E'\n') AS description
+    FROM messages
+    GROUP BY account_id
+)
+SELECT account_id
+FROM account_text
+WHERE SEMANTIC(description, 'The messages describe an unresolved request for help.');
+```
+
+PostgreSQL produces the account descriptions before JEV evaluates them. A second semantic stage can consume a SQL calculation over earlier resolved decisions. Shared CTEs materialize once; independent semantic branches share native scheduling and query limits. Project the columns needed for each judgment into its CTE: those projected values become its context. Exact arithmetic stays in PostgreSQL.
+
+This path accepts uncorrelated relational stages, including joins, aggregates, windows and set operations. Put expressions in a preceding SELECT and give them names before using them as semantic subjects. Recursive CTEs, correlated or scalar subqueries, maintained features and semantic writes are not supported here. Existing keyed base-column predicates retain their optimized scan path.
+
+An exact consumer waits for every required input decision. Missing evidence holds the target with `NOT_EVALUATED`; it does not return a zero count. The query response and saved history retain the proposed SQL, stage receipts, usage, applied policy and hold reason. The web workspace distinguishes a held query from an executed query with no matching rows. The generation and review contracts describe the configured engine's capabilities; compiler checks do not establish natural-language accuracy.
+
+The query service preserves decimal JSON tokens as exact strings in returned rows and history, matching its numeric serialization convention. Provider usage and policy metadata remain separate from result values.
+
 ## One graph for relational and semantic work
 
 The existing typed `StageDAG` supplies SQL, input identities, output columns, grain, keys and assertions. Natural-language plan descriptions help users review intent; they are not executable stage contracts.
@@ -46,7 +71,7 @@ The relational executor requires REPEATABLE READ or SERIALIZABLE before dispatch
 
 Materialized rows across all stages share `max_rows`; provider requests, judgments and input bytes share the existing executor limits. Target JSON is capped at 8 MB and fetched in bounded batches. Temporary relations follow PostgreSQL resource controls and are dropped before return, or rolled back on an error. Durable observations and uncertain request attempts retain the registry's separate commit timeline.
 
-Each source must be one SELECT that fits inside a derived table. The function runs with caller privileges; it is not a sandbox for SQL functions or an authorization layer. The query service must still validate user SQL and bind authorized catalog objects. Plan execution is currently an explicit SQL/programmatic interface, not the default natural-language execution path.
+Each source must be one SELECT that fits inside a derived table. The function runs with caller privileges; it is not a sandbox for SQL functions or an authorization layer. The query service validates user SQL and binds authorized catalog objects before lowering it. The released Python engine remains the default; automatic native execution requires explicit deployment configuration.
 
 ## Acceptance cases
 

@@ -140,6 +140,9 @@ def verify_application(connection, observations):
             "source filters and escaped literals reach PostgreSQL without Python population snapshots"
         )
         checks.append("restricted application role retains tenant row security during native scans")
+        from derived_application import verify_derived_application
+
+        checks.extend(verify_derived_application(sql, catalog, tenant, observations))
 
         catalog.create(
             tenant,

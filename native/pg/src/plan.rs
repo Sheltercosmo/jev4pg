@@ -264,6 +264,8 @@ pub fn execute(value: Value, options: Value) -> JsonB {
     let mut materialized = 0;
     let mut created = Vec::new();
     let mut completion_order = Vec::new();
+    let mut evidence_receipts = BTreeMap::new();
+    let mut evaluators = BTreeMap::new();
 
     while progress.iter().any(|state| !state.terminal) {
         pgrx::check_for_interrupts!();
@@ -331,6 +333,15 @@ pub fn execute(value: Value, options: Value) -> JsonB {
         }
         let mut batches: BTreeMap<usize, Vec<Value>> = BTreeMap::new();
         for (id, ordinal, _, decisions, observation, _, receipt, policy) in scan.next_batch() {
+            if let Some(observation) = &observation {
+                let evaluator = &observation.0["evaluator"];
+                evaluators.insert(evaluator.to_string(), evaluator.clone());
+            }
+            if let Some(receipt) = &receipt {
+                if let Some(identity) = receipt.0["attempt_id"].as_str() {
+                    evidence_receipts.insert(identity.to_owned(), receipt.0.clone());
+                }
+            }
             let index = indices[&id];
             for (question, result) in decisions.0.as_object().expect("Typed decisions") {
                 let slot = match result["output_state"].as_str() {
@@ -421,6 +432,8 @@ pub fn execute(value: Value, options: Value) -> JsonB {
         "version": 1, "target": plan.target, "rows": rows, "stages": stages,
         "completion_order": completion_order, "materialized_rows": materialized,
         "usage": scan.executor.usage, "policy": scan.executor.limits.policy(),
+        "evidence_receipts": evidence_receipts.into_values().collect::<Vec<_>>(),
+        "evaluators": evaluators.into_values().collect::<Vec<_>>(),
     }));
     drop(scan);
     for table in created.iter().rev() {

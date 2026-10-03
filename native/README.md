@@ -43,6 +43,7 @@ CREATE EXTENSION jev_native;
 GRANT USAGE ON SCHEMA jev_native TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.scan_many(jsonb,jsonb) TO analyst;
+GRANT EXECUTE ON FUNCTION jev_native.execute_plan(jsonb,jsonb) TO analyst;
 ```
 
 The caller also needs access to its source tables and columns. Source reads run with the caller's PostgreSQL privileges and row security. The scan function is not executable by PUBLIC by default.
@@ -191,7 +192,7 @@ Set `SDD_SEMANTIC_ENGINE=native` for the application service. Its existing SQL a
 
 This preview supports joins, subqueries, grouping and other relational calculations around Boolean semantic predicates. Structured filters are pushed into source selection only when their scope is proven safe. Questions with the same required source population share a scan and request context. Questions in different filtered branches retain their own populations, so unrelated NULL subjects neither consume calls nor make a result incomplete. Table column alias lists such as `items AS i(a,b,c)` are rejected until their ordinal lineage is supported; ordinary table aliases and SELECT column aliases work.
 
-Direct semantic references to the nullable side of an outer join are also rejected: an unmatched joined row has no base-row observation. Grouping sets, ROLLUP and CUBE can likewise synthesize rows with different subjects. Evaluate the base source in a CTE before these operations when the intended operation is to join or aggregate already evaluated results. Semantic predicates on a guaranteed preserved join side and ordinary GROUP BY expressions remain supported.
+In the optimized base-column path, direct semantic references to the nullable side of an outer join are rejected: an unmatched joined row has no base-row observation. Grouping sets, ROLLUP and CUBE can likewise synthesize rows with different subjects. Evaluate the base source in a CTE before these operations when the intended operation is to join or aggregate already evaluated results. Semantic predicates on a guaranteed preserved join side and ordinary GROUP BY expressions remain supported.
 
 For example, evaluate each message before calculating subtotals:
 
@@ -207,6 +208,8 @@ GROUP BY ROLLUP(needs_action);
 
 Incomplete evidence permits only a proven partial read: direct semantic projections and row predicates composed with AND, OR, NOT or Boolean equality, optionally across inner joins. Unresolved projections remain NULL and the manifest retains their UNKNOWN or NOT_EVALUATED coverage. Counts, subqueries, set operations, outer joins, ordering, limits and NULL-consuming expressions such as `COALESCE` require complete evidence. Otherwise execution reports the missing evidence instead of presenting an exact answer.
 
+`SEMANTIC` can also judge a named column from a CTE or derived table. The service compiles these queries into [dependent native plans](../docs/NATIVE_PLANS.md#use-generated-or-handwritten-sql). PostgreSQL can first combine text, group records or calculate windows, then provide the resulting relation to JEV. A downstream SQL stage waits for its required decisions while independent semantic branches continue. Shared CTEs materialize once; the graph shares one budget and provider scheduler. This route requires complete decisions for its consumers and saves held targets as NOT_EVALUATED. Correlated or scalar subqueries and recursive CTEs remain unsupported in dependent semantic plans.
+
 One native invocation evaluates the query's independent source populations, sharing question-context reuse, concurrency and query allowances. Database reservations share `SDD_DAILY_EVALUATIONS` with existing Python model calls. Completed scans settle their request count once and return unused allowance. Cancellation or a crash with an unknown dispatch count retains the reserved allowance; it does not assume the request was free. Direct SQL clients using `scan` or `scan_many` have their own explicit scan limits and are outside this application quota.
 
 `SDD_NATIVE_CONCURRENCY` sets concurrent requests across the query's source populations (default 4). `SDD_NATIVE_MAX_ROWS` bounds their combined row count (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). The optional native registry adds provider admission across PostgreSQL sessions.
@@ -215,6 +218,6 @@ Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still requi
 
 ## Remaining integration
 
-The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Reuse across differently packed question batches, dependent native stages, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
+The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Reuse across differently packed question batches, row guards and selected-branch composition, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
 
 Model calls are external effects: transaction rollback cannot undo provider usage. Synchronous scans hold a PostgreSQL backend while inference runs. Restrict execution grants during development and use the released queue interface where its asynchronous behavior is required.
