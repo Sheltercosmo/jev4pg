@@ -7,7 +7,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, Future
 from threading import Lock
 
-from ..evaluators import ProviderError
+from ..evaluators import ProviderError, decision_identity
 
 from sqlalchemy import insert
 
@@ -60,6 +60,7 @@ def catalog_signature(datasets):
 class ReviewDecisions:
     def __init__(self, delegate, previous=None, corrections=None):
         self.delegate, self.model = delegate, delegate.model
+        self.identity = decision_identity(delegate)
         self.previous = previous or {}
         self.corrections = corrections or {}
         self.batches, self.decisions = [], []
@@ -82,7 +83,7 @@ class ReviewDecisions:
                 raise ValueError("A Boolean decision requires true or false")
 
     def _evaluate(self, tenant, state, questions):
-        signature = digest(serial([tenant, self.model, state, questions]))
+        signature = digest(serial([tenant, self.identity, state, questions]))
         prior = next(
             (b for b in self.previous.get("batches", []) if b["signature"] == signature), None
         )
@@ -299,6 +300,7 @@ class PlanReviews:
         identity = uid()
         stored = deepcopy(plan)
         stored["_actor"] = actor
+        stored["_provider_identity"] = decision_identity(self.planner.decisions)
         stored["_expires_at"] = time.time() + 900
         with self.db.transaction(tenant) as connection:
             connection.execute(
@@ -335,6 +337,10 @@ class PlanReviews:
         )
         if catalog_signature(current) != plan["_catalog_signature"]:
             raise ValueError("Catalog definitions changed; plan the request again")
+        if plan.get("_provider_identity", self.planner.decisions.model) != decision_identity(
+            self.planner.decisions
+        ):
+            raise ValueError("Provider configuration changed; plan the request again")
         return plan
 
     def reopen(self, tenant, actor, identity):

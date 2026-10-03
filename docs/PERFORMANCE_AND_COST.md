@@ -1,53 +1,32 @@
 # Performance and cost
 
-These measurements apply to the planner and execution code in JevSDSQL 0.4.0. They describe a local comparison, not an official benchmark score or an expected result for every dataset.
+Version 0.5.0 adds configurable JEV endpoints and local Python adapters. Its checks cover provider compatibility, execution behavior and isolation of cached evidence. They do not establish natural-language accuracy, throughput or cost for a replacement model.
 
-## Measured results
+## What controls performance
 
-Each method attempted the same 100 questions labelled challenging in the cleaned BIRD development set, across 11 databases. One reference query timed out, leaving 99 questions for accuracy. Held proposals were scored when SQL was available; all 100 attempts per method contributed to usage and cost.
+Independent semantic work runs concurrently within the existing stage DAG. Questions with the same context can share a batch. Compatible observations are reused; a changed provider, model revision, source or question can require new work.
 
-The LLM baseline and hybrid used `gpt-5.6-terra` with low reasoning effort through the same local CLI transport. JEV used `jev-1.13.0`. SQL results were compared with references for columns, values, duplicates and applicable ordering.
+| Setting | Effect |
+| --- | --- |
+| `SDD_JEV_CONCURRENCY` | Concurrent JEV requests per tenant and database engine; default 4, maximum 16. |
+| `SDD_PLANNING_WORKERS` | Workers for independent planning jobs; default 4, maximum 16. |
+| Operator `limits.concurrency` | Workers admitted by an operator run, subject to provider limits. |
+| Operator `limits.batch_size` | Questions sharing a context; default and maximum 32. |
+| `SDD_HYBRID_CONCEPTS=off` | Avoid a preliminary LLM concept-generation call. |
+| `SDD_HYBRID_REPAIR=on` | Allow one additional generation for an actionable defect. |
 
-| Measure | JEV | LLM baseline | Hybrid |
-| --- | ---: | ---: | ---: |
-| Matching SQL answers | 20/99 | 39/99 | 34/99 |
-| Complete matching application results | 20/99 | 38/99 | 34/99 |
-| Median request time | 8.55 s | 8.68 s | 14.23 s |
-| 95th percentile request time | 26.80 s | 38.85 s | 54.16 s |
-| Estimated cost per 100 attempts | $0.389 | $3.262 | $2.839 |
-| LLM calls | 0 | 100 | 104 |
-| JEV HTTP attempts | 2,623 | 0 | 732 |
+Local adapters receive the complete question batch and may be called concurrently. Their implementation determines whether the underlying model processes those questions together. Transport compatibility alone does not guarantee parallel inference.
 
-Hybrid reduced estimated cost by about 13% relative to the LLM baseline. It answered fewer questions correctly and had about 64% higher median latency. This comparison does not establish an accuracy or speed advantage for hybrid.
+## Cost controls
 
-## Interpreting the numbers
+Operator budgets cap judgments, requests, estimated input tokens and estimated input cost. Inspect returned reservations, token usage and coverage. `JEV.EXPLAIN_PLAN` estimates missing work before dispatch.
 
-Timing covers 94 questions processed with up to three cases in flight. It includes planning, model transport, local CLI startup and application execution. It excludes database setup and reference execution. Provider load and transport choice can materially change latency.
+Set `SDD_JEV_INPUT_USD_PER_MILLION` to the input-token rate for your provider. The default 0.042 is a configured accounting assumption, not a current price quotation. A zero rate excludes provider token charges but does not measure local compute or electricity.
 
-The SQL score checks the complete generated query result. The application score additionally requires delivery without truncation. The application returns at most 1,000 rows, which accounts for the LLM baseline's lower application score.
+Reported usage depends on the provider. Missing token counts cannot establish actual cost. Conservative admission estimates use UTF-8 byte bounds and are not exact token counts. Retries consume work reservations, and failed calls can still incur provider charges.
 
-All JEV and hybrid attempts required planning review. Their scores measure available proposals, not unattended completion. The workspace retains the user confirmation step. Invalid SQL and unresolved plans cannot be executed through confirmation.
+## Validation scope
 
-Independent JEV work reached four concurrent provider requests. Batching also reduced transport work. There was no serial comparison, so these measurements do not quantify the speedup caused by parallel execution.
+The release tests exercise typed responses, all three primitives in one request, English and Simplified Chinese payloads, real loopback HTTP, local adapters, concurrency, provider failures and cache isolation. Synthetic responses make these checks deterministic; they are not model-quality scores.
 
-## Cost assumptions
-
-Dollar figures apply the following fixed rates to recorded provider usage:
-
-| Token category | Assumed USD per million tokens |
-| --- | ---: |
-| LLM input | 2.00 |
-| LLM cached input | 0.20 |
-| LLM output | 12.00 |
-| LLM cache write | 2.50 |
-| JEV input | 0.042 |
-
-These are accounting assumptions, not current price quotations or subscription charges. One failed hybrid JEV request had no token usage record and is unpriced. The hybrid total therefore has incomplete accounting for that request; missing usage is not a known zero cost.
-
-Estimated cost per matching SQL answer was $0.0194 for JEV, $0.0836 for the LLM baseline and $0.0835 for hybrid. These figures include the cost of unsuccessful attempts and should be read alongside accuracy.
-
-## Controlling usage
-
-Hybrid normally uses one LLM generation. Keep `SDD_HYBRID_CONCEPTS=off` to avoid a preliminary concept call. `SDD_HYBRID_REPAIR=on` permits one additional generation for an actionable defect; set it to `off` to disable that repair. In this measurement, 96 hybrid requests used one LLM call and four used two.
-
-Set explicit `limits` for direct operator calls and inspect returned usage, coverage and completeness. `JEV.EXPLAIN_PLAN` estimates missing work before inference. Compatible evidence can be reused, while changes to data, model or meaning can require new calls. See [operator controls](JEV_OPERATORS.md#inputs-and-execution-controls) and [hybrid configuration](HYBRID_QUERY.md#configuration).
+Latency and answer accuracy must be measured for the configured provider on representative tasks. Keep SQL execution correctness, natural-language interpretation and result completeness separate. Held proposals should remain in evaluation, while failed and unexecuted cases retain their explicit states.

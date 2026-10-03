@@ -2,6 +2,11 @@
 
 from dataclasses import dataclass, field
 import math
+import hashlib
+import json
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlsplit
 import httpx
 
 
@@ -31,12 +36,94 @@ class ProviderError(RuntimeError):
         self.retry_after = retry_after
 
 
+DEFAULT_JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+
+
+def validate_model(model):
+    if not isinstance(model, str) or not model.strip() or len(model) > 100:
+        raise ValueError("Use a nonempty model ID of at most 100 characters")
+    if any(alias in model.lower() for alias in ("latest", "preview")):
+        raise ValueError("Pin the JEV model version")
+    return model
+
+
+def decision_identity(decisions):
+    if decisions is None:
+        return "unconfigured"
+    return getattr(decisions, "identity", decisions.model)
+
+
+def retry_delay(header):
+    if not header:
+        return None
+    try:
+        delay = float(header)
+    except ValueError:
+        try:
+            delay = (parsedate_to_datetime(header) - datetime.now(timezone.utc)).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return None
+    return delay if math.isfinite(delay) and delay >= 0 else None
+
+
 class JevBackend:
-    def __init__(self, api_key, client=None):
-        if not api_key:
-            raise ValueError("TYPESAFE_API_KEY is required")
-        self.api_key = api_key
+    def __init__(self, api_key=None, client=None, *, endpoint=DEFAULT_JEV_ENDPOINT, revision=""):
+        parsed = urlsplit(endpoint)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "JEV endpoint must be an HTTP(S) URL without credentials or query parameters"
+            )
+        if endpoint == DEFAULT_JEV_ENDPOINT and not api_key:
+            raise ValueError("TYPESAFE_API_KEY or SDD_JEV_API_KEY is required")
+        self.api_key, self.endpoint, self.revision = api_key, endpoint, revision
         self.client = client or httpx.Client(timeout=httpx.Timeout(45, connect=10))
+
+    def cache_identity(self, model):
+        validate_model(model)
+        if self.endpoint == DEFAULT_JEV_ENDPOINT and not self.revision:
+            return model
+        value = json.dumps(["systemone-v1", self.endpoint, self.revision, model])
+        return "provider:" + hashlib.sha256(value.encode()).hexdigest()
+
+    def preprocessing(self, model):
+        identity = self.cache_identity(model)
+        if identity == model:
+            return "identity-v1"
+        return "provider:" + hashlib.sha256(identity.encode()).hexdigest()[:24]
+
+    def validate_evaluator(self, evaluator):
+        if evaluator.get("preprocessing", "identity-v1") != self.preprocessing(evaluator["model"]):
+            raise ValueError("Provider configuration changed; create a new evaluator revision")
+
+    def infer(self, model, state, questions):
+        headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}
+        try:
+            response = self.client.post(
+                self.endpoint,
+                headers=headers,
+                json={"model": model, "state": state, "questions": questions},
+                follow_redirects=False,
+            )
+        except httpx.RequestError as exc:
+            raise ProviderError(type(exc).__name__, True) from None
+        if not response.is_success:
+            status = response.status_code
+            raise ProviderError(
+                f"HTTP_{status}",
+                status in (408, 429) or status >= 500,
+                retry_after=retry_delay(response.headers.get("Retry-After")),
+            )
+        try:
+            return response.json()
+        except ValueError:
+            raise ProviderError("InvalidDecisionResponse", False) from None
 
     def evaluate(self, version, concept, evaluator):
         context = {k: version["context"][k] for k in concept["context_fields"]}
@@ -49,20 +136,13 @@ class JevBackend:
                 "true": concept["inclusion"] or concept["definition"],
                 "false": concept["exclusion"] or "The definition does not apply.",
             }
-        response = self.client.post(
-            "https://api.typesafe.ai/v1/systemone",
-            headers={"Authorization": "Bearer " + self.api_key},
-            json={
-                "model": evaluator["model"],
-                "state": {"message": version["text"], "context": context},
-                "questions": {"predicate": question},
-            },
-        )
-        if not response.is_success:
-            code = response.status_code
-            raise ProviderError(f"HTTP_{code}", code in (408, 429) or code >= 500)
+        self.validate_evaluator(evaluator)
         try:
-            payload = response.json()
+            payload = self.infer(
+                evaluator["model"],
+                {"message": version["text"], "context": context},
+                {"predicate": question},
+            )
             answer = payload["answers"]["predicate"]
             if answer["type"] != "noul":
                 raise ValueError("Expected Noul")
@@ -77,7 +157,7 @@ class JevBackend:
                 usage,
                 [{"source_version": version["id"], "scope": "whole_message"}],
             ).validate(evaluator["model"])
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise ProviderError("InvalidResponse", False) from exc
 
 

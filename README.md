@@ -1,4 +1,8 @@
-<h1 align="center">JevSDSQL:</h1>
+<h1 align="center">jevsd-pg</h1>
+
+<p align="center">
+  <img src="sdd/web/mascot.png" width="480" alt="jevsd-pg pangolin mascot with three parallel data paths" />
+</p>
 
 <p align="center">
   <strong>A self-developing SQL database with JEV based semantic operators and natural language queries</strong>
@@ -6,7 +10,7 @@
 
 41 JEV based semantic operators and conditional workflows cover classification, extraction, ranking, matching and verification. Parallel evaluation and reusable evidence reduce repeated work. English and Simplified Chinese queries, optional LLM planning, and text-to-table extraction make the database accessible through a web workspace and HTTP API.
 
-The operators combine JEV's native Noul, Choice and Score primitives with database and workflow logic. JEV is provided by TypeSafe; PostgreSQL handles storage, joins and arithmetic.
+The operators combine JEV's native Noul, Choice and Score primitives with database and workflow logic. The default JEV service is provided by TypeSafe. You can also connect a compatible third-party endpoint or a local model adapter. PostgreSQL handles storage, joins and arithmetic.
 
 [Installation](docs/INSTALLATION.md) · [User guide](docs/USER_GUIDE.md) · [简体中文](docs/zh/USER_GUIDE.md) · [Operator reference](docs/JEV_FUNCTION_REFERENCE.md)
 
@@ -18,16 +22,17 @@ The operators combine JEV's native Noul, Choice and Score primitives with databa
 * Extract database entries from documents. Describe the rows and columns, then review typed values alongside their source text before importing.
 * Preview inserts, updates and deletes before committing them.
 * Call semantic operators for extraction, ranking, matching, verification and conditional workflows.
+* Use TypeSafe, a compatible hosted endpoint or a local Python model adapter without changing operator calls.
 
 The self-developing part is the semantic layer: definitions, evidence and corrections can be saved, reviewed, reused and refreshed as data changes. New concepts require approval before promotion.
 
 ## Getting started
 
-You need Python 3.11 or newer, PostgreSQL and a TypeSafe API key. Python 3.13 and PostgreSQL 17 are the verified configuration. Hybrid mode also requires a configured LLM provider.
+You need Python 3.11 or newer, PostgreSQL and a configured JEV provider. TypeSafe requires an API key; a local provider can run without one. Python 3.13 and PostgreSQL 17 are the verified configuration. Hybrid mode also requires a configured LLM provider.
 
 ```bash
-git clone https://github.com/Sheltercosmo/JevSDSQL.git
-cd JevSDSQL
+git clone https://github.com/Sheltercosmo/jevsd-pg.git
+cd jevsd-pg
 python -m venv .venv
 ```
 
@@ -89,17 +94,11 @@ Use the [operator guide](docs/JEV_OPERATORS.md) to select an operator and set bu
 
 ## Performance and limitations
 
-For this release, a local comparison on 100 BIRD Challenging questions produced the following results. One reference timed out, leaving 99 scored questions. Held proposals were included.
+Independent semantic decisions run in parallel and compatible questions share a request. Cached evidence is scoped to the provider, model revision, source and question. Changing providers does not reuse their model judgments.
 
-| Method | Matching SQL answers | Median request time | Estimated cost per 100 attempts |
-| --- | ---: | ---: | ---: |
-| JEV | 20/99 | 8.55 s | $0.389 |
-| LLM baseline | 39/99 | 8.68 s | $3.262 |
-| Hybrid | 34/99 | 14.23 s | $2.839 |
+This release adds provider compatibility; it does not establish equal accuracy or speed across models. JEV planning supports a bounded set of query structures. All modes can produce incorrect interpretations, so inspect proposals and result completeness before relying on them. Model weights are not included.
 
-Timing covers 94 questions run with up to three concurrent cases. Costs use recorded usage and fixed assumed rates; they are not current prices or subscription charges. See [performance and cost](docs/PERFORMANCE_AND_COST.md) for the measurement conditions and missing usage.
-
-Hybrid cost less on this sample but did not outperform the LLM baseline in accuracy or speed. JEV planning supports a bounded set of query structures. All modes can produce incorrect interpretations; inspect proposals and result completeness before relying on them. JEV and LLM model weights are not included.
+See [provider setup](docs/PROVIDERS.md) for local and hosted configuration and [performance and cost](docs/PERFORMANCE_AND_COST.md) for usage controls and validation scope.
 
 ## Documentation and contributions
 

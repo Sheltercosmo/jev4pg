@@ -14,11 +14,12 @@ def load_env(path=".env"):
 def runtime():
     from .db import Database
     from .execution import Executor
-    from .evaluators import JevBackend
+    from .providers import configured_backend
 
     load_env()
     db = Database(os.getenv("DATABASE_URL", "sqlite:///sdd.db"))
     backends = {}
-    if os.getenv("TYPESAFE_API_KEY"):
-        backends["jev"] = JevBackend(os.environ["TYPESAFE_API_KEY"])
+    backend = configured_backend()
+    if backend is not None:
+        backends["jev"] = backend
     return db, Executor(db, backends)

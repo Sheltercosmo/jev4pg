@@ -1,12 +1,12 @@
 # Installation
 
-JevSDSQL runs as a Python service backed by PostgreSQL. The verified environment uses Python 3.13 and PostgreSQL 17. SQLite is used by the deterministic test suite.
+jevsd-pg runs as a Python service backed by PostgreSQL. The verified environment uses Python 3.13 and PostgreSQL 17. SQLite is used by the deterministic test suite.
 
 ## Python environment
 
 ```bash
-git clone https://github.com/Sheltercosmo/JevSDSQL.git
-cd JevSDSQL
+git clone https://github.com/Sheltercosmo/jevsd-pg.git
+cd jevsd-pg
 python -m venv .venv
 ```
 
@@ -53,7 +53,7 @@ TYPESAFE_API_KEY=<your-jev-provider-key>
 SDD_API_TOKENS={"<your-database-token>":{"tenant":"demo","name":"owner","role":"reviewer"}}
 ```
 
-The database token authenticates a person or client to JevSDSQL. The JEV provider key authenticates the server to TypeSafe. They are different credentials. Generate a database token with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and use that value as the JSON key in `SDD_API_TOKENS`.
+The database token authenticates a person or client to jevsd-pg. The JEV provider key authenticates the server to TypeSafe. They are different credentials. Generate a database token with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and use that value as the JSON key in `SDD_API_TOKENS`.
 
 Apply the schema and tenant policies:
 
@@ -84,6 +84,10 @@ python -m sdd.cli serve
 Open [English](http://127.0.0.1:8000/ask/en), [简体中文](http://127.0.0.1:8000/ask/zh), or the [API reference](http://127.0.0.1:8000/docs). Enter the database token in the connection settings. Import a dataset before asking a question about it.
 
 Existing process environment variables take precedence over `.env`. The supplied `.env.example` is a template, not an active credential file. The repository excludes `.env`, runtime databases and local artifacts.
+
+## Choose a JEV provider
+
+The configuration above uses TypeSafe. To use a compatible third-party service or a local model, follow [provider setup](PROVIDERS.md). A custom HTTP endpoint uses its own optional key; Python adapters need no TypeSafe key.
 
 ## Optional hybrid mode
 

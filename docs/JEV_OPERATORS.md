@@ -7,7 +7,7 @@ Use `POST /jev/call` to run the 41 database operators or a conditional WORKFLOW.
 ## First call
 
 1. Follow the repository's [installation instructions](INSTALLATION.md) and start the server.
-2. Use a database API token configured in `SDD_API_TOKENS`. The server uses `TYPESAFE_API_KEY` separately for JEV calls.
+2. Use a database API token configured in `SDD_API_TOKENS`. The server configures JEV separately; see [provider setup](PROVIDERS.md).
 3. Open [the API reference](http://127.0.0.1:8000/docs), choose Authorize, and enter the database token. Under JEV operators, open `POST /jev/call`, choose an example and select Try it out.
 
 A minimal request:

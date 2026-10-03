@@ -1,6 +1,6 @@
 # Capabilities and operator selection
 
-JevSDSQL separates language interpretation from data execution. JEV supplies bounded semantic decisions, while SQL and application code handle arithmetic, authorization, storage and workflow state. Use the table below to find the relevant API before consulting its full signature.
+jevsd-pg separates language interpretation from data execution. JEV supplies bounded semantic decisions, while SQL and application code handle arithmetic, authorization, storage and workflow state. Use the table below to find the relevant API before consulting its full signature.
 
 ## Query and data workflows
 
@@ -52,4 +52,4 @@ Direct operator populations currently support up to 5,000 registered rows and re
 
 Semantic decisions can be uncertain or fail operationally. Check `output_state`, `operation_state` and coverage before using a value in another operation. Unknown membership can block a write or prevent a result from being described as complete.
 
-JEV is an external service. The open-source project supplies the database integration, operators, execution controls and user interface; it does not bundle JEV model weights. Hybrid mode adds a separately configured LLM provider.
+The default JEV service is external. [Compatible HTTP providers and local Python adapters](PROVIDERS.md) can use the same operator API. The project supplies database integration, operators, execution controls and the user interface; it does not bundle model weights. Hybrid mode adds a separately configured LLM provider.

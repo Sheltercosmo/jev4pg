@@ -1,6 +1,6 @@
 # Dependencies
 
-JevSDSQL uses these libraries for storage, API handling and SQL validation. Exact installed versions are recorded in `requirements.lock.txt`; supported ranges are in `pyproject.toml`.
+jevsd-pg uses these libraries for storage, API handling and SQL validation. Exact installed versions are recorded in `requirements.lock.txt`; supported ranges are in `pyproject.toml`.
 
 | Component | Purpose | Upstream |
 | --- | --- | --- |
@@ -13,6 +13,6 @@ JevSDSQL uses these libraries for storage, API handling and SQL validation. Exac
 | HTTPX | Provider and client HTTP requests | [encode/httpx](https://github.com/encode/httpx) |
 | pytest, Ruff and Playwright | Tests, static checks and browser verification | [pytest](https://github.com/pytest-dev/pytest), [Ruff](https://github.com/astral-sh/ruff), [Playwright](https://github.com/microsoft/playwright-python) |
 
-Each dependency retains its upstream license. The project's Apache 2.0 license applies to original JevSDSQL code and documentation.
+Each dependency retains its upstream license. The project's Apache 2.0 license applies to original jevsd-pg code and documentation.
 
-JEV is provided by the external TypeSafe service. Its API key is configured on the server; model weights are not distributed here. Hybrid mode uses a separately configured LLM through the supported API or local CLI transport. Service terms and charges are separate from this project's license.
+TypeSafe is the default JEV service. Compatible third-party endpoints and local Python model adapters can replace it; see [provider setup](PROVIDERS.md). Credentials are configured on the server. Model weights are not distributed here. Hybrid mode uses a separately configured LLM through the supported API or local CLI transport. Service terms and charges are separate from this project's license.

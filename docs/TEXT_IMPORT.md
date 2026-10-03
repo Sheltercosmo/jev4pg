@@ -16,7 +16,7 @@ The Simplified Chinese interface uses the same operator. Descriptions, column na
 
 ## API example
 
-Requires a configured JEV key and a database reviewer token. They are separate credentials. Send this JSON to `POST /data/extractions` with `Authorization: Bearer <database-token>`:
+Requires a configured JEV provider and a database reviewer token. They are separate credentials. Send this JSON to `POST /data/extractions` with `Authorization: Bearer <database-token>`:
 
 ```json
 {

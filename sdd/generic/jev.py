@@ -1,16 +1,14 @@
 """Bounded Jev decisions shared by generic planning and row classification."""
 
-from email.utils import parsedate_to_datetime
 import math
 import os
 from threading import BoundedSemaphore, Lock
 from contextlib import contextmanager
-import httpx
 from datetime import datetime, timezone
 from sqlalchemy import update
 from .. import schema as base
 from ..ledger import digest
-from ..evaluators import ProviderError
+from ..evaluators import ProviderError, validate_model
 
 
 def reserve(db, tenant):
@@ -102,8 +100,8 @@ def validate_response(result, questions, model):
 class Decisions:
     def __init__(self, db, backend, model="jev-1.13.0"):
         self.db, self.backend, self.model = db, backend, model
-        if "latest" in model or "preview" in model:
-            raise ValueError("Pin the Jev model version")
+        validate_model(model)
+        self.identity = backend.cache_identity(model)
         self.concurrency = max(1, min(16, int(os.getenv("SDD_JEV_CONCURRENCY", "4"))))
 
     @contextmanager
@@ -127,40 +125,7 @@ class Decisions:
                 raise ValueError("Score requires 2–10 ordered levels")
         with self.slot(tenant):
             reserve(self.db, tenant)
-            try:
-                response = self.backend.client.post(
-                    "https://api.typesafe.ai/v1/systemone",
-                    headers={"Authorization": "Bearer " + self.backend.api_key},
-                    json={"model": self.model, "state": state, "questions": questions},
-                )
-            except httpx.RequestError as exc:
-                raise ProviderError(type(exc).__name__, True) from exc
-            if not response.is_success:
-                retry_after = None
-                header = response.headers.get("Retry-After")
-                if header:
-                    try:
-                        retry_after = float(header)
-                    except ValueError:
-                        try:
-                            retry_after = (
-                                parsedate_to_datetime(header) - datetime.now(timezone.utc)
-                            ).total_seconds()
-                        except (ValueError, TypeError, OverflowError):
-                            pass
-                    if retry_after is not None and (
-                        not math.isfinite(retry_after) or retry_after < 0
-                    ):
-                        retry_after = None
-                raise ProviderError(
-                    "HTTP_" + str(response.status_code),
-                    response.status_code in (408, 429) or response.status_code >= 500,
-                    retry_after=retry_after,
-                )
-            try:
-                result = response.json()
-            except ValueError as exc:
-                raise ProviderError("InvalidDecisionResponse", False) from exc
+            result = self.backend.infer(self.model, state, questions)
             return validate_response(result, questions, self.model)
 
 

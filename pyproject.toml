@@ -3,8 +3,8 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jev-sdd"
-version = "0.4.0"
+name = "jevsd-pg"
+version = "0.5.0"
 description = "A self-developing JEV-based SQL database with JEV-powered NL2SQL"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
@@ -17,12 +17,13 @@ browser-test = ["playwright>=1.50,<2"]
 dev = ["ruff==0.16.8"]
 
 [project.urls]
-Repository = "https://github.com/Sheltercosmo/JevSDSQL"
-Documentation = "https://github.com/Sheltercosmo/JevSDSQL/tree/main/docs"
-Issues = "https://github.com/Sheltercosmo/JevSDSQL/issues"
+Repository = "https://github.com/Sheltercosmo/jevsd-pg"
+Documentation = "https://github.com/Sheltercosmo/jevsd-pg/tree/main/docs"
+Issues = "https://github.com/Sheltercosmo/jevsd-pg/issues"
 
 [project.scripts]
 sdd = "sdd.cli:main"
+jevsd-pg = "sdd.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["sdd*"]

@@ -11,6 +11,7 @@ from sqlalchemy import String, cast, func, literal, select, text
 from .analytic_program import AnalyticProgram
 from .catalog import serial
 from .compositional import CompositionalPlanner, FAMILIES
+from ..evaluators import decision_identity
 from .jev import choice, noul, selected
 from .planning_review import PlanReviewRequired
 from .planning_phases import placement
@@ -976,6 +977,7 @@ class ParallelDecisions:
 
     def __init__(self, planner):
         self.planner, self.model = planner, planner.decisions.model
+        self.identity = decision_identity(planner.decisions)
 
     def ask(self, tenant, state, questions):
         jobs = [(state, dict(page)) for page in chunks(questions.items(), 16)]

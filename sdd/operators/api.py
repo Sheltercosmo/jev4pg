@@ -10,6 +10,7 @@ from sqlalchemy import update
 
 from ..ir import Strict
 from ..ledger import digest
+from ..evaluators import decision_identity
 from . import schema
 from .service import OperatorService, manifest, operator_options
 from .store import Store
@@ -108,6 +109,7 @@ def mount(app, db, decisions, identity, reviewer):
             raise ValueError("An approval request cannot reuse another approval")
         limits, policy = operator_options(body.operator, body.limits, body.policy)
         request = {
+            "provider_identity": decision_identity(decisions),
             "source_signature": OperatorService(
                 db, decisions, p["tenant"], p["name"]
             ).source_signature(body.arguments, body.operator),
@@ -144,6 +146,10 @@ def mount(app, db, decisions, identity, reviewer):
         if previous["state"] in {"RUNNING", "RESUMED"}:
             raise ValueError("Run is active or has already been resumed")
         request = previous["request"]
+        if request.get(
+            "provider_identity", previous["result"].get("manifest", {}).get("model")
+        ) != decision_identity(decisions):
+            raise ValueError("Provider configuration changed; submit a new request")
         limits = dict(request["limits"])
         usage = previous["result"].get("manifest", {})
         for limit, used in (

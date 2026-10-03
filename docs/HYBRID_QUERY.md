@@ -19,7 +19,7 @@ Configure these server environment variables:
 
 | Setting | Purpose |
 | --- | --- |
-| `TYPESAFE_API_KEY` | JEV provider credential. |
+| `TYPESAFE_API_KEY` | Credential for the default JEV service; see [providers](PROVIDERS.md) for alternatives. |
 | `OPENAI_API_KEY` | LLM provider credential for the API transport. |
 | `SDD_LLM_TRANSPORT=openai` | Use the Responses API. |
 | `SDD_LLM_MODEL` | A structured-output model available to your provider account. |

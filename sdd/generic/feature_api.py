@@ -49,7 +49,7 @@ def mount(app, executor, decisions, identity, reviewer):
 
     def configured():
         if decisions is None:
-            raise HTTPException(503, "Configure TYPESAFE_API_KEY to evaluate features")
+            raise HTTPException(503, "Configure a JEV provider to evaluate features")
 
     @app.get("/features", tags=["Semantic features"])
     def features(dataset_id: str | None = None, p=Depends(identity)):

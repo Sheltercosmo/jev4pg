@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from sqlalchemy import select, update, insert, delete
 
 from ..ledger import uid, now, digest
-from ..evaluators import ProviderError
+from ..evaluators import ProviderError, decision_identity
 from . import schema
 from .catalog import Catalog, serial
 from .jev import validate_response
@@ -56,7 +56,7 @@ class Semantics:
                         row_key,
                         dependency_hash,
                         spec.key,
-                        self.decisions.model,
+                        decision_identity(self.decisions),
                     ]
                 )
                 if spec.feature_id:
@@ -197,7 +197,7 @@ class Semantics:
                         row_key=row_key,
                         row_hash=dependency_hash,
                         definition=spec.definition,
-                        evaluator=self.decisions.model,
+                        evaluator=decision_identity(self.decisions),
                         state="pending",
                         usage={},
                         lease_until=0,

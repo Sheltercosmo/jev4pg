@@ -206,7 +206,7 @@ def mount(app, executor, identity, reviewer):
     def ask(body: QuestionInput, p=Depends(identity)):
         def execute():
             if planner is None:
-                raise HTTPException(503, "Configure TYPESAFE_API_KEY to enable Jev planning")
+                raise HTTPException(503, "Configure a JEV provider to enable planning")
             selected_reviews = (
                 PlanReviews(
                     executor.db, Planner(executor.db, planner.decisions, "hybrid", planner.llm)
@@ -240,7 +240,7 @@ def mount(app, executor, identity, reviewer):
     @app.post("/ask/review", tags=["Generic query"])
     def correct_plan(body: PlanCorrectionInput, p=Depends(identity)):
         if reviews is None:
-            raise HTTPException(503, "Configure TYPESAFE_API_KEY to enable Jev planning")
+            raise HTTPException(503, "Configure a JEV provider to enable planning")
         original = reviews.load(p["tenant"], p["name"], body.review_id)
         parent = (
             history.get(p["tenant"], p["name"], body.parent_history_id)
@@ -279,7 +279,7 @@ def mount(app, executor, identity, reviewer):
     @app.post("/ask/confirm", tags=["Generic query"])
     def confirm_plan(body: PlanConfirmationInput, p=Depends(identity)):
         if reviews is None:
-            raise HTTPException(503, "Configure TYPESAFE_API_KEY to enable Jev planning")
+            raise HTTPException(503, "Configure a JEV provider to enable planning")
         plan = reviews.confirm(p["tenant"], p["name"], body.review_id)
 
         def execute():
@@ -350,7 +350,7 @@ def mount(app, executor, identity, reviewer):
         if record["status"] == "redacted" or not record["review_id"]:
             raise ValueError("This history entry has no available planning decisions")
         if reviews is None:
-            raise HTTPException(503, "Configure TYPESAFE_API_KEY to enable Jev planning")
+            raise HTTPException(503, "Configure a JEV provider to enable planning")
         plan = reviews.reopen(p["tenant"], p["name"], record["review_id"])
         return {
             "plan": plan,

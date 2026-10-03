@@ -7,7 +7,7 @@ from .config import runtime
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Self-Developing Database")
+    parser = argparse.ArgumentParser(description="jevsd-pg database workspace")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init")
     sub.add_parser("demo")
@@ -37,6 +37,11 @@ def main():
     live.add_argument("--model", required=True)
     live.add_argument("--output", default="artifacts/live-test.json")
     args = parser.parse_args()
+    if args.command == "serve":
+        import uvicorn
+
+        uvicorn.run("sdd.api:create_app", factory=True, host="127.0.0.1", port=args.port)
+        return
     db, executor = runtime()
     if args.command == "init":
         db.initialize()
@@ -46,10 +51,6 @@ def main():
 
         db.initialize()
         print(json.dumps(demo(db), indent=2))
-    elif args.command == "serve":
-        import uvicorn
-
-        uvicorn.run("sdd.api:create_app", factory=True, host="127.0.0.1", port=args.port)
     elif args.command == "worker":
         while True:
             worked = executor.workers.work_one(args.tenant)
@@ -63,7 +64,7 @@ def main():
 
         _, service, _ = services(executor)
         if service.decisions is None:
-            parser.error("Configure TYPESAFE_API_KEY to maintain semantic features")
+            parser.error("Configure a JEV provider to maintain semantic features")
         registry = FeatureRegistry(db)
         while True:
             worked = registry.work_one(args.tenant, service.decisions)
@@ -111,7 +112,7 @@ def main():
         owner = next((p["name"] for p in principals if p["tenant"] == tenant), "local-cli")
         _, service, planner = services(executor)
         if planner is None:
-            parser.error("Configure TYPESAFE_API_KEY to enable Jev planning.")
+            parser.error("Configure a JEV provider to enable planning.")
         from .generic.planning_review import PlanReviews, PlanReviewRequired
         from .generic.history import QueryHistory
 

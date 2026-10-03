@@ -14,6 +14,7 @@ from sqlglot.optimizer.qualify import qualify
 from sqlglot.schema import MappingSchema
 from sqlglot.optimizer.scope import traverse_scope
 from sqlalchemy import text, insert, update, delete, select
+from ..evaluators import decision_identity
 from ..ledger import uid, now, digest
 from .catalog import Catalog, serial
 from .semantics import Semantics
@@ -756,7 +757,7 @@ class SQLService:
                 "snapshot_mode": snapshot_mode if native_read else "content_hash",
                 "complete": complete,
                 "semantic_coverage": coverage,
-                "evaluator": self.decisions.model if self.decisions else None,
+                "evaluator": decision_identity(self.decisions) if self.decisions else None,
                 "decision_policy": {"accept": accept, "reject": reject},
                 "result_is_partial": not complete,
                 "evidence": evidence,

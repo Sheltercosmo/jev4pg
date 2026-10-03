@@ -1,6 +1,6 @@
 # Architecture
 
-JevSDSQL has three main responsibilities: interpret the request, establish the evidence needed by that interpretation, and execute authorized data operations. Keeping these responsibilities separate makes plans inspectable and allows independent semantic work to run in parallel.
+jevsd-pg has three main responsibilities: interpret the request, establish the evidence needed by that interpretation, and execute authorized data operations. Keeping these responsibilities separate makes plans inspectable and allows independent semantic work to run in parallel.
 
 ## Components
 
@@ -45,3 +45,11 @@ Ordinary reads use a database transaction. Semantic reads retain the source evid
 ## Extending the system
 
 Add a reusable operator or planning mechanism through its typed inputs and result contract. Record when a new stage depends on another result and what work can remain independent. Keep dataset names and expected benchmark answers out of production decisions. See [contribution guidance](../CONTRIBUTING.md) for tests and documentation.
+
+## Provider boundary
+
+Provider transport sits below the typed stage DAG. Each dispatch receives one complete shared-context question batch. Independent batches retain the existing worker and tenant concurrency limits; changing an endpoint does not introduce a new planning barrier.
+
+The HTTP and Python adapters return the same Noul, Choice and Score envelope. Validation occurs before evidence is stored. Failed or malformed responses remain operational failures, and skipped branches remain NOT_EVALUATED.
+
+Cache identity includes endpoint or adapter, configured revision and model. Reviews, operator approvals and automatic refresh bind to that identity, so changing a provider cannot silently reuse its model judgments. Local predictors must support concurrent calls or serialize access internally when their runtime requires it.

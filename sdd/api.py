@@ -130,8 +130,8 @@ def create_app(executor=None, tokens=None):
                 await asyncio.to_thread(worker.join, 3)
 
     app = FastAPI(
-        title="SDD · Semantic evidence database",
-        version="0.4.0",
+        title="jevsd-pg",
+        version="0.5.0",
         lifespan=lifespan,
         description="Query, inspect evidence, review decisions, and govern reusable concepts. Tenant is bound to the bearer token.",
     )
@@ -175,7 +175,7 @@ def create_app(executor=None, tokens=None):
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": "0.4.0"}
+        return {"status": "ok", "version": "0.5.0"}
 
     @app.get("/catalog")
     def catalog(p=Depends(identity)):
@@ -209,7 +209,13 @@ def create_app(executor=None, tokens=None):
 
     @app.post("/evaluators")
     def evaluator(body: EvaluatorInput, p=Depends(reviewer)):
-        return ledger.evaluator(p["tenant"], "jev", body.model)
+        backend = executor.workers.backends.get("jev")
+        preprocessing = (
+            backend.preprocessing(body.model)
+            if hasattr(backend, "preprocessing")
+            else "identity-v1"
+        )
+        return ledger.evaluator(p["tenant"], "jev", body.model, preprocessing=preprocessing)
 
     @app.post("/policies")
     def policy(body: PolicyInput, p=Depends(reviewer)):

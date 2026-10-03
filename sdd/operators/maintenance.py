@@ -4,6 +4,7 @@ import time
 
 from sqlalchemy import select, update
 
+from ..evaluators import decision_identity
 from . import schema
 from .service import OperatorService
 from .store import Store
@@ -52,7 +53,8 @@ def work_one(db, decisions, tenant):
         snapshot = service.population_hash(service.catalog.rows(tenant, dataset, limit=5001))
         if [snapshot] == generation["snapshot"]:
             return True
-        if decisions.model != generation["coverage"]["model"]:
+        coverage = generation["coverage"]
+        if decision_identity(decisions) != coverage.get("provider_identity", coverage["model"]):
             state = "MODEL_CHANGED"
             return True
         with db.transaction(tenant) as connection:

@@ -8,6 +8,7 @@ Start with installation, then use the workspace guide or API examples for your t
 | [Workspace](USER_GUIDE.md) | Queries, corrections, history and data changes. |
 | [简体中文指南](zh/USER_GUIDE.md) | 简体中文工作区使用说明。 |
 | [Query API](NATURAL_LANGUAGE.md) | Planning, review, confirmation and saved queries. |
+| [JEV providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
 | [Text imports](TEXT_IMPORT.md) | Row descriptions, typed extraction and import. |
 | [Semantic features](SEMANTIC_FEATURES.md) | Reviewed definitions, corrections and refresh. |

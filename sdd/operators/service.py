@@ -1,4 +1,4 @@
-"""Authorized catalog adapter and public dispatch for the proposed JEV interfaces."""
+"""Authorized catalog adapter and public dispatch for JEV interfaces."""
 
 import inspect
 import json
@@ -13,6 +13,7 @@ from ..generic.catalog import Catalog, serial
 from ..generic.planner import Planner
 from ..generic.planning_review import PlanReviewRequired
 from ..ledger import digest
+from ..evaluators import decision_identity
 from . import schema
 from .advanced import AdvancedOperators
 from .extraction import ExtractionOperators
@@ -83,6 +84,7 @@ class OperatorService(
         self.expected_sources = self.source_signature(arguments, name)
         request = {
             "source_signature": self.expected_sources,
+            "provider_identity": decision_identity(self.decisions),
             "operator": name,
             "arguments": arguments,
             "limits": asdict(limits),
@@ -532,6 +534,7 @@ class OperatorService(
 
         class Adapter:
             model = service.runtime.model
+            identity = service.runtime.identity
 
             def ask(self, tenant, state, questions):
                 work = [WorkItem(k, state, q, "sql-planning") for k, q in questions.items()]

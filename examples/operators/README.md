@@ -2,7 +2,7 @@
 
 Install and start the database using the [repository setup](../../docs/INSTALLATION.md). The examples use `httpx`, which is included in the project dependencies. Run them from the repository root with the installed Python environment.
 
-Set `SDD_TOKEN` to a database API token from your server's `SDD_API_TOKENS` configuration. The server's `TYPESAFE_API_KEY` is a different credential and is not sent by these clients.
+Set `SDD_TOKEN` to a database API token from your server's `SDD_API_TOKENS` configuration. Provider credentials belong to the server and are not sent by these clients. See [provider setup](../../docs/PROVIDERS.md).
 
 PowerShell:
 

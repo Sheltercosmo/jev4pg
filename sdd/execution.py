@@ -20,6 +20,9 @@ class Executor:
             for cid in sorted(plan.predicate.concepts())
         }
         evaluator = self.ledger.get(tenant, s.evaluators, plan.evaluator_id)
+        backend = self.workers.backends.get(evaluator["provider"])
+        if hasattr(backend, "validate_evaluator"):
+            backend.validate_evaluator(evaluator)
         policy = self.ledger.get(tenant, s.policies, plan.policy_id)
         if any(c["status"] == "deprecated" for c in concepts.values()):
             raise ValueError("Deprecated concepts cannot create new runs")

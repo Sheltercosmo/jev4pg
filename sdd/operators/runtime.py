@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from threading import Lock
 
-from ..evaluators import ProviderError
+from ..evaluators import ProviderError, decision_identity
 from ..generic.jev import validate_response
 from ..ledger import digest
 from . import schema
@@ -76,6 +76,7 @@ class Runtime:
         self.budget, self.policy = Budget(limits), policy or Policy()
         self.approved, self.source_check = approved, source_check or (lambda connection=None: True)
         self.model = decisions.model if decisions else "unconfigured"
+        self.identity = decision_identity(decisions)
         self.warnings = []
         self.stages = 0
 
@@ -84,7 +85,7 @@ class Runtime:
             [
                 "jev-operators-v1",
                 self.store.tenant,
-                self.model,
+                self.identity,
                 item.subject_id,
                 item.source_revisions,
                 item.state,
@@ -284,7 +285,7 @@ class Runtime:
                             schema.observations,
                             connection=connection,
                             cache_key=self.key(item),
-                            model=self.model,
+                            model=self.identity,
                             subject_id=item.subject_id,
                             source_revisions=list(item.source_revisions),
                             question=item.question,
@@ -341,6 +342,7 @@ class Runtime:
             **coverage(decisions),
             **self.budget.manifest(),
             "model": self.model,
+            "provider_identity": self.identity,
             "policy_revision": self.policy.revision,
             "logical_evaluation_stages": self.stages,
             "warnings": sorted(set(self.warnings)),
