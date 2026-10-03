@@ -1,0 +1,322 @@
+use jev_executor::source::{MAX_CONTEXT_BYTES, parse_source};
+use jev_executor::{EvaluationInput, Executor, Limits, Provider, Questions, validate_questions};
+use pgrx::JsonB;
+use pgrx::prelude::*;
+use serde_json::Value;
+use std::collections::{HashSet, VecDeque};
+use std::ffi::CString;
+
+pub type ResultRow = (String, i64, JsonB, JsonB, Option<JsonB>, JsonB);
+
+pub struct SourceSpec {
+    id: String,
+    sql: String,
+    questions: Questions,
+}
+
+impl SourceSpec {
+    pub fn new(id: String, sql: String, questions: Value) -> Self {
+        if id.is_empty() || id.len() > 200 || sql.is_empty() || sql.len() > 30_000 {
+            error!("Supply a source identity and one bounded source SELECT");
+        }
+        let questions: Questions =
+            serde_json::from_value(questions).unwrap_or_else(|_| error!("Invalid typed questions"));
+        validate_questions(&questions).unwrap_or_else(|message| error!("{}", message));
+        Self { id, sql, questions }
+    }
+}
+
+pub fn sources(value: Value) -> Vec<SourceSpec> {
+    if serde_json::to_vec(&value).expect("JSON serializes").len() > 2_000_000 {
+        error!("Native source declarations exceed 2 MB");
+    }
+    let entries = value
+        .as_array()
+        .filter(|items| (1..=32).contains(&items.len()))
+        .unwrap_or_else(|| error!("Supply 1 to 32 independent source declarations"));
+    let mut identities = HashSet::new();
+    entries
+        .iter()
+        .map(|entry| {
+            let object = entry
+                .as_object()
+                .unwrap_or_else(|| error!("Invalid source declaration"));
+            if object.len() != 3
+                || !object
+                    .keys()
+                    .all(|key| ["id", "sql", "questions"].contains(&key.as_str()))
+            {
+                error!("Each source requires only id, sql and questions");
+            }
+            let id = entry["id"]
+                .as_str()
+                .unwrap_or_else(|| error!("Source identity must be text"));
+            if !identities.insert(id.to_owned()) {
+                error!("Source identities must be unique");
+            }
+            let sql = entry["sql"]
+                .as_str()
+                .unwrap_or_else(|| error!("Source SELECT must be text"));
+            SourceSpec::new(id.to_owned(), sql.to_owned(), entry["questions"].clone())
+        })
+        .collect()
+}
+
+struct SourceCursor {
+    spec: SourceSpec,
+    cursor: Option<String>,
+    seen: usize,
+    cleanup: Option<CursorCleanup>,
+}
+
+struct CursorCleanup {
+    context: *mut pg_sys::ExprContext,
+    name: *mut std::ffi::c_char,
+}
+
+#[pgrx::pg_guard]
+unsafe extern "C-unwind" fn close_source_cursor(argument: pg_sys::Datum) {
+    // Normal shutdown/rescan uses this callback; PostgreSQL owns abort cleanup.
+    unsafe {
+        let portal = pg_sys::SPI_cursor_find(argument.cast_mut_ptr());
+        if !portal.is_null() {
+            pg_sys::SPI_cursor_close(portal);
+        }
+    }
+}
+
+fn register_cursor_cleanup(fcinfo: pg_sys::FunctionCallInfo, name: &str) -> CursorCleanup {
+    let name = CString::new(name).expect("PostgreSQL cursor names contain no NUL");
+    // Callback names live in the query context, independently of movable Rust values.
+    unsafe {
+        let info = (*fcinfo).resultinfo.cast::<pg_sys::ReturnSetInfo>();
+        let context = (*info).econtext;
+        let name = pg_sys::MemoryContextStrdup((*context).ecxt_per_query_memory, name.as_ptr());
+        pg_sys::RegisterExprContextCallback(
+            context,
+            Some(close_source_cursor),
+            pg_sys::Datum::from(name),
+        );
+        CursorCleanup { context, name }
+    }
+}
+
+impl SourceCursor {
+    fn open(spec: SourceSpec, fcinfo: pg_sys::FunctionCallInfo) -> Self {
+        let query = format!(
+            "SELECT CASE WHEN octet_length(__jev_context.body) <= {MAX_CONTEXT_BYTES} \
+             THEN __jev_context.body ELSE NULL END \
+             FROM (SELECT row_to_json(__jev_source)::text AS body \
+                   FROM ({}) AS __jev_source OFFSET 0) AS __jev_context",
+            spec.sql.trim_end().trim_end_matches(';')
+        );
+        let cursor = Spi::connect(|client| {
+            client
+                .try_open_cursor(&query, &[])
+                .map(|c| c.detach_into_name())
+        })
+        .unwrap_or_else(|_| {
+            error!("Source must be one SELECT authorized for the current PostgreSQL role")
+        });
+        let cleanup = Some(register_cursor_cleanup(fcinfo, &cursor));
+        Self {
+            spec,
+            cursor: Some(cursor),
+            seen: 0,
+            cleanup,
+        }
+    }
+
+    fn fetch(&mut self, count: usize, bytes: &mut usize) -> VecDeque<(i64, Value)> {
+        let name = self
+            .cursor
+            .as_ref()
+            .expect("Only active cursors are fetched");
+        let rows: Vec<Value> = Spi::connect(|client| {
+            let mut cursor = client.find_cursor(name)?;
+            let table = cursor.fetch(count as i64)?;
+            let rows = table
+                .into_iter()
+                .map(|row| {
+                    row.get::<String>(1).map(|value| {
+                        let text = value.unwrap_or_else(|| {
+                            error!("Semantic source exceeds the 1 MB context limit")
+                        });
+                        *bytes += text.len();
+                        if *bytes > 8_000_000 {
+                            error!("Semantic source batch exceeds 8 MB; reduce batch_rows");
+                        }
+                        parse_source(&text).unwrap_or_else(|message| error!("{}", message))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            cursor.detach_into_name();
+            Ok::<_, pgrx::spi::Error>(rows)
+        })
+        .unwrap_or_else(|_| error!("Could not read the authorized source relation"));
+        if rows.len() < count {
+            self.close();
+        }
+        rows.into_iter()
+            .map(|source| {
+                self.seen += 1;
+                (self.seen as i64, source)
+            })
+            .collect()
+    }
+
+    fn close(&mut self) {
+        if let Some(cleanup) = self.cleanup.take() {
+            // Unregister before closing so later portal-name reuse cannot close another cursor.
+            unsafe {
+                pg_sys::UnregisterExprContextCallback(
+                    cleanup.context,
+                    Some(close_source_cursor),
+                    pg_sys::Datum::from(cleanup.name),
+                );
+            }
+        }
+        if let Some(name) = self.cursor.take() {
+            Spi::connect(|client| {
+                if let Ok(cursor) = client.find_cursor(&name) {
+                    drop(cursor);
+                }
+            });
+        }
+    }
+}
+
+struct SourceRow {
+    index: usize,
+    ordinal: i64,
+    source: Value,
+}
+
+pub struct SemanticScan {
+    sources: Vec<SourceCursor>,
+    executor: Executor,
+    pending: VecDeque<ResultRow>,
+    next_source: usize,
+    seen: usize,
+}
+
+impl SemanticScan {
+    pub fn new(sources: Vec<SourceSpec>, options: Value, fcinfo: pg_sys::FunctionCallInfo) -> Self {
+        let limits: Limits = serde_json::from_value(options)
+            .unwrap_or_else(|_| error!("Invalid native execution options"));
+        limits
+            .validate()
+            .unwrap_or_else(|message| error!("{}", message));
+        let config_path = std::env::var("JEV_NATIVE_CONFIG_FILE").unwrap_or_else(|_| {
+            error!("Administrator must configure JEV_NATIVE_CONFIG_FILE on the PostgreSQL server")
+        });
+        let config = std::fs::read_to_string(config_path)
+            .unwrap_or_else(|_| error!("Cannot read native provider configuration"));
+        let provider: Provider = serde_json::from_str(&config)
+            .unwrap_or_else(|_| error!("Invalid native provider configuration"));
+        let executor =
+            Executor::new(provider, limits).unwrap_or_else(|message| error!("{}", message));
+        let sources = sources
+            .into_iter()
+            .map(|source| SourceCursor::open(source, fcinfo))
+            .collect();
+        Self {
+            sources,
+            executor,
+            pending: VecDeque::new(),
+            next_source: 0,
+            seen: 0,
+        }
+    }
+
+    fn read_batch(&mut self) -> Vec<SourceRow> {
+        let mut active = self
+            .sources
+            .iter()
+            .filter(|source| source.cursor.is_some())
+            .count();
+        let mut chunks = Vec::new();
+        let mut count = 0;
+        let mut bytes = 0;
+        let start = self.next_source;
+        for offset in 0..self.sources.len() {
+            if count == self.executor.limits.batch_rows || active == 0 {
+                break;
+            }
+            let index = (start + offset) % self.sources.len();
+            if self.sources[index].cursor.is_none() {
+                continue;
+            }
+            let quota = (self.executor.limits.batch_rows - count).div_ceil(active);
+            active -= 1;
+            let rows = self.sources[index].fetch(quota, &mut bytes);
+            count += rows.len();
+            chunks.push((index, rows));
+        }
+        if self.seen + count > self.executor.limits.max_rows {
+            error!(
+                "Semantic source exceeds max_rows; constrain the source query or raise its explicit limit"
+            );
+        }
+        self.seen += count;
+        let mut rows = Vec::with_capacity(count);
+        while rows.len() < count {
+            for (index, chunk) in &mut chunks {
+                if let Some((ordinal, source)) = chunk.pop_front() {
+                    rows.push(SourceRow {
+                        index: *index,
+                        ordinal,
+                        source,
+                    });
+                }
+            }
+        }
+        if let Some(last) = rows.last() {
+            self.next_source = (last.index + 1) % self.sources.len();
+        }
+        rows
+    }
+}
+
+impl Iterator for SemanticScan {
+    type Item = ResultRow;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(row) = self.pending.pop_front() {
+            return Some(row);
+        }
+        pgrx::check_for_interrupts!();
+        let rows = self.read_batch();
+        if rows.is_empty() {
+            return None;
+        }
+        let inputs: Vec<_> = rows
+            .iter()
+            .map(|row| EvaluationInput {
+                source: &row.source,
+                questions: &self.sources[row.index].spec.questions,
+            })
+            .collect();
+        let results = self
+            .executor
+            .evaluate_many(&inputs, || {
+                pgrx::check_for_interrupts!();
+            })
+            .unwrap_or_else(|message| error!("{}", message));
+        for (row, evaluation) in rows.into_iter().zip(results) {
+            self.pending.push_back((
+                self.sources[row.index].spec.id.clone(),
+                row.ordinal,
+                JsonB(row.source),
+                JsonB(
+                    serde_json::to_value(evaluation.decisions).expect("Typed decisions serialize"),
+                ),
+                evaluation.observation.map(|observation| {
+                    JsonB(serde_json::to_value(observation).expect("Observations serialize"))
+                }),
+                JsonB(serde_json::to_value(&self.executor.usage).expect("Usage serializes")),
+            ));
+        }
+        self.pending.pop_front()
+    }
+}

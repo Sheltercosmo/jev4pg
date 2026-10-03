@@ -264,6 +264,23 @@ def verify_application(connection, observations):
         assert len(observations) == start + 2
         assert result["manifest"]["semantic_coverage"]["new_evaluations"] == 2
         assert result["manifest"]["semantic_coverage"]["budget_skipped"] == 4
+        assert result["manifest"]["native_source_populations"] == 2
+        assert result["manifest"]["native_scheduler"] == "shared_round_robin"
+        assert (
+            sum(
+                step["sql"].startswith("CREATE TEMP TABLE")
+                for step in result["manifest"]["execution_steps"]
+            )
+            == 1
+        )
+        with db.transaction(tenant) as cx:
+            assert (
+                cx.execute(
+                    text("SELECT requests FROM native_query_admissions WHERE id=:id"),
+                    {"id": result["manifest"]["admission_id"]},
+                ).scalar_one()
+                == 2
+            )
         assert not result["manifest"]["complete"]
         for query in [
             "SELECT COUNT(*) AS n FROM work_items WHERE SEMANTIC(note,'Complete?')",
@@ -327,6 +344,29 @@ def verify_application(connection, observations):
         assert result["manifest"]["semantic_coverage"]["unresolved"] == 0
         checks.append(
             "question-specific source domains avoid unrelated calls and false incompleteness"
+        )
+        catalog.create(
+            tenant,
+            "matching_contexts",
+            [
+                {"id": 1, "note": "完成", "p": 0.95},
+                {"id": 2, "note": "pending", "p": 0.05},
+                {"id": 3, "note": "O'Reilly 100% complete", "p": 0.95},
+            ],
+            primary_key=["id"],
+        )
+        start = len(observations)
+        result = sql.execute(
+            tenant,
+            "SELECT a.id FROM work_items a JOIN matching_contexts b ON a.id=b.id "
+            "WHERE SEMANTIC(a.note,'Complete?') AND SEMANTIC(b.note,'Complete?') ORDER BY a.id",
+        )
+        assert result["result"] == [{"id": 1}, {"id": 3}]
+        assert len(observations) == start + 3
+        assert result["manifest"]["semantic_coverage"]["requests"] == 3
+        assert result["manifest"]["semantic_coverage"]["resolved"] == 6
+        checks.append(
+            "application populations share context reuse and settle cumulative usage only once"
         )
         start = len(observations)
         try:
@@ -473,6 +513,54 @@ def verify_application(connection, observations):
             )
         checks.append(
             "cancellation after real dispatch preserves durable uncertain usage through rollback"
+        )
+        failure_tenant = "native-late-source-error"
+        for table_name in ("small_rows", "large_rows"):
+            catalog.create(
+                failure_tenant,
+                table_name,
+                [
+                    {
+                        "id": index,
+                        "note": "x" * 1_000_001
+                        if table_name == "large_rows" and index == 17
+                        else table_name,
+                        "p": 0.95,
+                    }
+                    for index in range(1, 18)
+                ],
+                primary_key=["id"],
+            )
+        start = len(observations)
+        try:
+            sql.execute(
+                failure_tenant,
+                "SELECT SEMANTIC(a.note,'Complete?') AS a,SEMANTIC(b.note,'Complete?') AS b "
+                "FROM small_rows a JOIN large_rows b ON a.id=b.id",
+                max_evaluations=40,
+            )
+        except DBAPIError as error:
+            assert "1 MB context limit" in str(error)
+        else:
+            raise AssertionError("Native source accepted an oversized context")
+        assert len(observations) == start + 32
+        with db.transaction(failure_tenant) as cx:
+            reservation = cx.execute(
+                text(
+                    "SELECT reserved,requests,state FROM native_query_admissions WHERE tenant=:tenant"
+                ),
+                {"tenant": failure_tenant},
+            ).one()
+            assert tuple(reservation) == (40, None, "UNCERTAIN")
+            assert (
+                cx.execute(
+                    text("SELECT calls FROM tenant_daily_usage WHERE tenant=:tenant"),
+                    {"tenant": failure_tenant},
+                ).scalar_one()
+                == 40
+            )
+        checks.append(
+            "a late error in another source retains the shared allowance after real dispatch"
         )
         previous = os.environ.get("SDD_DAILY_EVALUATIONS")
         os.environ["SDD_DAILY_EVALUATIONS"] = "3"

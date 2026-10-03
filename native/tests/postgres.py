@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PG_BIN = Path(os.environ.get("PG_BIN", "/usr/lib/postgresql/17/bin"))
 QUESTIONS = {"done": {"type": "noul", "instructions": "Has the work been completed? 完成了吗？"}}
 observations = []
+gates = {}
 lock = threading.Lock()
 active = peak = 0
 
@@ -37,6 +38,8 @@ class Model(BaseHTTPRequestHandler):
             active += 1
             peak = max(peak, active)
         try:
+            if gate := payload["state"].get("gate"):
+                gates[gate].wait(timeout=3)
             time.sleep(float(payload["state"].get("delay", 0.025)))
             probability = payload["state"].get("p", 0.95)
             if isinstance(probability, Decimal):
@@ -143,7 +146,9 @@ def verify(connection):
     assert invalid[0][2]["done"]["output_state"] == "NOT_EVALUATED"
     checks.append("malformed provider results remain operational failures")
 
-    connection.execute("CREATE TABLE evidence_source AS SELECT 1 AS id,'完成'::text AS note,0.7::numeric AS p")
+    connection.execute(
+        "CREATE TABLE evidence_source AS SELECT 1 AS id,'完成'::text AS note,0.7::numeric AS p"
+    )
     connection.execute(
         "CREATE TABLE saved_evidence AS SELECT * FROM jev_native.scan('SELECT * FROM evidence_source',%s)",
         (Jsonb(QUESTIONS),),
@@ -168,18 +173,23 @@ def verify(connection):
         )
         connection.execute("DELETE FROM evidence_source")
         assert replay.execute("SELECT count(*) FROM saved_evidence").fetchone()[0] == 1
-        assert replay.execute(
-            "SELECT jev_native.decide(source,observation)->'done'->>'output_state' FROM saved_evidence"
-        ).fetchone()[0] == "UNKNOWN"
+        assert (
+            replay.execute(
+                "SELECT jev_native.decide(source,observation)->'done'->>'output_state' FROM saved_evidence"
+            ).fetchone()[0]
+            == "UNKNOWN"
+        )
         must_fail(lambda: replay.execute("SELECT jev_native.decide('{}',NULL)"), "not evaluated")
         must_fail(
             lambda: replay.execute(
-                "SELECT jev_native.decide(source,observation,'{\"accept\":0.1,\"reject\":0.2}') FROM saved_evidence"
+                'SELECT jev_native.decide(source,observation,\'{"accept":0.1,"reject":0.2}\') FROM saved_evidence'
             ),
             "thresholds",
         )
     assert len(observations) == start
-    checks.append("durable observations replay across sessions without requests and reject changed contexts")
+    checks.append(
+        "durable observations replay across sessions without requests and reject changed contexts"
+    )
 
     for literal in ["1e-7::float8", "-0.0::numeric", "900719925474099312345.123456789::numeric"]:
         result = connection.execute(
@@ -193,7 +203,9 @@ def verify(connection):
     ).fetchone()
     assert no_evidence[0] is None
     assert no_evidence[1]["done"]["output_state"] == "NOT_EVALUATED"
-    checks.append("evidence survives PostgreSQL numeric normalization and absent work has no observation")
+    checks.append(
+        "evidence survives PostgreSQL numeric normalization and absent work has no observation"
+    )
 
     large = "900719925474099312345.123456789"
     scan(connection, "SELECT " + large + "::numeric AS amount")
@@ -309,7 +321,10 @@ def verify(connection):
         "100,000 duplicate contexts retain multiplicity with one request and bounded observed memory"
     )
     from application import verify_application
+    from multi_source import verify_multi_source
 
+    multi_checks, multi_metrics = verify_multi_source(connection, observations, gates, must_fail)
+    checks.extend(multi_checks)
     checks.extend(verify_application(connection, observations))
     return {
         "checks": checks,
@@ -320,6 +335,7 @@ def verify(connection):
         "cancellation_seconds": elapsed,
         "bulk_scan_seconds": bulk_seconds,
         "bulk_scan_incremental_peak_kib": memory_kib,
+        "multi_source_fixture": multi_metrics,
     }
 
 

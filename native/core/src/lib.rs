@@ -177,6 +177,11 @@ pub struct Evaluation {
     pub observation: Option<Observation>,
 }
 
+pub struct EvaluationInput<'a> {
+    pub source: &'a Value,
+    pub questions: &'a Questions,
+}
+
 impl Evaluation {
     fn unexecuted(questions: &Questions, state: &str, reason: &str) -> Self {
         Self {
@@ -237,17 +242,34 @@ impl Executor {
         &mut self,
         rows: &[Value],
         questions: &Questions,
-        mut check_interrupt: impl FnMut(),
+        check_interrupt: impl FnMut(),
     ) -> Result<Vec<Evaluation>, &'static str> {
         validate_questions(questions)?;
-        if rows.len() > self.limits.batch_rows {
+        let inputs: Vec<_> = rows
+            .iter()
+            .map(|source| EvaluationInput { source, questions })
+            .collect();
+        self.evaluate_many(&inputs, check_interrupt)
+    }
+
+    pub fn evaluate_many(
+        &mut self,
+        inputs: &[EvaluationInput<'_>],
+        mut check_interrupt: impl FnMut(),
+    ) -> Result<Vec<Evaluation>, &'static str> {
+        if inputs.len() > self.limits.batch_rows {
             return Err("Source batch exceeds batch_rows");
         }
-        let mut results: Vec<Option<Evaluation>> = vec![None; rows.len()];
+        for input in inputs {
+            validate_questions(input.questions)?;
+        }
+        let mut results: Vec<Option<Evaluation>> = vec![None; inputs.len()];
         let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
         let mut requests = Vec::new();
         let mut output_bytes = 0;
-        for (index, row) in rows.iter().enumerate() {
+        for (index, input) in inputs.iter().enumerate() {
+            let row = input.source;
+            let questions = input.questions;
             let (active, skipped) = applicable_questions(row, questions)?;
             if active.is_empty() {
                 results[index] = Some(Evaluation {

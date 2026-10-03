@@ -195,7 +195,7 @@ def _source_text(service, connection, dataset, query, source):
         return cursor.mogrify(str(statement), parameters)
 
 
-def _coverage(connection, relation):
+def _usage(connection, relation):
     usage = (
         connection.execute(
             text(f"""
@@ -210,6 +210,10 @@ def _coverage(connection, relation):
         .mappings()
         .one()
     )
+    return dict(usage)
+
+
+def _coverage(connection, relation, source_id):
     by_question = {}
     for row in connection.execute(
         text(f"""
@@ -222,25 +226,29 @@ def _coverage(connection, relation):
                count(*) FILTER (WHERE q.value->>'operation_state' = 'BLOCKED_BY_BUDGET') AS budget_skipped,
                count(*) FILTER (WHERE q.value->>'operation_state' = 'SKIPPED') AS missing_subject
         FROM {relation} AS r CROSS JOIN LATERAL jsonb_each(r.decisions) AS q
+        WHERE r.source_id=:source_id
         GROUP BY q.key
-    """)
+    """),
+        {"source_id": source_id},
     ).mappings():
         stats = dict(row)
         key = stats.pop("key")
         stats["unresolved"] = stats["unknown"] + stats["not_evaluated"]
         by_question[key] = stats
-    return dict(usage), by_question
+    return by_question
 
 
 def _replace(operators, relations):
     for function, dataset, alias, spec, _ in operators:
-        relation = relations[dataset["id"], spec.key]
+        relation, source_id = relations[dataset["id"], spec.key]
         inner = "_decision_" + uid()
 
         def quote(value):
             return exp.to_identifier(value, quoted=True).sql(dialect="postgres")
 
         tests = [
+            f"{quote(inner)}.source_id = {exp.Literal.string(source_id).sql(dialect='postgres')}"
+        ] + [
             f"{quote(inner)}.source -> {exp.Literal.string(key).sql(dialect='postgres')} = "
             f"to_jsonb({exp.column(key, table=alias, quoted=True).sql(dialect='postgres')})"
             for key in dataset["primary_key"]
@@ -287,10 +295,10 @@ def execute_native(
             "Maintained feature reviews require the python semantic engine until native review integration is available"
         )
     _validate_semantic_lineage(operators)
-    groups = _source_groups(operators, bindings)
+    groups = list(_source_groups(operators, bindings))
+    if len(groups) > 32:
+        raise ValueError("At most 32 independent source populations per native query")
     partial_allowed = _allows_partial_results(tree, operators)
-    remaining = max_evaluations
-    remaining_bytes = 8_000_000
     max_rows = int(os.getenv("SDD_NATIVE_MAX_ROWS", "100000"))
     timeout_ms = int(os.getenv("SDD_NATIVE_TIMEOUT_MS", "120000"))
     if not 1 <= max_rows <= 1_000_000 or not 1 <= timeout_ms <= 600_000:
@@ -313,44 +321,49 @@ def execute_native(
                 "Install the jev_native PostgreSQL extension before enabling native execution"
             )
         snapshot = connection.execute(text("SELECT pg_current_snapshot()::text")).scalar_one()
-        for dataset, query, source, group in groups:
+        sources, source_specs = [], []
+        for index, (dataset, query, source, group) in enumerate(groups):
             if progress is not None and not progress():
                 raise ValueError("Query cancelled before native semantic dispatch")
             specs = {item[3].key: item[3] for item in group}
             if len(specs) > 32:
-                raise ValueError("At most 32 independent semantic questions per dataset")
+                raise ValueError("At most 32 independent semantic questions per source population")
             questions = {}
             for key, spec in specs.items():
                 batch, _ = spec.questions({}, key)
                 questions.update(batch)
                 questions[key]["subject_column"] = spec.column
             source_sql = _source_text(service, connection, dataset, query, source)
-            name = "_jev_" + uid()
-            relation = 'pg_temp."' + name + '"'
-            options = {
-                "max_rows": max_rows,
-                "max_judgments": remaining,
-                "max_requests": admission.reserved - admission.requests,
-                "max_input_bytes": remaining_bytes,
-                "accept": accept,
-                "reject": reject,
-                "concurrency": int(os.getenv("SDD_NATIVE_CONCURRENCY", "4")),
-            }
-            statement = f'CREATE TEMP TABLE "{name}" ON COMMIT DROP AS SELECT * FROM jev_native.scan(:source,CAST(:questions AS jsonb),CAST(:options AS jsonb))'
-            parameters = {
-                "source": source_sql,
-                "questions": json.dumps(questions, ensure_ascii=False),
-                "options": json.dumps(options),
-            }
-            admission.inflight = True
-            connection.execute(text(statement), parameters)
-            steps.append({"sql": statement, "parameters": parameters})
-            usage, coverage = _coverage(connection, relation)
-            admission.requests += usage["requests"]
-            admission.inflight = False
-            remaining -= usage["new_evaluations"]
-            remaining_bytes -= usage["input_bytes"]
-            totals.update(usage)
+            source_id = "s" + str(index)
+            sources.append({"id": source_id, "sql": source_sql, "questions": questions})
+            source_specs.append((source_id, dataset, specs))
+        name = "_jev_" + uid()
+        relation = 'pg_temp."' + name + '"'
+        options = {
+            "max_rows": max_rows,
+            "max_judgments": max_evaluations,
+            "max_requests": admission.reserved,
+            "max_input_bytes": 8_000_000,
+            "accept": accept,
+            "reject": reject,
+            "concurrency": int(os.getenv("SDD_NATIVE_CONCURRENCY", "4")),
+        }
+        statement = f'CREATE TEMP TABLE "{name}" ON COMMIT DROP AS SELECT * FROM jev_native.scan_many(CAST(:sources AS jsonb),CAST(:options AS jsonb))'
+        parameters = {
+            "sources": json.dumps(sources, ensure_ascii=False),
+            "options": json.dumps(options),
+        }
+        if progress is not None and not progress():
+            raise ValueError("Query cancelled before native semantic dispatch")
+        admission.inflight = True
+        connection.execute(text(statement), parameters)
+        usage = _usage(connection, relation)
+        admission.requests = usage["requests"]
+        admission.inflight = False
+        totals.update(usage)
+        steps.append({"sql": statement, "parameters": parameters})
+        for source_id, dataset, specs in source_specs:
+            coverage = _coverage(connection, relation, source_id)
             for key, spec in specs.items():
                 stats = coverage.get(
                     key,
@@ -366,21 +379,23 @@ def execute_native(
                         **stats,
                     }
                 )
-            for row in connection.execute(
-                text(
-                    f"SELECT DISTINCT observation->'evaluator' AS evaluator FROM {relation} WHERE observation IS NOT NULL"
-                )
-            ):
-                if row[0] not in evaluators:
-                    evaluators.append(row[0])
             keys = ",".join(
                 "(source -> " + exp.Literal.string(key).sql(dialect="postgres") + ")"
                 for key in dataset["primary_key"]
             )
-            connection.execute(text(f"CREATE UNIQUE INDEX ON {relation} ({keys})"))
-            connection.execute(text(f"ANALYZE {relation}"))
+            source_literal = exp.Literal.string(source_id).sql(dialect="postgres")
+            connection.execute(
+                text(f"CREATE UNIQUE INDEX ON {relation} ({keys}) WHERE source_id={source_literal}")
+            )
             for key in specs:
-                relations[dataset["id"], key] = relation
+                relations[dataset["id"], key] = (relation, source_id)
+        connection.execute(text(f"ANALYZE {relation}"))
+        for row in connection.execute(
+            text(
+                f"SELECT DISTINCT observation->'evaluator' AS evaluator FROM {relation} WHERE observation IS NOT NULL"
+            )
+        ):
+            evaluators.append(row[0])
         complete = not totals["unresolved"]
         if not complete and not partial_allowed:
             raise ValueError(
@@ -398,6 +413,8 @@ def execute_native(
             "execution_backend": "rust_postgresql",
             "admission_id": admission.identity,
             "native_version": version,
+            "native_scheduler": "shared_round_robin",
+            "native_source_populations": len(sources),
             "dataset_ids": [dataset["id"] for dataset in datasets],
             "source_snapshot": snapshot,
             "snapshot_mode": "postgres_repeatable_read",

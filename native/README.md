@@ -40,6 +40,7 @@ As an administrator:
 CREATE EXTENSION jev_native;
 GRANT USAGE ON SCHEMA jev_native TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO analyst;
+GRANT EXECUTE ON FUNCTION jev_native.scan_many(jsonb,jsonb) TO analyst;
 ```
 
 The caller also needs access to its source tables and columns. Source reads run with the caller's PostgreSQL privileges and row security. The scan function is not executable by PUBLIC by default.
@@ -80,6 +81,29 @@ WHERE jev_native.require_bool(decisions, 'action');
 ```
 
 `require_bool` returns a resolved true or false and raises an error for unresolved or failed decisions. It prevents an incomplete population from silently producing an exact count. To review uncertainty, select the decisions directly.
+
+## Independent sources
+
+Use `scan_many` to evaluate independent source populations through one scheduler:
+
+```sql
+SELECT source_id, ordinal, source, decisions
+FROM jev_native.scan_many(
+    '[
+      {"id":"messages", "sql":"SELECT id,body FROM messages ORDER BY id",
+       "questions":{"action":{"type":"noul","instructions":"The message requests further action."}}},
+      {"id":"notes", "sql":"SELECT id,body FROM notes ORDER BY id",
+       "questions":{"action":{"type":"noul","instructions":"The note requests further action."}}}
+    ]',
+    '{"max_rows":1000,"max_requests":500,"concurrency":4}'
+);
+```
+
+Each declaration has a unique `id`, one source `sql` SELECT and its own `questions`. Up to 32 sources share the row, request, judgment, input-byte and concurrency limits. Source declarations together are limited to 2 MB. The scheduler reads bounded chunks and interleaves their rows; its position persists across batches. Empty sources emit no rows. Exhausted model allowance produces NOT_EVALUATED decisions for remaining rows, preserving coverage.
+
+The result adds `source_id` to the single-source columns. `ordinal` starts at 1 within each source. Neither routing field is added to the provider context. Identical contexts and question sets can reuse one observation across sources without removing result rows; different definitions remain separate. All PostgreSQL reads stay on the calling backend with its privileges and snapshot, while independent provider requests overlap.
+
+`usage` is cumulative for the entire invocation. Take its maximum once over the complete result; summing per-source maxima would count requests more than once. This interface accepts an independent frontier only. A question that needs another stage's output belongs in a subsequent stage.
 
 ## Save and reconsider evidence
 
@@ -125,7 +149,7 @@ Noul uses configurable `accept` and `reject` thresholds, defaulting to 0.8 and 0
 
 | Option | Default | Scope |
 | --- | ---: | --- |
-| `max_rows` | 10,000 | Source rows per scan; exceeding it aborts the statement. |
+| `max_rows` | 10,000 | Total source rows per invocation, across all sources in `scan_many`; exceeding it aborts the statement. |
 | `max_judgments` | 1,000 | Admitted questions across all batches. |
 | `max_requests` | 1,000 | Admitted HTTP requests across all batches. |
 | `max_input_bytes` | 8,000,000 | Serialized request bytes across all batches. |
@@ -163,9 +187,9 @@ GROUP BY ROLLUP(needs_action);
 
 Incomplete evidence permits only a proven partial read: direct semantic projections and row predicates composed with AND, OR, NOT or Boolean equality, optionally across inner joins. Unresolved projections remain NULL and the manifest retains their UNKNOWN or NOT_EVALUATED coverage. Counts, subqueries, set operations, outer joins, ordering, limits and NULL-consuming expressions such as `COALESCE` require complete evidence. Otherwise execution reports the missing evidence instead of presenting an exact answer.
 
-One query shares its judgment and input-byte allowance across dataset scans. Database reservations share `SDD_DAILY_EVALUATIONS` with existing Python model calls. Completed scans settle their request count and return unused allowance. Cancellation or a crash with an unknown dispatch count retains the reserved allowance; it does not assume the request was free. Direct SQL clients using `jev_native.scan` have their own explicit scan limits and are outside this application quota.
+One native invocation evaluates the query's independent source populations, sharing question-context reuse, concurrency and query allowances. Database reservations share `SDD_DAILY_EVALUATIONS` with existing Python model calls. Completed scans settle their request count once and return unused allowance. Cancellation or a crash with an unknown dispatch count retains the reserved allowance; it does not assume the request was free. Direct SQL clients using `scan` or `scan_many` have their own explicit scan limits and are outside this application quota.
 
-`SDD_NATIVE_CONCURRENCY` sets concurrent requests within a scan (default 4). `SDD_NATIVE_MAX_ROWS` bounds each selected source population (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). Shared limits on simultaneous requests across PostgreSQL sessions are still planned.
+`SDD_NATIVE_CONCURRENCY` sets concurrent requests across the query's source populations (default 4). `SDD_NATIVE_MAX_ROWS` bounds their combined row count (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). Shared limits on simultaneous requests across PostgreSQL sessions are still planned.
 
 Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still require `SDD_SEMANTIC_ENGINE=python`, the default. Native mode reports these unsupported paths explicitly. Ordinary relational mutations retain the existing preview and confirmation flow. The query service currently retains coverage summaries; use explicit saved observation tables when raw evidence must survive the query.
 

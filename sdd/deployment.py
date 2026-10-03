@@ -58,6 +58,7 @@ def check_database(db, sql_interface=None):
                 text(
                     "SELECT has_schema_privilege(current_user,'jev_native','USAGE') "
                     "AND has_function_privilege(current_user,'jev_native.scan(text,jsonb,jsonb)','EXECUTE')"
+                    " AND has_function_privilege(current_user,to_regprocedure('jev_native.scan_many(jsonb,jsonb)'),'EXECUTE')"
                 )
             ).scalar()
             if not admission or not executable:
