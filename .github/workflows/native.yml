@@ -1,0 +1,78 @@
+name: Native PostgreSQL
+on:
+  push:
+    paths: ['native/**', '.github/workflows/native.yml']
+  pull_request:
+    paths: ['native/**', '.github/workflows/native.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL headers
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-17 postgresql-server-dev-17 libclang-dev pkg-config
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: actions/cache/restore@v4
+        id: native_cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-pgrx
+            native/target
+          key: native-pg17-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            native-pg17-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-
+            native-pg17-rust196-pgrx0192-
+      - name: Check core execution
+        working-directory: native
+        run: |
+          cargo fmt --all --check
+          cargo test --locked -p jev-executor
+          cargo clippy --locked -p jev-executor --all-targets -- -D warnings
+      - name: Build and install extension
+        working-directory: native/pg
+        run: |
+          if ! cargo pgrx --version | grep -q '0.19.2'; then
+            cargo install --locked cargo-pgrx --version 0.19.2
+          fi
+          cargo pgrx init --pg17 /usr/lib/postgresql/17/bin/pg_config
+          cargo pgrx install --sudo --pg-config /usr/lib/postgresql/17/bin/pg_config
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify direct PostgreSQL execution
+        run: |
+          python -m pip install 'psycopg[binary]==3.2.9'
+          python native/tests/postgres.py
+      - uses: actions/cache/save@v4
+        if: always() && steps.native_cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-pgrx
+            native/target
+          key: ${{ steps.native_cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-verification
+          path: |
+            native/Cargo.lock
+            native/core/src/
+            native/core/tests/
+            native/pg/src/
+            native/verification.json
+          retention-days: 7
