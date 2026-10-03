@@ -8,23 +8,46 @@
   <strong>A self-developing SQL database with JEV based semantic operators and natural language queries</strong>
 </p>
 
-41 JEV based semantic operators and conditional workflows cover classification, extraction, ranking, matching and verification. Parallel evaluation and reusable evidence reduce repeated work. English and Simplified Chinese queries, optional LLM planning, and text-to-table extraction make the database accessible through a web workspace and HTTP API.
+Ask questions in plain language, inspect the SQL, and turn useful semantic decisions into reusable database features. jevsd-pg brings together 41 semantic operators, parallel JEV evaluation, cached evidence and optional LLM planning in a web workspace and HTTP API.
 
 The operators combine JEV's native Noul, Choice and Score primitives with database and workflow logic. The default JEV service is provided by TypeSafe. You can also connect a compatible third-party endpoint or a local model adapter. PostgreSQL handles storage, joins and arithmetic.
 
 [Installation](docs/INSTALLATION.md) · [User guide](docs/USER_GUIDE.md) · [简体中文](docs/zh/USER_GUIDE.md) · [Operator reference](docs/JEV_FUNCTION_REFERENCE.md)
 
-## Features
+## Why jevsd-pg
 
 * Query data in English or Simplified Chinese. Inspect the SQL, correct its interpretation and rerun it from query history.
 * Choose JEV planning or hybrid planning. In hybrid mode, JEV selects relevant context, an LLM proposes SQL, and JEV reviews the proposal.
-* Filter and classify text by meaning. Save reviewed definitions as reusable features, such as whether a message requests action.
+* Query text by meaning alongside structured data. Save reviewed definitions as reusable features, such as whether a message requests action.
 * Extract database entries from documents. Describe the rows and columns, then review typed values alongside their source text before importing.
 * Preview inserts, updates and deletes before committing them.
-* Call semantic operators for extraction, ranking, matching, verification and conditional workflows.
+* Batch independent semantic decisions and reuse compatible evidence. Apply the same operators to extraction, ranking, matching, verification and conditional workflows.
 * Use TypeSafe, a compatible hosted endpoint or a local Python model adapter without changing operator calls.
 
 The self-developing part is the semantic layer: definitions, evidence and corrections can be saved, reviewed, reused and refreshed as data changes. New concepts require approval before promotion.
+
+## From question to SQL
+
+Given a `deliveries` table with supplier names and quantities:
+
+> For each supplier, show the total quantity delivered, largest total first.
+
+The JEV planner generated:
+
+```sql
+SELECT
+  SUM("r0"."quantity") AS "result_1",
+  "r0"."supplier" AS "result_2"
+FROM "deliveries" AS "r0"
+GROUP BY
+  "r0"."supplier"
+ORDER BY
+  SUM("r0"."quantity") DESC NULLS LAST
+```
+
+The result is Birch: 36, Aster: 30, Cedar: 8. The query groups repeated suppliers and ignores the unknown quantity when summing. SQL performs the calculation; JEV selects the meaning and structure.
+
+See [verified examples](docs/NL2SQL_EXAMPLES.md) for filtering, averages and the runnable dataset. Preview a proposal, inspect its decisions, and approve it when it matches your intent.
 
 ## Getting started
 
@@ -92,13 +115,21 @@ Results distinguish a known value, an unknown answer and work that was not evalu
 
 Use the [operator guide](docs/JEV_OPERATORS.md) to select an operator and set budgets. The [function reference](docs/JEV_FUNCTION_REFERENCE.md) includes arguments, examples and result contracts for every operator.
 
-## Performance and limitations
+## Simple-query performance
 
-Independent semantic decisions run in parallel and compatible questions share a request. Cached evidence is scoped to the provider, model revision, source and question. Changing providers does not reuse their model judgments.
+On the version 0.5.0 tutorial check, JEV-only planning matched GPT-5.6 Terra's SQL answer agreement: 11/11 proposals, with no LLM generation calls. Hybrid planning also matched all 11.
 
-This release adds provider compatibility; it does not establish equal accuracy or speed across models. JEV planning supports a bounded set of query structures. All modes can produce incorrect interpretations, so inspect proposals and result completeness before relying on them. Model weights are not included.
+| Method | Matching SQL proposals | Median time | LLM calls |
+| --- | ---: | ---: | ---: |
+| JEV | 11/11 | 5.51 s | 0 |
+| GPT-5.6 Terra | 11/11 | 4.94 s | 11 |
+| JEV + GPT-5.6 Terra | 11/11 | 7.21 s | 11 |
 
-See [provider setup](docs/PROVIDERS.md) for local and hosted configuration and [performance and cost](docs/PERFORMANCE_AND_COST.md) for usage controls and validation scope.
+The check contains eight basic objectives and three paired variations across two small synthetic datasets. All JEV and hybrid proposals were held for review and scored by executing their SQL in the evaluation. These results describe proposed answers, not automatic execution accuracy. Terra timing includes local CLI startup.
+
+The [data, runner and results](examples/nl2sql/README.md) are included. See [performance and cost](docs/PERFORMANCE_AND_COST.md) for token usage, scoring and scope. Complex queries and new domains require their own evaluation.
+
+Independent JEV decisions can run in parallel, and compatible evidence can be reused. [Local and hosted providers](docs/PROVIDERS.md) use the same operator interface, with cached judgments isolated by provider and revision.
 
 ## Documentation and contributions
 

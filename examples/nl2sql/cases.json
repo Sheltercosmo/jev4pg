@@ -1,0 +1,385 @@
+{
+  "description": "Eight tutorial objectives and three paired wording, language or schema checks. Fixed before generation; no planner tuning.",
+  "datasets": [
+    {
+      "name": "deliveries",
+      "description": "One row per delivery. Quantity is the number of items delivered; a NULL quantity is unknown.",
+      "primary_key": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "description": "Unique delivery identifier",
+          "nullable": false
+        },
+        {
+          "name": "supplier",
+          "type": "text",
+          "description": "Supplier name",
+          "nullable": false
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "description": "Number of items delivered",
+          "nullable": true
+        }
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "supplier": "Aster",
+          "quantity": 12
+        },
+        {
+          "id": 2,
+          "supplier": "Aster",
+          "quantity": 18
+        },
+        {
+          "id": 3,
+          "supplier": "Birch",
+          "quantity": 30
+        },
+        {
+          "id": 4,
+          "supplier": "Cedar",
+          "quantity": 8
+        },
+        {
+          "id": 5,
+          "supplier": "Cedar",
+          "quantity": null
+        },
+        {
+          "id": 6,
+          "supplier": "Birch",
+          "quantity": 6
+        }
+      ]
+    },
+    {
+      "name": "exams",
+      "description": "One row per student exam result. Scores range from 0 to 100; NULL means no recorded score.",
+      "primary_key": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "description": "Unique exam result identifier",
+          "nullable": false
+        },
+        {
+          "name": "student",
+          "type": "text",
+          "description": "Student name",
+          "nullable": false
+        },
+        {
+          "name": "course",
+          "type": "text",
+          "description": "Course name",
+          "nullable": false
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "description": "Exam score from 0 to 100",
+          "nullable": true
+        }
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "student": "Ada",
+          "course": "Math",
+          "score": 92
+        },
+        {
+          "id": 2,
+          "student": "Ben",
+          "course": "Math",
+          "score": 75
+        },
+        {
+          "id": 3,
+          "student": "Chen",
+          "course": "Science",
+          "score": 88
+        },
+        {
+          "id": 4,
+          "student": "Devi",
+          "course": "Science",
+          "score": null
+        },
+        {
+          "id": 5,
+          "student": "Emil",
+          "course": "Math",
+          "score": 92
+        },
+        {
+          "id": 6,
+          "student": "Farah",
+          "course": "Science",
+          "score": 64
+        }
+      ]
+    },
+    {
+      "name": "ledger_a",
+      "description": "One row per delivery. Quantity is the number of items delivered; a NULL quantity is unknown.",
+      "primary_key": [
+        "key_a"
+      ],
+      "columns": [
+        {
+          "name": "key_a",
+          "type": "integer",
+          "description": "Unique delivery identifier",
+          "nullable": false
+        },
+        {
+          "name": "label_b",
+          "type": "text",
+          "description": "Supplier name",
+          "nullable": false
+        },
+        {
+          "name": "value_c",
+          "type": "number",
+          "description": "Number of items delivered",
+          "nullable": true
+        }
+      ],
+      "rows": [
+        {
+          "key_a": 1,
+          "label_b": "Aster",
+          "value_c": 12
+        },
+        {
+          "key_a": 2,
+          "label_b": "Aster",
+          "value_c": 18
+        },
+        {
+          "key_a": 3,
+          "label_b": "Birch",
+          "value_c": 30
+        },
+        {
+          "key_a": 4,
+          "label_b": "Cedar",
+          "value_c": 8
+        },
+        {
+          "key_a": 5,
+          "label_b": "Cedar",
+          "value_c": null
+        },
+        {
+          "key_a": 6,
+          "label_b": "Birch",
+          "value_c": 6
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "delivery_count",
+      "dataset": "deliveries",
+      "question": "How many deliveries are there? Return just the number.",
+      "reference_sql": "SELECT COUNT(*) FROM deliveries",
+      "expected": [
+        [
+          6
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "delivery_sum",
+      "dataset": "deliveries",
+      "question": "How many items were delivered in total?",
+      "reference_sql": "SELECT SUM(quantity) FROM deliveries",
+      "expected": [
+        [
+          74
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "delivery_average",
+      "dataset": "deliveries",
+      "question": "What is the average quantity delivered, ignoring unknown quantities?",
+      "reference_sql": "SELECT AVG(quantity) FROM deliveries",
+      "expected": [
+        [
+          14.8
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "supplier_totals",
+      "dataset": "deliveries",
+      "question": "For each supplier, show the total quantity delivered, largest total first.",
+      "reference_sql": "SELECT supplier, SUM(quantity) AS total FROM deliveries GROUP BY supplier ORDER BY total DESC",
+      "expected": [
+        [
+          "Birch",
+          36
+        ],
+        [
+          "Aster",
+          30
+        ],
+        [
+          "Cedar",
+          8
+        ]
+      ],
+      "ordered": true,
+      "variant_of": null
+    },
+    {
+      "id": "delivery_filter",
+      "dataset": "deliveries",
+      "question": "Show the supplier and quantity for deliveries with more than 15 items.",
+      "reference_sql": "SELECT supplier, quantity FROM deliveries WHERE quantity > 15",
+      "expected": [
+        [
+          "Aster",
+          18
+        ],
+        [
+          "Birch",
+          30
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "exam_filter",
+      "dataset": "exams",
+      "question": "Show the names and scores of students who scored at least 80, ordered by name.",
+      "reference_sql": "SELECT student, score FROM exams WHERE score >= 80 ORDER BY student",
+      "expected": [
+        [
+          "Ada",
+          92
+        ],
+        [
+          "Chen",
+          88
+        ],
+        [
+          "Emil",
+          92
+        ]
+      ],
+      "ordered": true,
+      "variant_of": null
+    },
+    {
+      "id": "course_averages",
+      "dataset": "exams",
+      "question": "What is the average recorded score for each course?",
+      "reference_sql": "SELECT course, AVG(score) FROM exams GROUP BY course",
+      "expected": [
+        [
+          "Math",
+          86.33333333333333
+        ],
+        [
+          "Science",
+          76
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "course_count",
+      "dataset": "exams",
+      "question": "How many different courses are there? Return only the count.",
+      "reference_sql": "SELECT COUNT(DISTINCT course) FROM exams",
+      "expected": [
+        [
+          2
+        ]
+      ],
+      "ordered": false,
+      "variant_of": null
+    },
+    {
+      "id": "supplier_paraphrase",
+      "dataset": "deliveries",
+      "question": "Which suppliers sent us the most items altogether? List every supplier with its total, biggest first.",
+      "reference_sql": "SELECT supplier, SUM(quantity) AS total FROM deliveries GROUP BY supplier ORDER BY total DESC",
+      "expected": [
+        [
+          "Birch",
+          36
+        ],
+        [
+          "Aster",
+          30
+        ],
+        [
+          "Cedar",
+          8
+        ]
+      ],
+      "ordered": true,
+      "variant_of": "supplier_totals"
+    },
+    {
+      "id": "exam_chinese",
+      "dataset": "exams",
+      "question": "列出成绩至少为80分的学生姓名和分数，按姓名排序。",
+      "reference_sql": "SELECT student, score FROM exams WHERE score >= 80 ORDER BY student",
+      "expected": [
+        [
+          "Ada",
+          92
+        ],
+        [
+          "Chen",
+          88
+        ],
+        [
+          "Emil",
+          92
+        ]
+      ],
+      "ordered": true,
+      "variant_of": "exam_filter"
+    },
+    {
+      "id": "quantity_renamed",
+      "dataset": "ledger_a",
+      "question": "How many items were delivered in total?",
+      "reference_sql": "SELECT SUM(value_c) FROM ledger_a",
+      "expected": [
+        [
+          74
+        ]
+      ],
+      "ordered": false,
+      "variant_of": "delivery_sum"
+    }
+  ]
+}

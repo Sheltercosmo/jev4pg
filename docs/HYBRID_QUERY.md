@@ -26,7 +26,7 @@ Configure these server environment variables:
 | `SDD_HYBRID_CONCEPTS=off` | Skip a separate preliminary concept call; this is the default. |
 | `SDD_HYBRID_REPAIR=on` | Allow one additional generation for a concrete defect; this is the default. |
 
-For local use, `SDD_LLM_TRANSPORT=codex_cli` uses an installed, signed-in CLI with tools disabled. Select a model available to that CLI. `SDD_CODEX_EXECUTABLE` can specify its executable path. This transport includes process startup time.
+For local use, `SDD_LLM_TRANSPORT=codex_cli` uses an installed, signed-in CLI with tools disabled. The default CLI model is `gpt-5.6-terra`; the tutorial baseline and hybrid comparison both use GPT-5.6 Terra. Set `SDD_LLM_MODEL` to choose another model available to that CLI. `SDD_CODEX_EXECUTABLE` can specify its executable path. This transport includes process startup time.
 
 Concept mode `auto` lets JEV request a short concept call for vague objectives or unfamiliar vocabulary; `on` always adds it. Concepts guide retrieval and do not become row filters. With concepts and repair both `off`, a request uses one LLM generation.
 

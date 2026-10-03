@@ -60,3 +60,22 @@
 使用 `GET /jev/operators` 查看目录，使用 `GET /jev/operators/examples` 查看示例，通过 `POST /jev/call` 执行。可依次查阅[算子指南](../JEV_OPERATORS.md)、[函数参考](../JEV_FUNCTION_REFERENCE.md)及[可运行示例](../../examples/operators/README.md)。这些开发者参考目前使用英文。
 
 工作区的指南提供上述操作的简要说明。已测能力及局限见[性能与成本说明](../PERFORMANCE_AND_COST.md)。
+
+## SQL 示例
+
+以下请求已在 0.5.0 版本的教学数据上验证。查询生成后仍需用户确认。
+
+> 列出成绩至少为80分的学生姓名和分数，按姓名排序。
+
+```sql
+SELECT
+  "r0"."student" AS "result_1",
+  "r0"."score" AS "result_2"
+FROM "exams" AS "r0"
+WHERE
+  "r0"."score" >= 80
+ORDER BY
+  "r0"."student" ASC
+```
+
+结果为 Ada：92、Chen：88、Emil：92。未记录的成绩不会入选。数据与运行方法见[教学示例](../../examples/nl2sql/README.md)。

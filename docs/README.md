@@ -20,3 +20,7 @@ Start with installation, then use the workspace guide or API examples for your t
 | [Dependencies](DEPENDENCIES.md) | Libraries and external services. |
 
 The running service exposes OpenAPI documentation at `/docs`. Runnable operator clients are in [examples/operators](../examples/operators/README.md). See [contribution guidance](../CONTRIBUTING.md) to change the code or documentation.
+
+## Examples
+
+[Verified natural language to SQL](NL2SQL_EXAMPLES.md) includes generated queries and results. The [simple-query tutorial](../examples/nl2sql/README.md) provides data and a reproducible comparison with GPT-5.6 Terra.

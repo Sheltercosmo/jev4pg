@@ -1,0 +1,1323 @@
+{
+  "version": "0.5.0",
+  "release_commit": "ecea7d8a49ba05541776f1d6fc674b4395e15dae",
+  "started_at": "2026-10-03T16:13:06.459377+00:00",
+  "source_sha256": "d8230a35e3751ac4846964ff8999b21ca434e7b06a1d8f3f29b254b2c867da38",
+  "cases_sha256": "30fc3ee15a3fc2aa7550b83736069a717c5287aaa487d85cec520183a6a656db",
+  "runner_sha256": "ad64db753e11cf5b36927d8149e257b2159e6207f57c40bf9f0f37bcc5f77bfd",
+  "llm_model": "gpt-5.6-terra",
+  "effort": "low",
+  "llm_transport": "codex_cli",
+  "jev_model": "jev-1.13.0",
+  "database": "isolated SQLite per method and case",
+  "records": [
+    {
+      "id": "delivery_count",
+      "method": "jev",
+      "variant_of": null,
+      "question": "How many deliveries are there? Return just the number.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  COUNT(*) AS \"result_1\"\nFROM \"deliveries\" AS \"r0\"",
+      "planning_ms": 4661.58,
+      "rows": [
+        {
+          "result_1": 6
+        }
+      ],
+      "total_ms": 4678.34,
+      "llm": [],
+      "jev": {
+        "requests": 17,
+        "judgments": 60,
+        "usage": {
+          "input_tokens": 19038,
+          "output_tokens": 2575
+        }
+      }
+    },
+    {
+      "id": "delivery_count",
+      "method": "llm",
+      "variant_of": null,
+      "question": "How many deliveries are there? Return just the number.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT COUNT(*) AS delivery_count\nFROM deliveries;",
+      "planning_ms": 5672.36,
+      "rows": [
+        {
+          "delivery_count": 6
+        }
+      ],
+      "total_ms": 5677.68,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5664.94,
+          "usage": {
+            "input_tokens": 9474,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 24,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "delivery_count",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "How many deliveries are there? Return just the number.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT COUNT(*) AS \"delivery_count\"\nFROM \"deliveries\";",
+      "planning_ms": 6986.27,
+      "rows": [
+        {
+          "delivery_count": 6
+        }
+      ],
+      "total_ms": 6998.66,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5934.78,
+          "usage": {
+            "input_tokens": 10707,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 64,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 15,
+        "usage": {
+          "input_tokens": 3008,
+          "output_tokens": 393
+        }
+      }
+    },
+    {
+      "id": "delivery_sum",
+      "method": "llm",
+      "variant_of": null,
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT SUM(quantity) AS total_items_delivered\nFROM deliveries;",
+      "planning_ms": 4844.03,
+      "rows": [
+        {
+          "total_items_delivered": 74
+        }
+      ],
+      "total_ms": 4855.18,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4839.84,
+          "usage": {
+            "input_tokens": 9477,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 27,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "delivery_sum",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT SUM(\"quantity\") AS \"total_items_delivered\"\nFROM \"deliveries\";",
+      "planning_ms": 7193.44,
+      "rows": [
+        {
+          "total_items_delivered": 74
+        }
+      ],
+      "total_ms": 7211.22,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5961.87,
+          "usage": {
+            "input_tokens": 10708,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 70,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 15,
+        "usage": {
+          "input_tokens": 3045,
+          "output_tokens": 393
+        }
+      }
+    },
+    {
+      "id": "delivery_sum",
+      "method": "jev",
+      "variant_of": null,
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  SUM(\"r0\".\"quantity\") AS \"result_1\"\nFROM \"deliveries\" AS \"r0\"",
+      "planning_ms": 4233.91,
+      "rows": [
+        {
+          "result_1": 74
+        }
+      ],
+      "total_ms": 4242.63,
+      "llm": [],
+      "jev": {
+        "requests": 17,
+        "judgments": 60,
+        "usage": {
+          "input_tokens": 19303,
+          "output_tokens": 2429
+        }
+      }
+    },
+    {
+      "id": "delivery_average",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "What is the average quantity delivered, ignoring unknown quantities?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT AVG(\"quantity\") AS \"average_quantity_delivered\"\nFROM \"deliveries\"\nWHERE \"quantity\" IS NOT NULL;",
+      "planning_ms": 6417.52,
+      "rows": [
+        {
+          "average_quantity_delivered": 14.8
+        }
+      ],
+      "total_ms": 6436.88,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5477.88,
+          "usage": {
+            "input_tokens": 10711,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 73,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 16,
+        "usage": {
+          "input_tokens": 3185,
+          "output_tokens": 413
+        }
+      }
+    },
+    {
+      "id": "delivery_average",
+      "method": "jev",
+      "variant_of": null,
+      "question": "What is the average quantity delivered, ignoring unknown quantities?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  AVG(\"r0\".\"quantity\") AS \"result_1\"\nFROM \"deliveries\" AS \"r0\"\nWHERE\n  NOT \"r0\".\"quantity\" IS NULL",
+      "planning_ms": 4111.59,
+      "rows": [
+        {
+          "result_1": 14.8
+        }
+      ],
+      "total_ms": 4118.86,
+      "llm": [],
+      "jev": {
+        "requests": 17,
+        "judgments": 60,
+        "usage": {
+          "input_tokens": 19423,
+          "output_tokens": 2430
+        }
+      }
+    },
+    {
+      "id": "delivery_average",
+      "method": "llm",
+      "variant_of": null,
+      "question": "What is the average quantity delivered, ignoring unknown quantities?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT AVG(quantity) AS average_quantity_delivered\nFROM deliveries\nWHERE quantity IS NOT NULL;",
+      "planning_ms": 4796.0,
+      "rows": [
+        {
+          "average_quantity_delivered": 14.8
+        }
+      ],
+      "total_ms": 4803.17,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4787.61,
+          "usage": {
+            "input_tokens": 9476,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 33,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "supplier_totals",
+      "method": "jev",
+      "variant_of": null,
+      "question": "For each supplier, show the total quantity delivered, largest total first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  SUM(\"r0\".\"quantity\") AS \"result_1\",\n  \"r0\".\"supplier\" AS \"result_2\"\nFROM \"deliveries\" AS \"r0\"\nGROUP BY\n  \"r0\".\"supplier\"\nORDER BY\n  SUM(\"r0\".\"quantity\") DESC NULLS LAST",
+      "planning_ms": 4929.04,
+      "rows": [
+        {
+          "result_1": 36,
+          "result_2": "Birch"
+        },
+        {
+          "result_1": 30,
+          "result_2": "Aster"
+        },
+        {
+          "result_1": 8,
+          "result_2": "Cedar"
+        }
+      ],
+      "total_ms": 4939.28,
+      "llm": [],
+      "jev": {
+        "requests": 21,
+        "judgments": 70,
+        "usage": {
+          "input_tokens": 23146,
+          "output_tokens": 2691
+        }
+      }
+    },
+    {
+      "id": "supplier_totals",
+      "method": "llm",
+      "variant_of": null,
+      "question": "For each supplier, show the total quantity delivered, largest total first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT supplier, SUM(quantity) AS total_quantity\nFROM deliveries\nGROUP BY supplier\nORDER BY total_quantity DESC;",
+      "planning_ms": 4928.62,
+      "rows": [
+        {
+          "supplier": "Birch",
+          "total_quantity": 36
+        },
+        {
+          "supplier": "Aster",
+          "total_quantity": 30
+        },
+        {
+          "supplier": "Cedar",
+          "total_quantity": 8
+        }
+      ],
+      "total_ms": 4938.74,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4924.47,
+          "usage": {
+            "input_tokens": 9479,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 37,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "supplier_totals",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "For each supplier, show the total quantity delivered, largest total first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"supplier\",\n  SUM(\"quantity\") AS \"total_quantity_delivered\"\nFROM \"deliveries\"\nGROUP BY \"supplier\"\nORDER BY \"total_quantity_delivered\" DESC;",
+      "planning_ms": 6204.81,
+      "rows": [
+        {
+          "supplier": "Birch",
+          "total_quantity_delivered": 36
+        },
+        {
+          "supplier": "Aster",
+          "total_quantity_delivered": 30
+        },
+        {
+          "supplier": "Cedar",
+          "total_quantity_delivered": 8
+        }
+      ],
+      "total_ms": 6228.09,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5238.35,
+          "usage": {
+            "input_tokens": 10796,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 114,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 3,
+        "judgments": 16,
+        "usage": {
+          "input_tokens": 3103,
+          "output_tokens": 430
+        }
+      }
+    },
+    {
+      "id": "delivery_filter",
+      "method": "llm",
+      "variant_of": null,
+      "question": "Show the supplier and quantity for deliveries with more than 15 items.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT supplier, quantity\nFROM deliveries\nWHERE quantity > 15;",
+      "planning_ms": 4436.47,
+      "rows": [
+        {
+          "supplier": "Aster",
+          "quantity": 18
+        },
+        {
+          "supplier": "Birch",
+          "quantity": 30
+        }
+      ],
+      "total_ms": 4449.42,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4430.24,
+          "usage": {
+            "input_tokens": 9477,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 28,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "delivery_filter",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "Show the supplier and quantity for deliveries with more than 15 items.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"supplier\",\n  \"quantity\"\nFROM \"deliveries\"\nWHERE \"quantity\" > 15;",
+      "planning_ms": 7013.78,
+      "rows": [
+        {
+          "supplier": "Aster",
+          "quantity": 18
+        },
+        {
+          "supplier": "Birch",
+          "quantity": 30
+        }
+      ],
+      "total_ms": 7036.27,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5967.71,
+          "usage": {
+            "input_tokens": 10798,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 85,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 3,
+        "judgments": 16,
+        "usage": {
+          "input_tokens": 3001,
+          "output_tokens": 430
+        }
+      }
+    },
+    {
+      "id": "delivery_filter",
+      "method": "jev",
+      "variant_of": null,
+      "question": "Show the supplier and quantity for deliveries with more than 15 items.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"r0\".\"supplier\" AS \"result_1\",\n  \"r0\".\"quantity\" AS \"result_2\"\nFROM \"deliveries\" AS \"r0\"\nWHERE\n  \"r0\".\"quantity\" > 15",
+      "planning_ms": 6464.95,
+      "rows": [
+        {
+          "result_1": "Aster",
+          "result_2": 18
+        },
+        {
+          "result_1": "Birch",
+          "result_2": 30
+        }
+      ],
+      "total_ms": 6484.25,
+      "llm": [],
+      "jev": {
+        "requests": 22,
+        "judgments": 70,
+        "usage": {
+          "input_tokens": 23446,
+          "output_tokens": 2764
+        }
+      }
+    },
+    {
+      "id": "exam_filter",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "Show the names and scores of students who scored at least 80, ordered by name.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"student\",\n  \"score\"\nFROM \"exams\"\nWHERE \"score\" >= 80\nORDER BY \"student\" ASC;",
+      "planning_ms": 8326.82,
+      "rows": [
+        {
+          "student": "Ada",
+          "score": 92
+        },
+        {
+          "student": "Chen",
+          "score": 88
+        },
+        {
+          "student": "Emil",
+          "score": 92
+        }
+      ],
+      "total_ms": 8347.17,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 7429.02,
+          "usage": {
+            "input_tokens": 10811,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 87,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 18,
+        "usage": {
+          "input_tokens": 3643,
+          "output_tokens": 476
+        }
+      }
+    },
+    {
+      "id": "exam_filter",
+      "method": "jev",
+      "variant_of": null,
+      "question": "Show the names and scores of students who scored at least 80, ordered by name.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"r0\".\"student\" AS \"result_1\",\n  \"r0\".\"score\" AS \"result_2\"\nFROM \"exams\" AS \"r0\"\nWHERE\n  \"r0\".\"score\" >= 80\nORDER BY\n  \"r0\".\"student\" ASC",
+      "planning_ms": 5828.68,
+      "rows": [
+        {
+          "result_1": "Ada",
+          "result_2": 92
+        },
+        {
+          "result_1": "Chen",
+          "result_2": 88
+        },
+        {
+          "result_1": "Emil",
+          "result_2": 92
+        }
+      ],
+      "total_ms": 5841.39,
+      "llm": [],
+      "jev": {
+        "requests": 21,
+        "judgments": 71,
+        "usage": {
+          "input_tokens": 24523,
+          "output_tokens": 2946
+        }
+      }
+    },
+    {
+      "id": "exam_filter",
+      "method": "llm",
+      "variant_of": null,
+      "question": "Show the names and scores of students who scored at least 80, ordered by name.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT student, score\nFROM exams\nWHERE score >= 80\nORDER BY student;",
+      "planning_ms": 4052.89,
+      "rows": [
+        {
+          "student": "Ada",
+          "score": 92
+        },
+        {
+          "student": "Chen",
+          "score": 88
+        },
+        {
+          "student": "Emil",
+          "score": 92
+        }
+      ],
+      "total_ms": 4060.39,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4048.54,
+          "usage": {
+            "input_tokens": 9540,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 32,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "course_averages",
+      "method": "jev",
+      "variant_of": null,
+      "question": "What is the average recorded score for each course?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"r0\".\"course\" AS \"result_1\",\n  AVG(\"r0\".\"score\") AS \"result_2\"\nFROM \"exams\" AS \"r0\"\nGROUP BY\n  \"r0\".\"course\"",
+      "planning_ms": 5502.31,
+      "rows": [
+        {
+          "result_1": "Math",
+          "result_2": 86.33333333333333
+        },
+        {
+          "result_1": "Science",
+          "result_2": 76.0
+        }
+      ],
+      "total_ms": 5514.48,
+      "llm": [],
+      "jev": {
+        "requests": 21,
+        "judgments": 72,
+        "usage": {
+          "input_tokens": 24871,
+          "output_tokens": 2923
+        }
+      }
+    },
+    {
+      "id": "course_averages",
+      "method": "llm",
+      "variant_of": null,
+      "question": "What is the average recorded score for each course?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT course, AVG(score) AS average_score\nFROM exams\nGROUP BY course",
+      "planning_ms": 3910.07,
+      "rows": [
+        {
+          "course": "Math",
+          "average_score": 86.33333333333333
+        },
+        {
+          "course": "Science",
+          "average_score": 76.0
+        }
+      ],
+      "total_ms": 3918.88,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 3904.56,
+          "usage": {
+            "input_tokens": 9528,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 30,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "course_averages",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "What is the average recorded score for each course?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"course\",\n  AVG(\"score\") AS \"average_recorded_score\"\nFROM \"exams\"\nWHERE \"score\" IS NOT NULL\nGROUP BY \"course\"\nORDER BY \"course\" ASC;",
+      "planning_ms": 6901.5,
+      "rows": [
+        {
+          "course": "Math",
+          "average_recorded_score": 86.33333333333333
+        },
+        {
+          "course": "Science",
+          "average_recorded_score": 76.0
+        }
+      ],
+      "total_ms": 6921.47,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5558.46,
+          "usage": {
+            "input_tokens": 10792,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 123,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 19,
+        "usage": {
+          "input_tokens": 3755,
+          "output_tokens": 496
+        }
+      }
+    },
+    {
+      "id": "course_count",
+      "method": "llm",
+      "variant_of": null,
+      "question": "How many different courses are there? Return only the count.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT COUNT(DISTINCT course) AS count\nFROM exams;",
+      "planning_ms": 5240.13,
+      "rows": [
+        {
+          "count": 2
+        }
+      ],
+      "total_ms": 5252.77,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5228.83,
+          "usage": {
+            "input_tokens": 9532,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 27,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "course_count",
+      "method": "hybrid",
+      "variant_of": null,
+      "question": "How many different courses are there? Return only the count.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT COUNT(DISTINCT \"course\") AS \"course_count\"\nFROM \"exams\";",
+      "planning_ms": 7453.52,
+      "rows": [
+        {
+          "course_count": 2
+        }
+      ],
+      "total_ms": 7471.67,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 6390.03,
+          "usage": {
+            "input_tokens": 10678,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 93,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 17,
+        "usage": {
+          "input_tokens": 3224,
+          "output_tokens": 435
+        }
+      }
+    },
+    {
+      "id": "course_count",
+      "method": "jev",
+      "variant_of": null,
+      "question": "How many different courses are there? Return only the count.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  COUNT(DISTINCT \"r0\".\"course\") AS \"result_1\"\nFROM \"exams\" AS \"r0\"",
+      "planning_ms": 5297.12,
+      "rows": [
+        {
+          "result_1": 2
+        }
+      ],
+      "total_ms": 5308.21,
+      "llm": [],
+      "jev": {
+        "requests": 19,
+        "judgments": 66,
+        "usage": {
+          "input_tokens": 22722,
+          "output_tokens": 2791
+        }
+      }
+    },
+    {
+      "id": "supplier_paraphrase",
+      "method": "hybrid",
+      "variant_of": "supplier_totals",
+      "question": "Which suppliers sent us the most items altogether? List every supplier with its total, biggest first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"supplier\",\n  SUM(\"quantity\") AS \"total_items\"\nFROM \"deliveries\"\nGROUP BY \"supplier\"\nORDER BY \"total_items\" DESC, \"supplier\" ASC;",
+      "planning_ms": 7852.32,
+      "rows": [
+        {
+          "supplier": "Birch",
+          "total_items": 36
+        },
+        {
+          "supplier": "Aster",
+          "total_items": 30
+        },
+        {
+          "supplier": "Cedar",
+          "total_items": 8
+        }
+      ],
+      "total_ms": 7865.7,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 6723.31,
+          "usage": {
+            "input_tokens": 10801,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 118,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 3,
+        "judgments": 16,
+        "usage": {
+          "input_tokens": 3112,
+          "output_tokens": 430
+        }
+      }
+    },
+    {
+      "id": "supplier_paraphrase",
+      "method": "jev",
+      "variant_of": "supplier_totals",
+      "question": "Which suppliers sent us the most items altogether? List every supplier with its total, biggest first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"r0\".\"supplier\" AS \"result_1\",\n  SUM(\"r0\".\"quantity\") AS \"result_2\"\nFROM \"deliveries\" AS \"r0\"\nGROUP BY\n  \"r0\".\"supplier\"\nORDER BY\n  SUM(\"r0\".\"quantity\") DESC NULLS LAST",
+      "planning_ms": 5650.92,
+      "rows": [
+        {
+          "result_1": "Birch",
+          "result_2": 36
+        },
+        {
+          "result_1": "Aster",
+          "result_2": 30
+        },
+        {
+          "result_1": "Cedar",
+          "result_2": 8
+        }
+      ],
+      "total_ms": 5663.41,
+      "llm": [],
+      "jev": {
+        "requests": 21,
+        "judgments": 70,
+        "usage": {
+          "input_tokens": 23128,
+          "output_tokens": 2691
+        }
+      }
+    },
+    {
+      "id": "supplier_paraphrase",
+      "method": "llm",
+      "variant_of": "supplier_totals",
+      "question": "Which suppliers sent us the most items altogether? List every supplier with its total, biggest first.",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT supplier, SUM(quantity) AS total\nFROM deliveries\nGROUP BY supplier\nORDER BY total DESC;",
+      "planning_ms": 4951.98,
+      "rows": [
+        {
+          "supplier": "Birch",
+          "total": 36
+        },
+        {
+          "supplier": "Aster",
+          "total": 30
+        },
+        {
+          "supplier": "Cedar",
+          "total": 8
+        }
+      ],
+      "total_ms": 4961.52,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 4948.38,
+          "usage": {
+            "input_tokens": 9488,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 35,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "exam_chinese",
+      "method": "jev",
+      "variant_of": "exam_filter",
+      "question": "列出成绩至少为80分的学生姓名和分数，按姓名排序。",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"r0\".\"student\" AS \"result_1\",\n  \"r0\".\"score\" AS \"result_2\"\nFROM \"exams\" AS \"r0\"\nWHERE\n  \"r0\".\"score\" >= 80\nORDER BY\n  \"r0\".\"student\" ASC",
+      "planning_ms": 5608.78,
+      "rows": [
+        {
+          "result_1": "Ada",
+          "result_2": 92
+        },
+        {
+          "result_1": "Chen",
+          "result_2": 88
+        },
+        {
+          "result_1": "Emil",
+          "result_2": 92
+        }
+      ],
+      "total_ms": 5612.58,
+      "llm": [],
+      "jev": {
+        "requests": 21,
+        "judgments": 71,
+        "usage": {
+          "input_tokens": 24653,
+          "output_tokens": 2946
+        }
+      }
+    },
+    {
+      "id": "exam_chinese",
+      "method": "llm",
+      "variant_of": "exam_filter",
+      "question": "列出成绩至少为80分的学生姓名和分数，按姓名排序。",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT student, score\nFROM exams\nWHERE score >= 80\nORDER BY student ASC;",
+      "planning_ms": 5213.57,
+      "rows": [
+        {
+          "student": "Ada",
+          "score": 92
+        },
+        {
+          "student": "Chen",
+          "score": 88
+        },
+        {
+          "student": "Emil",
+          "score": 92
+        }
+      ],
+      "total_ms": 5221.06,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5208.96,
+          "usage": {
+            "input_tokens": 9537,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 33,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "exam_chinese",
+      "method": "hybrid",
+      "variant_of": "exam_filter",
+      "question": "列出成绩至少为80分的学生姓名和分数，按姓名排序。",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  \"student\",\n  \"score\"\nFROM \"exams\"\nWHERE \"score\" >= 80\nORDER BY \"student\" ASC;",
+      "planning_ms": 7548.44,
+      "rows": [
+        {
+          "student": "Ada",
+          "score": 92
+        },
+        {
+          "student": "Chen",
+          "score": 88
+        },
+        {
+          "student": "Emil",
+          "score": 92
+        }
+      ],
+      "total_ms": 7560.52,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 6068.55,
+          "usage": {
+            "input_tokens": 10814,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 113,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 4,
+        "judgments": 18,
+        "usage": {
+          "input_tokens": 3690,
+          "output_tokens": 476
+        }
+      }
+    },
+    {
+      "id": "quantity_renamed",
+      "method": "llm",
+      "variant_of": "delivery_sum",
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": false,
+      "sql": "SELECT SUM(value_c) AS total_items_delivered\nFROM ledger_a;",
+      "planning_ms": 5850.57,
+      "rows": [
+        {
+          "total_items_delivered": 74
+        }
+      ],
+      "total_ms": 5856.13,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5847.69,
+          "usage": {
+            "input_tokens": 9477,
+            "cached_input_tokens": 8960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 29,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "quantity_renamed",
+      "method": "hybrid",
+      "variant_of": "delivery_sum",
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT SUM(\"value_c\") AS \"total_items_delivered\"\nFROM \"ledger_a\";",
+      "planning_ms": 7263.11,
+      "rows": [
+        {
+          "total_items_delivered": 74
+        }
+      ],
+      "total_ms": 7276.58,
+      "llm": [
+        {
+          "model": "gpt-5.6-terra",
+          "transport": "codex_cli",
+          "calls": 1,
+          "generation_ms": 5832.28,
+          "usage": {
+            "input_tokens": 10792,
+            "cached_input_tokens": 7936,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 73,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "jev": {
+        "requests": 3,
+        "judgments": 14,
+        "usage": {
+          "input_tokens": 2732,
+          "output_tokens": 368
+        }
+      }
+    },
+    {
+      "id": "quantity_renamed",
+      "method": "jev",
+      "variant_of": "delivery_sum",
+      "question": "How many items were delivered in total?",
+      "status": "COMPLETED",
+      "match": true,
+      "held": true,
+      "sql": "SELECT\n  SUM(\"r0\".\"value_c\") AS \"result_1\"\nFROM \"ledger_a\" AS \"r0\"",
+      "planning_ms": 5769.78,
+      "rows": [
+        {
+          "result_1": 74
+        }
+      ],
+      "total_ms": 5781.31,
+      "llm": [],
+      "jev": {
+        "requests": 18,
+        "judgments": 61,
+        "usage": {
+          "input_tokens": 20004,
+          "output_tokens": 2459
+        }
+      }
+    }
+  ],
+  "summary": {
+    "jev": {
+      "matches": 11,
+      "attempts": 11,
+      "held": 11,
+      "median_ms": 5514.48,
+      "objective_matches": 8,
+      "variant_matches": 3,
+      "jev_usage": {
+        "input_tokens": 244257,
+        "output_tokens": 29645
+      },
+      "llm_usage": {},
+      "llm_calls": 0,
+      "jev_requests": 215,
+      "jev_judgments": 731
+    },
+    "llm": {
+      "matches": 11,
+      "attempts": 11,
+      "held": 0,
+      "median_ms": 4938.74,
+      "objective_matches": 8,
+      "variant_matches": 3,
+      "jev_usage": {},
+      "llm_usage": {
+        "input_tokens": 104485,
+        "cached_input_tokens": 62720,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 335,
+        "reasoning_output_tokens": 0
+      },
+      "llm_calls": 11,
+      "jev_requests": 0,
+      "jev_judgments": 0
+    },
+    "hybrid": {
+      "matches": 11,
+      "attempts": 11,
+      "held": 11,
+      "median_ms": 7211.22,
+      "objective_matches": 8,
+      "variant_matches": 3,
+      "jev_usage": {
+        "input_tokens": 35498,
+        "output_tokens": 4740
+      },
+      "llm_usage": {
+        "input_tokens": 118408,
+        "cached_input_tokens": 63488,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1013,
+        "reasoning_output_tokens": 0
+      },
+      "llm_calls": 11,
+      "jev_requests": 40,
+      "jev_judgments": 180
+    }
+  },
+  "completed_at": "2026-10-03T16:15:15.434456+00:00",
+  "protocol": {
+    "scope": "Eight simple tutorial objectives and three paired variants; one measured attempt per method. Not a held-out generalization benchmark.",
+    "data": "Two synthetic datasets of six rows each, plus a renamed copy. NULL values, repeated supplier/course values, and tied exam scores are present.",
+    "reference_validation": "Reference SQL checked against explicit expected rows before inference. No reference SQL or expected rows passed to a model.",
+    "scoring": "Ignore aliases and a global output-column permutation; preserve multiplicities and requested order. Numeric values rounded to six decimal places. Incomplete results cannot pass.",
+    "holds": "Held proposals are executed in the isolated evaluation only and counted. No review is bypassed in the application.",
+    "timing": "Generation/planning plus guarded SQLite execution. Excludes dataset setup and queue wait. At most two case-method jobs overlap. CLI startup is included for Terra.",
+    "settings": {
+      "planner": "staged",
+      "hybrid_concepts": "off",
+      "hybrid_repair": "on",
+      "jev_concurrency": 4,
+      "planning_workers": 4
+    },
+    "harness_validation": "The baseline receives logical dataset names and column metadata. Internal storage identifiers are excluded. This is a complete measured run after harness validation.",
+    "environment": {
+      "os": "Windows",
+      "python": "3.13.5"
+    },
+    "cost_note": "Token usage is reported. Actual billed cost was not measured; CLI subscription usage is not an API invoice."
+  }
+}
