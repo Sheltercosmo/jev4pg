@@ -52,6 +52,9 @@ def verify_registry_runtime(connection, observations, gates, config_path):
         from policy import verify_registry_policy
 
         checks.extend(verify_registry_policy(connection, observations))
+        from plans import verify_plan_replay
+
+        checks.extend(verify_plan_replay(connection, observations))
         source = "SELECT 1 AS id,'完成' AS note,0.7 AS p"
         start = len(observations)
         connection.execute("BEGIN")

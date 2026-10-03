@@ -1,4 +1,5 @@
 mod execution;
+mod plan;
 
 use execution::{SemanticScan, SourceSpec};
 use jev_executor::Decision;
@@ -7,6 +8,13 @@ use pgrx::JsonB;
 use pgrx::prelude::*;
 
 pgrx::pg_module_magic!(name, version);
+
+#[pg_extern]
+fn execute_plan(plan: Option<JsonB>, options: default!(Option<JsonB>, "'{}'::jsonb")) -> JsonB {
+    let plan = plan.unwrap_or_else(|| error!("A typed native plan is required"));
+    let options = options.unwrap_or_else(|| error!("Execution options are required"));
+    plan::execute(plan.0, options.0)
+}
 
 #[pg_extern]
 fn scan(
@@ -114,17 +122,20 @@ extension_sql!(
     r#"
 REVOKE ALL ON FUNCTION jev_native.scan(text,jsonb,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION jev_native.scan_many(jsonb,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION jev_native.execute_plan(jsonb,jsonb) FROM PUBLIC;
 COMMENT ON FUNCTION jev_native.scan(text,jsonb,jsonb) IS
 'Invoker-rights, bounded semantic evaluation over an explicit source SELECT. External model usage does not roll back with SQL.';
 COMMENT ON FUNCTION jev_native.scan_many(jsonb,jsonb) IS
 'One bounded native scheduler for independent source populations, with shared request admission and source-local result identity.';
+COMMENT ON FUNCTION jev_native.execute_plan(jsonb,jsonb) IS
+'Execute a typed relational and semantic stage DAG in a repeatable source snapshot with shared request limits and explicit held-stage receipts.';
 COMMENT ON FUNCTION jev_native.require_bool(jsonb,text) IS
 'Require a resolved Boolean value; UNKNOWN and NOT_EVALUATED cannot silently become false.';
 COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS
 'Reapply a decision policy to a caller-supplied observation and matching source context without provider I/O. Stored evidence requires ordinary table access controls.';
 "#,
     name = "native_permissions",
-    requires = [scan, scan_many, require_bool, decide]
+    requires = [scan, scan_many, require_bool, decide, execute_plan]
 );
 
 extension_sql_file!("../sql/registry.sql", name = "native_registry");

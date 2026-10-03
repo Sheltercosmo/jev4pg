@@ -1,14 +1,26 @@
 # Native relational plans
 
-Design contract for the next native execution step. The executor described here is not yet available. Current SQL entry points are documented in [native execution](../native/README.md).
+Development interface for relational and semantic execution through `jev_native.execute_plan(plan, options)`. This is part of the unreleased Rust extension. Build and provider configuration are documented in [native execution](../native/README.md).
+
+## Run a plan
+
+An administrator grants `EXECUTE ON FUNCTION jev_native.execute_plan(jsonb,jsonb)` to the caller. The caller also needs temporary-table privileges and ordinary access to the source relations. Run the function inside a REPEATABLE READ or SERIALIZABLE transaction. The [SQL example](../examples/planning/native_plan.sql) evaluates completion descriptions and calculates a count only when membership is resolved.
+
+The plan contains `version: 1`, a `target` stage ID and up to 32 `stages`. Each stage declares `id`, `operator`, `sql` and `columns`. Column declarations include `kind`, `label`, optional `nullable`, `unit` and `lineage`. Supported kinds are `integer`, `number`, `text`, `boolean`, `date`, `datetime`, `json` and `other`; `other` retains a PostgreSQL type without asserting a portable kind. Runtime checks enforce output names, kinds, non-null declarations and unique `keys`. A scalar key is `[]`. Labels, units, lineage descriptions and textual assertions remain descriptive metadata.
+
+`inputs` bind predecessor IDs to SQL aliases: `{"stage":"assessed","alias":"items","require_values":["eligible"]}`. A semantic stage adds typed `questions` to its SQL projection. Its consumers can read `__jev_decisions`, `__jev_observation`, `__jev_receipt` and `__jev_policy` alongside the original typed columns. Project only needed context into a subsequent semantic stage.
+
+The result contains target `rows`, separate `stages` receipts, shared `usage`, the applied `policy` and `completion_order`. A sealed empty target has `VALUE`, zero rows and `population_closed: true`. A held target has `NOT_EVALUATED` and a reason. Decision counts within each stage preserve VALUE, UNKNOWN and NOT_EVALUATED independently of relation availability.
+
+Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
 
 ## One graph for relational and semantic work
 
-Extend the existing typed `StageDAG`. Its executable records carry SQL, input identities, output columns, grain, keys and assertions. Natural-language plan descriptions help users review intent; they are not executable stage contracts.
+The existing typed `StageDAG` supplies SQL, input identities, output columns, grain, keys and assertions. Natural-language plan descriptions help users review intent; they are not executable stage contracts.
 
 PostgreSQL owns joins, grouping, windows, sorting and exact arithmetic. A semantic stage adds typed questions to a projected relation. One native executor, query allowance, registry connection and source snapshot span the graph. A shared predecessor is materialized once. Dependent stages become runnable when their own inputs close, while unrelated cursors continue. The existing bounded batch remains a scheduling boundary; a whole-graph layer barrier is unnecessary.
 
-Input aliases bind explicitly to predecessor relations. Generated SQL refers to those aliases, and native execution binds them to private temporary relations. Temporary storage retains row multiplicity and PostgreSQL types. Semantic row observations carry separate lineage to their input rows, upstream evidence and applied policy.
+Input aliases bind explicitly to predecessor relations. Generated SQL refers to those aliases, and native execution binds them to private temporary relations. Temporary storage retains row multiplicity and PostgreSQL types. Row ordinals associate each semantic result with its materialized input. Observations and applied policies remain separate from source values. Explicit provenance across arbitrary joins and projections is a remaining gate.
 
 ## Input requirements
 
@@ -18,19 +30,23 @@ Input aliases bind explicitly to predecessor relations. Generated SQL refers to 
 | Complete decisions | Named decisions resolved for every eligible input row. Required before exact semantic membership or population-dependent calculation. |
 | Selected value | A particular typed upstream decision supplies a context value. UNKNOWN or NOT_EVALUATED blocks dependent work. |
 
-Completeness is scoped to the questions and population the consumer actually needs. A skipped branch does not invalidate an unrelated branch. Every stage has a separate receipt recording whether its population closed, its eligible counts and its operational state. Empty and held stages never invent a data row to carry status.
+Omitting `require_values` requires all declared decisions of that predecessor. An explicit list limits completeness to those questions; `[]` explicitly accepts a sealed relation with unresolved decisions, for example an independently scoped denominator. Use `jev_native.require_bool` when a decision determines exact membership. Completeness is currently checked over the whole declared input relation. A narrower eligible population should be its own stage.
+
+Every stage has a separate receipt recording whether its population closed, its row and decision counts, and its operational state. Empty and held stages never invent a data row to carry status. A held predecessor blocks its consumers; independent branches continue.
 
 ## Conditions
 
-A row guard follows declared row lineage. A stage guard requires exactly one selected value. Empty inputs are unresolved; multiple rows are a cardinality error. Neither implies ANY, ALL or false.
+A stage can declare `guard: {"input":"items","question":"eligible","equals":true}`. This requires exactly one selected value. Empty inputs are unresolved; multiple rows produce a FAILED stage receipt. Neither implies ANY, ALL or false. Row guards and combining selected alternatives are not implemented yet.
 
 Matching values enable work. A known nonmatching guard leaves the branch `NOT_EVALUATED / SKIPPED`. An unresolved guard produces `NOT_EVALUATED / BLOCKED_BY_DEPENDENCY`; incompatible types produce `BLOCKED_BY_POLICY`. Boolean true and integer 1 are different values. Declared Choice uncertainty options and Score confidence policies must be resolved before checking a guard.
 
 ## Snapshot and resource contract
 
-The first relational executor will require REPEATABLE READ or SERIALIZABLE before dispatch. Read-write SPI makes completed temporary relations visible to later stages. Under READ COMMITTED it can also refresh external source snapshots, so accepting that isolation level would break the intended source consistency contract.
+The relational executor requires REPEATABLE READ or SERIALIZABLE before dispatch. Read-write SPI makes completed temporary relations visible to later stages. Under READ COMMITTED it can also refresh external source snapshots, so accepting that isolation level would break the intended source consistency contract.
 
-Source rows and provider requests share graph-wide limits. Temporary relations follow PostgreSQL resource controls, and cursor and relation cleanup must work on cancellation, errors and partial result consumption. Durable observations and uncertain request attempts retain the registry's separate commit timeline.
+Materialized rows across all stages share `max_rows`; provider requests, judgments and input bytes share the existing executor limits. Target JSON is capped at 8 MB and fetched in bounded batches. Temporary relations follow PostgreSQL resource controls and are dropped before return, or rolled back on an error. Durable observations and uncertain request attempts retain the registry's separate commit timeline.
+
+Each source must be one SELECT that fits inside a derived table. The function runs with caller privileges; it is not a sandbox for SQL functions or an authorization layer. The query service must still validate user SQL and bind authorized catalog objects. Plan execution is currently an explicit SQL/programmatic interface, not the default natural-language execution path.
 
 ## Acceptance cases
 

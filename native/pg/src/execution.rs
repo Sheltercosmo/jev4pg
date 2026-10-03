@@ -22,6 +22,7 @@ pub struct SourceSpec {
     id: String,
     sql: String,
     questions: Questions,
+    nested_context: bool,
 }
 
 impl SourceSpec {
@@ -32,7 +33,18 @@ impl SourceSpec {
         let questions: Questions =
             serde_json::from_value(questions).unwrap_or_else(|_| error!("Invalid typed questions"));
         validate_questions(&questions).unwrap_or_else(|message| error!("{}", message));
-        Self { id, sql, questions }
+        Self {
+            id,
+            sql,
+            questions,
+            nested_context: false,
+        }
+    }
+
+    pub fn for_plan(id: String, sql: String, questions: Value) -> Self {
+        let mut source = Self::new(id, sql, questions);
+        source.nested_context = true;
+        source
     }
 }
 
@@ -128,7 +140,7 @@ impl SourceCursor {
         .unwrap_or_else(|_| {
             error!("Source must be one SELECT authorized for the current PostgreSQL role")
         });
-        let cleanup = Some(register_cursor_cleanup(fcinfo, &cursor));
+        let cleanup = (!fcinfo.is_null()).then(|| register_cursor_cleanup(fcinfo, &cursor));
         Self {
             spec,
             cursor: Some(cursor),
@@ -168,8 +180,14 @@ impl SourceCursor {
             self.close();
         }
         rows.into_iter()
-            .map(|source| {
+            .map(|mut source| {
                 self.seen += 1;
+                if self.spec.nested_context {
+                    source = source
+                        .as_object_mut()
+                        .and_then(|row| row.remove("__jev_context"))
+                        .unwrap_or_else(|| error!("Native plan context is absent"));
+                }
                 (self.seen as i64, source)
             })
             .collect()
@@ -196,6 +214,12 @@ impl SourceCursor {
     }
 }
 
+impl Drop for SourceCursor {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 struct SourceRow {
     index: usize,
     ordinal: i64,
@@ -204,13 +228,32 @@ struct SourceRow {
 
 pub struct SemanticScan {
     sources: Vec<SourceCursor>,
-    executor: Executor,
+    pub(crate) executor: Executor,
     pending: VecDeque<ResultRow>,
     next_source: usize,
     seen: usize,
 }
 
 impl SemanticScan {
+    pub fn add_source(&mut self, source: SourceSpec) {
+        self.sources
+            .push(SourceCursor::open(source, std::ptr::null_mut()));
+    }
+
+    pub fn finished(&self, id: &str) -> bool {
+        self.sources
+            .iter()
+            .any(|source| source.spec.id == id && source.cursor.is_none())
+    }
+
+    pub fn next_batch(&mut self) -> Vec<ResultRow> {
+        let mut rows = Vec::new();
+        if let Some(row) = self.next() {
+            rows.push(row);
+            rows.extend(self.pending.drain(..));
+        }
+        rows
+    }
     pub fn new(
         sources: Vec<SourceSpec>,
         mut options: Value,

@@ -151,6 +151,10 @@ def verify(connection, config):
 
     checks.extend(verify_policy(connection, observations))
 
+    from plans import verify_plans
+
+    checks.extend(verify_plans(connection, observations, gates))
+
     connection.execute(
         "CREATE TABLE evidence_source AS SELECT 1 AS id,'完成'::text AS note,0.7::numeric AS p"
     )

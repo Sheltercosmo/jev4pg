@@ -233,7 +233,7 @@ fn hash_value(hash: &mut Sha256, value: &Value) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn canonical_number(number: &str) -> Result<String, &'static str> {
+pub(crate) fn canonical_number(number: &str) -> Result<String, &'static str> {
     // Normalize decimal spelling exactly, without converting through floating point.
     let (mantissa, exponent) = number.split_once(['e', 'E']).unwrap_or((number, "0"));
     let exponent: i64 = exponent
