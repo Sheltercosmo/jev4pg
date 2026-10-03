@@ -29,4 +29,8 @@ The scalar-aggregate optimizer passed a whole AST to SQLGlot after validating on
 
 The released semantic population snapshots and per-batch freshness checks materialize full rows. Provider throttling and duplicate suppression are process-local. Its PostgreSQL interface is an asynchronous queue. These are architectural gaps; adding a different implementation language alone does not close them.
 
-The development native scan now builds on PostgreSQL 17 and passes direct SQL integration checks. It supports bounded concurrent evaluation, explicit result states and saved observations with local policy replay. Shared admission, automatic evidence reuse, live source revisions and integration with the existing planner remain open gates.
+The development native scan builds on PostgreSQL 17 and passes direct SQL integration checks. Ordinary `SEMANTIC` reads now use it through the existing query service, including generated SQL. Source selection and relational consumption share a PostgreSQL snapshot. Query allowances span datasets, and durable daily reservations are shared with Python requests. Saved observations support local policy replay.
+
+The compiler groups questions by required source population and permits incomplete results only within a proven row-local fragment. It rejects unsupported alias lineage and direct evaluation on synthetic outer-join or subtotal rows. Explicit base-source evaluation remains composable with subsequent joins and grouping. These boundaries protect correctness while broader evaluation-site support is developed.
+
+Automatic evidence reuse, shared in-flight concurrency, aggregate byte limits, live source revisions and maintained features remain open gates. Dataset scans still stage sequentially. Installation packages, comparative measurements and a frozen final evaluation are also required before release.

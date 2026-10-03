@@ -1,6 +1,6 @@
 # Native semantic execution
 
-Development implementation of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. It is separate from the released 0.6.0 queue interface and is not yet connected to natural-language planning.
+Development implementation of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the released 0.6.0 queue interface.
 
 PostgreSQL filters, projects and joins source data. A cursor supplies bounded batches to Rust. Questions about one context share a request; independent contexts run concurrently. PostgreSQL receives the original projected row and its typed decisions.
 
@@ -62,7 +62,11 @@ FROM jev_native.scan(
 
 Put exact filters and required columns inside the source SELECT. An outer `WHERE` or `LIMIT` does not promise to reduce semantic work. Source rows retain PostgreSQL JSON representations, including NULLs, Unicode and numeric values. Include a stable key when results need to identify individual rows.
 
-The result has `ordinal`, `source`, `decisions` and `observation` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
+The result has `ordinal`, `source`, `decisions`, `observation` and `usage` columns. `ordinal` follows the source cursor's order; use an explicit source `ORDER BY` when order matters. Duplicate contexts can reuse observations, while duplicate result rows retain their multiplicity.
+
+`usage` contains cumulative admitted requests, judgments, input bytes and reused rows. Take the maximum of each field across a completed scan, rather than adding the repeated counters. A request may fail after admission; these counters measure admission for dispatch, not provider billing.
+
+A question can include `"subject_column":"body"` to require a non-NULL subject. A NULL subject produces `NOT_EVALUATED / SKIPPED` for that question. Other questions about the same row can still run together. This routing field is consumed by the executor and is not sent to the provider.
 
 For exact Boolean membership:
 
@@ -97,13 +101,13 @@ Apply a different decision threshold later, including from another connection:
 ```sql
 SELECT source,
        CASE WHEN observation IS NOT NULL
-            THEN jev_native.decide(source, observation, '{"accept":0.9,"reject":0.1}')
+            THEN decisions || jev_native.decide(source, observation, '{"accept":0.9,"reject":0.1}')
             ELSE decisions
        END AS decisions
 FROM message_review;
 ```
 
-`decide` performs no model call. It validates the stored response and checks that the supplied source matches its recorded context. Decimal spelling and JSON key order do not change identity; changed values, column names and missing fields do. It evaluates the recorded questions and model response, not a new question or a newer model revision.
+`decide` performs no model call. It validates the stored response and checks that the supplied source matches its recorded context. Decimal spelling and JSON key order do not change identity; changed values, column names and missing fields do. It evaluates the recorded questions and model response, not a new question or a newer model revision. If some questions were skipped, merge the replay with the saved decisions (`decisions || jev_native.decide(...)`) to retain their states.
 
 This table is a saved population, not an automatically refreshed view of `messages`. Changes or deletions in the live source do not modify it. Refresh explicitly when the current population is required. Control its SELECT and write permissions as for other source data. The observation envelope detects context mismatch; it is not a cryptographic signature or a substitute for trusted table ownership. Callers can construct JSON, so applications must choose which evidence tables they trust.
 
@@ -131,8 +135,42 @@ Noul uses configurable `accept` and `reject` thresholds, defaulting to 0.8 and 0
 
 One context is limited to 1 MB before Rust deserialization. Source and result batches each have an 8 MB serialized limit; reduce `batch_rows` for wide records. Responses are limited to 4 MB and the reuse cache to 8 MB of serialized content. These are data-size limits, not a hard cap on process memory. Oversized inputs cause errors rather than silent truncation. Duplicate source column names require explicit aliases. PostgreSQL statement cancellation is checked while waiting for responses; the HTTP client uses asynchronous DNS resolution.
 
+## Use through the query service
+
+After building and installing the extension on the PostgreSQL server, run the application migration with administrator credentials:
+
+```sh
+jevsd-pg migrate --native-interface
+```
+
+Set `SDD_SEMANTIC_ENGINE=native` for the application service. Its existing SQL and natural-language query routes then use Rust for ordinary `SEMANTIC(column, definition)` reads. The planner still produces inspectable SQL; the executor selects authorized source rows, batches questions in Rust, and returns temporary PostgreSQL relations for the remaining query. Full source populations do not pass through Python. Results identify `rust_postgresql` in the manifest and include the SQL execution steps.
+
+This preview supports joins, subqueries, grouping and other relational calculations around Boolean semantic predicates. Structured filters are pushed into source selection only when their scope is proven safe. Questions with the same required source population share a scan and request context. Questions in different filtered branches retain their own populations, so unrelated NULL subjects neither consume calls nor make a result incomplete. Table column alias lists such as `items AS i(a,b,c)` are rejected until their ordinal lineage is supported; ordinary table aliases and SELECT column aliases work.
+
+Direct semantic references to the nullable side of an outer join are also rejected: an unmatched joined row has no base-row observation. Grouping sets, ROLLUP and CUBE can likewise synthesize rows with different subjects. Evaluate the base source in a CTE before these operations when the intended operation is to join or aggregate already evaluated results. Semantic predicates on a guaranteed preserved join side and ordinary GROUP BY expressions remain supported.
+
+For example, evaluate each message before calculating subtotals:
+
+```sql
+WITH evaluated AS (
+    SELECT id, SEMANTIC(body, 'The message requests further action.') AS needs_action
+    FROM messages
+)
+SELECT needs_action, COUNT(*) AS messages
+FROM evaluated
+GROUP BY ROLLUP(needs_action);
+```
+
+Incomplete evidence permits only a proven partial read: direct semantic projections and row predicates composed with AND, OR, NOT or Boolean equality, optionally across inner joins. Unresolved projections remain NULL and the manifest retains their UNKNOWN or NOT_EVALUATED coverage. Counts, subqueries, set operations, outer joins, ordering, limits and NULL-consuming expressions such as `COALESCE` require complete evidence. Otherwise execution reports the missing evidence instead of presenting an exact answer.
+
+One query shares its judgment and input-byte allowance across dataset scans. Database reservations share `SDD_DAILY_EVALUATIONS` with existing Python model calls. Completed scans settle their request count and return unused allowance. Cancellation or a crash with an unknown dispatch count retains the reserved allowance; it does not assume the request was free. Direct SQL clients using `jev_native.scan` have their own explicit scan limits and are outside this application quota.
+
+`SDD_NATIVE_CONCURRENCY` sets concurrent requests within a scan (default 4). `SDD_NATIVE_MAX_ROWS` bounds each selected source population (default 100,000). `SDD_NATIVE_TIMEOUT_MS` bounds each application SQL statement (default 120,000 ms). Shared limits on simultaneous requests across PostgreSQL sessions are still planned.
+
+Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still require `SDD_SEMANTIC_ENGINE=python`, the default. Native mode reports these unsupported paths explicitly. Ordinary relational mutations retain the existing preview and confirmation flow. The query service currently retains coverage summaries; use explicit saved observation tables when raw evidence must survive the query.
+
 ## Remaining integration
 
-Automatic reuse and admission currently belong to one scan invocation. Saved observations support explicit replay across sessions. Automatic evidence lookup, concurrent claims, budgets shared between sessions, live source revision tracking, maintained features and planner integration remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
+Automatic observation reuse currently belongs to one scan invocation. Saved observations support explicit replay across sessions, and the application coordinates query and daily request admission. Automatic evidence lookup, concurrent claims, shared in-flight concurrency, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
 
 Model calls are external effects: transaction rollback cannot undo provider usage. Synchronous scans hold a PostgreSQL backend while inference runs. Restrict execution grants during development and use the released queue interface where its asynchronous behavior is required.

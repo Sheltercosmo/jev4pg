@@ -61,7 +61,13 @@ def ensure_login(connection, role, password=None):
     return True
 
 
-def migrate(admin_url, runtime_role="sdd_app", runtime_password=None, sql_interface=False):
+def migrate(
+    admin_url,
+    runtime_role="sdd_app",
+    runtime_password=None,
+    sql_interface=False,
+    native_interface=False,
+):
     db = Database(admin_url)
     if db.engine.dialect.name != "postgresql":
         raise ValueError("PostgreSQL is required for deployment")
@@ -110,6 +116,12 @@ def migrate(admin_url, runtime_role="sdd_app", runtime_password=None, sql_interf
             if sql_interface:
                 connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jevsd_pg")
                 grant_worker(connection, runtime_role)
+            if native_interface:
+                connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jev_native")
+                connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA jev_native TO {role}")
+                connection.exec_driver_sql(
+                    f"GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO {role}"
+                )
             connection.execute(
                 text(
                     "INSERT INTO public.sdd_schema_version(singleton, version) VALUES(true, :version) "
@@ -118,7 +130,10 @@ def migrate(admin_url, runtime_role="sdd_app", runtime_password=None, sql_interf
                 {"version": SCHEMA_VERSION},
             )
             connection.exec_driver_sql(f"GRANT SELECT ON public.sdd_schema_version TO {role}")
-        return {"schema_version": SCHEMA_VERSION, "sql_interface": sql_interface}
+        result = {"schema_version": SCHEMA_VERSION, "sql_interface": sql_interface}
+        if native_interface:
+            result["native_interface"] = True
+        return result
     finally:
         db.engine.dispose()
 

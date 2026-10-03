@@ -12,6 +12,7 @@ from pathlib import Path
 from decimal import Decimal
 
 import psycopg
+import sqlglot
 from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -307,10 +308,14 @@ def verify(connection):
     checks.append(
         "100,000 duplicate contexts retain multiplicity with one request and bounded observed memory"
     )
+    from application import verify_application
+
+    checks.extend(verify_application(connection, observations))
     return {
         "checks": checks,
         "passed": len(checks),
         "provider": "deterministic fixture",
+        "sqlglot_version": sqlglot.__version__,
         "nl_accuracy_measured": False,
         "cancellation_seconds": elapsed,
         "bulk_scan_seconds": bulk_seconds,

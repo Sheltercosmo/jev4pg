@@ -11,6 +11,15 @@ from sqlalchemy import (
 )
 from ..schema import table
 
+native_admissions = table(
+    "native_query_admissions",
+    Column("budget_id", ForeignKey("tenant_daily_usage.id"), nullable=False),
+    Column("reserved", Integer, nullable=False),
+    Column("requests", Integer),
+    Column("state", String(24), nullable=False),
+    Column("created_at", String(32), nullable=False),
+)
+
 datasets = table(
     "dataset_catalog",
     Column("name", String(160), nullable=False),

@@ -9,7 +9,7 @@ use std::ffi::CString;
 
 pgrx::pg_module_magic!(name, version);
 
-type ResultRow = (i64, JsonB, JsonB, Option<JsonB>);
+type ResultRow = (i64, JsonB, JsonB, Option<JsonB>, JsonB);
 
 struct SemanticScan {
     cursor: Option<String>,
@@ -111,6 +111,7 @@ impl Iterator for SemanticScan {
                 evaluation.observation.map(|observation| {
                     JsonB(serde_json::to_value(observation).expect("Observations serialize"))
                 }),
+                JsonB(serde_json::to_value(&self.executor.usage).expect("Usage serializes")),
             ));
         }
         self.pending.pop_front()
@@ -152,6 +153,7 @@ fn scan(
         name!(source, JsonB),
         name!(decisions, JsonB),
         name!(observation, Option<JsonB>),
+        name!(usage, JsonB),
     ),
 > {
     let source_sql = source_sql.unwrap_or_else(|| error!("Source SELECT is required"));

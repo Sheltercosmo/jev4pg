@@ -22,6 +22,8 @@ pub struct Question {
     pub instructions: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub criteria: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_column: Option<String>,
 }
 
 pub fn validate_questions(questions: &Questions) -> Result<(), &'static str> {
@@ -35,7 +37,13 @@ pub fn validate_questions(questions: &Questions) -> Result<(), &'static str> {
             Value::Array(items) => !items.is_empty(),
             _ => false,
         };
-        if id.is_empty() || id.len() > 200 || !has_instructions {
+        if id.is_empty()
+            || id.len() > 200
+            || !has_instructions
+            || q.subject_column
+                .as_ref()
+                .is_some_and(|name| name.is_empty())
+        {
             return Err("Question identity and instructions are required");
         }
         match q.kind.as_str() {
@@ -240,6 +248,14 @@ impl Executor {
         let mut requests = Vec::new();
         let mut output_bytes = 0;
         for (index, row) in rows.iter().enumerate() {
+            let (active, skipped) = applicable_questions(row, questions)?;
+            if active.is_empty() {
+                results[index] = Some(Evaluation {
+                    decisions: skipped,
+                    observation: None,
+                });
+                continue;
+            }
             let key =
                 serde_json::to_string(&(row, questions)).map_err(|_| "Invalid semantic input")?;
             if let Some(cached) = self.cache.get(&key) {
@@ -259,29 +275,35 @@ impl Executor {
                 continue;
             }
             aliases.insert(key.clone(), vec![index]);
-            let payload =
-                json!({"model": self.provider.model, "state": row, "questions": questions});
+            let mut provider_questions =
+                serde_json::to_value(&active).map_err(|_| "Invalid questions")?;
+            for question in provider_questions.as_object_mut().unwrap().values_mut() {
+                question.as_object_mut().unwrap().remove("subject_column");
+            }
+            let payload = json!({"model": self.provider.model, "state": row, "questions": provider_questions});
             let bytes = serde_json::to_vec(&payload)
                 .map_err(|_| "Invalid semantic input")?
                 .len();
             if bytes > 1_000_000 {
                 return Err("One semantic input exceeds the 1 MB context limit");
             }
-            if self.usage.judgments + questions.len() > self.limits.max_judgments
+            if self.usage.judgments + active.len() > self.limits.max_judgments
                 || self.usage.requests + 1 > self.limits.max_requests
                 || self.usage.input_bytes + bytes > self.limits.max_input_bytes
             {
-                results[index] = Some(Evaluation::unexecuted(
-                    questions,
+                let mut held = Evaluation::unexecuted(
+                    &active,
                     "BLOCKED_BY_BUDGET",
                     "Native query budget exhausted",
-                ));
+                );
+                held.decisions.extend(skipped);
+                results[index] = Some(held);
                 continue;
             }
-            self.usage.judgments += questions.len();
+            self.usage.judgments += active.len();
             self.usage.requests += 1;
             self.usage.input_bytes += bytes;
-            requests.push((key, payload, row));
+            requests.push((key, payload, row, active, skipped));
         }
         let provider = &self.provider;
         let client = &self.client;
@@ -289,21 +311,22 @@ impl Executor {
         let cache = &mut self.cache;
         let cache_bytes = &mut self.cache_bytes;
         self.runtime.block_on(async {
-            let pending = stream::iter(requests.into_iter().map(|(key, payload, row)| async move {
+            let pending = stream::iter(requests.into_iter().map(|(key, payload, row, active, skipped)| async move {
                 let response = send(client, provider, payload).await.and_then(|value| {
-                    let observation = Observation::capture(row, questions, provider, value)?;
+                    let observation = Observation::capture(row, &active, provider, value)?;
                     let decisions = observation.decide(row, Policy { accept: limits.accept, reject: limits.reject })?;
                     Ok(Evaluation { decisions, observation: Some(observation) })
                 });
-                (key, response)
+                let mut evaluation = response.unwrap_or_else(|reason| Evaluation::unexecuted(&active, "FAILED", reason));
+                evaluation.decisions.extend(skipped);
+                (key, evaluation)
             })).buffer_unordered(limits.concurrency);
             futures_util::pin_mut!(pending);
             let mut tick = tokio::time::interval(Duration::from_millis(25));
             loop {
                 tokio::select! {
                     item = pending.next() => {
-                        let Some((key, response)) = item else { break; };
-                        let decisions = response.unwrap_or_else(|reason| Evaluation::unexecuted(questions, "FAILED", reason));
+                        let Some((key, decisions)) = item else { break; };
                         let bytes = serde_json::to_vec(&decisions).map_err(|_| "Invalid result")?.len();
                         output_bytes += bytes * aliases[&key].len();
                         if output_bytes > 8_000_000 {
@@ -335,6 +358,33 @@ impl Executor {
             .map(|v| v.ok_or("Native execution lost a result identity"))
             .collect()
     }
+}
+
+fn applicable_questions(
+    row: &Value,
+    questions: &Questions,
+) -> Result<(Questions, Decisions), &'static str> {
+    let row = row
+        .as_object()
+        .ok_or("Semantic input must be a projected row object")?;
+    let mut active = Questions::new();
+    let mut skipped = Decisions::new();
+    for (id, question) in questions {
+        if let Some(column) = &question.subject_column {
+            let value = row
+                .get(column)
+                .ok_or("Subject column is absent from the context")?;
+            if value.is_null() {
+                skipped.insert(
+                    id.clone(),
+                    Decision::blocked("SKIPPED", "Subject value is NULL"),
+                );
+                continue;
+            }
+        }
+        active.insert(id.clone(), question.clone());
+    }
+    Ok((active, skipped))
 }
 
 fn unexecuted(questions: &Questions, state: &str, reason: &str) -> Decisions {

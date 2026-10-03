@@ -1,9 +1,9 @@
 name: Native PostgreSQL
 on:
   push:
-    paths: ['native/**', '.github/workflows/native.yml']
+    paths: ['native/**', 'sdd/**', '.github/workflows/native.yml']
   pull_request:
-    paths: ['native/**', '.github/workflows/native.yml']
+    paths: ['native/**', 'sdd/**', '.github/workflows/native.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -54,7 +54,7 @@ jobs:
           python-version: '3.13'
       - name: Verify direct PostgreSQL execution
         run: |
-          python -m pip install 'psycopg[binary]==3.2.9'
+          python -m pip install -e '.[test]' 'psycopg[binary]==3.2.9'
           python native/tests/postgres.py
       - uses: actions/cache/save@v4
         if: always() && steps.native_cache.outputs.cache-hit != 'true'

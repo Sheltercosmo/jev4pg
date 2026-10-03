@@ -10,10 +10,14 @@ jevsd-pg has three main responsibilities: interpret the request, establish the e
 | Catalog | `sdd/generic/catalog.py` | Dataset schemas, field descriptions, keys and relationships. |
 | Query planning | `sdd/generic/planner.py` and adjacent planner modules | JEV planning, typed stages, hybrid proposals and review. |
 | SQL execution | `sdd/generic/sql.py` | SQL validation, semantic predicates, result coverage and mutation previews. |
+| Native query compilation | `sdd/generic/native_sql.py`, `native_admission.py` | PostgreSQL source relations, native dispatch and durable request allowance. |
+| Native semantic execution | `native/core/`, `native/pg/` | Bounded Rust evaluation, concurrent provider I/O, typed decisions and observation replay. |
 | Semantic features | `sdd/generic/features.py` | Definition revisions, evidence reuse, human corrections and materialization. |
 | Operator API | `sdd/operators/service.py` | Operator contracts, authorization and dispatch. |
 | Operator runtime | `sdd/operators/runtime.py`, `budget.py`, `types.py` | Batching, concurrency, reservations and explicit output states. |
 | Workspace | `sdd/web/` | Separate English and Simplified Chinese interfaces. |
+
+The Rust execution path is an opt-in development feature; Python remains the default semantic engine. PostgreSQL executes relational SQL in both paths. See the [native usage guide](../native/README.md) and [execution stage dependencies](JEV_PLANNING_STAGES.md).
 
 ## Hybrid stage placement
 

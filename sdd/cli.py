@@ -18,6 +18,11 @@ def main():
         "migrate", help="Install schema and tenant policies as an administrator"
     )
     migration.add_argument("--sql-interface", action="store_true")
+    migration.add_argument(
+        "--native-interface",
+        action="store_true",
+        help="Enable the installed Rust semantic extension",
+    )
     grant = sub.add_parser("sql-grant", help="Map an existing SQL login to a JEV identity")
     grant.add_argument("login")
     grant.add_argument("--tenant", required=True)
@@ -74,6 +79,7 @@ def main():
                     os.getenv("SDD_DB_USER", "sdd_app"),
                     secret("SDD_DB_PASSWORD"),
                     args.sql_interface,
+                    native_interface=args.native_interface,
                 )
             elif args.command == "sql-grant":
                 grant_client(
