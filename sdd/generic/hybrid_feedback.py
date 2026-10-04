@@ -3,14 +3,13 @@
 from copy import deepcopy
 import os
 
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlglot import exp, parse_one
 from sqlglot.optimizer.scope import traverse_scope
 from sqlglot.lineage import lineage
 from sqlglot.errors import SqlglotError
 
-from .catalog import serial
 from .sql import FUNCTIONS
 
 
@@ -71,50 +70,71 @@ def observed_context(tenant, packet, catalog):
         "sample_only": True,
     }
     datasets = {d["name"]: d for d in catalog.list(tenant)}
-    for item in output["catalog"][:16]:
-        dataset = datasets[item["name"]]
-        columns = [c for c in item["columns"] if not c.get("feature_id")][:24]
-        try:
-            with catalog.db.transaction(tenant) as connection:
-                if catalog.db.engine.dialect.name == "postgresql":
-                    connection.execute(text("SET LOCAL statement_timeout = '1500ms'"))
-                table = catalog.table(dataset, connection)
-                fields = [
-                    func.substr(table.c[c["name"]], 1, 160).label(c["name"])
-                    if c["type"] == "text"
-                    else table.c[c["name"]]
-                    for c in columns
-                    if c["name"] in table.c
-                ]
-                if not fields:
-                    continue
-                rows = connection.execute(select(*fields).limit(256)).mappings().all()
-            for column in columns:
-                values = []
-                for row in rows:
-                    value = serial(row.get(column["name"]))
-                    if value is not None and value not in values and len(str(value)) <= 160:
-                        values.append(value)
-                    if len(values) >= 16:
-                        break
-                column["value_evidence"] = {
-                    "examples": values,
-                    "sample_only": True,
-                    "rows_inspected": len(rows),
-                    "observed_nulls": sum(row.get(column["name"]) is None for row in rows),
-                    "observed_blanks": sum(
-                        isinstance(row.get(column["name"]), str) and not row[column["name"]].strip()
-                        for row in rows
-                    ),
-                    "text_may_be_truncated": column["type"] == "text",
-                }
-            trace["tables"] += 1
-        except (ValueError, DBAPIError) as exc:
-            trace.setdefault("unavailable", []).append(
-                {"table": item["name"], "operation_state": "FAILED", "code": type(exc).__name__}
+    from .planning_samples import PlanningSamples
+
+    sampler = PlanningSamples(catalog, row_limit=256)
+    items = output["catalog"][:16]
+    batches = sampler.many(
+        tenant,
+        [
+            (
+                datasets[item["name"]],
+                [c["name"] for c in item["columns"] if not c.get("feature_id")][:24],
             )
-    if trace.get("unavailable"):
+            for item in items
+        ],
+    )
+    omitted_columns = 0
+    for index, item in enumerate(output["catalog"]):
+        sample = batches[index] if index < len(batches) else None
+        for column in item["columns"]:
+            if column.get("feature_id"):
+                continue
+            if sample is None:
+                column["value_evidence"] = {
+                    "sample_only": True,
+                    "examples": [],
+                    "output_state": "NOT_EVALUATED",
+                    "operation_state": "BLOCKED_BY_BUDGET",
+                }
+            else:
+                column["value_evidence"] = sample.evidence(column["name"])
+                column["value_evidence"].pop("exact_values", None)
+                evidence = column["value_evidence"]
+                if column["type"] == "text" and not evidence["complete"]:
+                    lookup = sampler.matches(
+                        tenant, datasets[item["name"]], column["name"], packet["request"]
+                    )
+                    evidence["examples"] = list(
+                        dict.fromkeys([*lookup["values"], *evidence["examples"]])
+                    )[:16]
+                    evidence["literal_lookup"] = {k: v for k, v in lookup.items() if k != "values"}
+            if column["value_evidence"]["output_state"] == "NOT_EVALUATED":
+                omitted_columns += 1
+        if sample and sample.output_state == "VALUE":
+            trace["tables"] += 1
+        else:
+            trace.setdefault("unavailable", []).append(
+                {
+                    "table": item["name"],
+                    "output_state": sample.output_state if sample else "NOT_EVALUATED",
+                    "operation_state": sample.operation_state if sample else "BLOCKED_BY_BUDGET",
+                }
+            )
+    trace.update(
+        source_reads=sampler.reads, sample_bytes=sampler.bytes, omitted_columns=omitted_columns
+    )
+    if any(item["output_state"] == "UNKNOWN" for item in trace.get("unavailable", [])):
         trace.update(output_state="UNKNOWN", operation_state="FAILED")
+    elif (
+        trace.get("unavailable")
+        or omitted_columns
+        or any(not sample.complete or sample.clipped for sample in batches)
+    ):
+        trace.update(
+            output_state="VALUE" if trace["tables"] else "NOT_EVALUATED",
+            operation_state="TRUNCATED" if trace["tables"] else "BLOCKED_BY_BUDGET",
+        )
     return output, trace
 
 

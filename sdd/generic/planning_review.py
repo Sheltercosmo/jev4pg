@@ -37,7 +37,10 @@ def catalog_signature(datasets):
             [
                 {
                     key: (
-                        [{k: v for k, v in c.items() if k != "values"} for c in dataset[key]]
+                        [
+                            {k: v for k, v in c.items() if k not in {"values", "value_evidence"}}
+                            for c in dataset[key]
+                        ]
                         if key == "columns"
                         else dataset[key]
                     )

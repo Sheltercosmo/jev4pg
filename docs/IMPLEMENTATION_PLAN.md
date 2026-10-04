@@ -27,6 +27,8 @@ The immediate priority is practical application use: efficient large-table reads
 
 Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES.md), typed assignment previews and row locks. This removes the whole-table Python snapshot for those writes. Bulk jobs, application cancellation, native semantic mutations and maintained-feature generations remain separate work; a successful bounded write does not establish their readiness.
 
+Planning now uses [bounded shared value evidence](PLANNING_CONTEXT.md), concurrent table samples and index-checked literal probes. Sample completeness controls whether data can support a uniqueness hypothesis. These limits reduce preparation work; large-population semantic evaluation, query cancellation and durable bulk jobs remain unqualified.
+
 | Area | Needed before a native production release |
 | --- | --- |
 | Relational coverage | Broader dependent query shapes and explicit provenance across joins and projections. |

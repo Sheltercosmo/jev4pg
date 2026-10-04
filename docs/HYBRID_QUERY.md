@@ -43,6 +43,8 @@ Concept mode `auto` lets JEV request a short concept call for vague objectives o
 
 Value observation samples at most 256 rows from each of 16 tables and 24 retained columns. Each column retains up to 16 example values, with text bounded to 160 characters. Samples help interpretation; execution still uses the full authorized source.
 
+In the development preview, independent PostgreSQL samples load concurrently under a shared payload budget. Indexed literal lookups can add rare values outside the sample after JEV selects relevant fields. Large text and JSON values are clipped before transfer, and omitted fields remain explicitly unexecuted. See [planning context and collection limits](PLANNING_CONTEXT.md).
+
 A semantic repair requires a defect-category probability of at least 0.8 and a corresponding negative check of at most 0.2. Uncertainty alone holds the proposal for review. Output-only repair cannot change joins, filters, shared CTEs or ordering. Failed replacements leave the original proposal available.
 
 Arithmetic runs in SQL. A semantic predicate can use `SEMANTIC(source_column, 'definition')`, which invokes JEV through the evidence and budget machinery.

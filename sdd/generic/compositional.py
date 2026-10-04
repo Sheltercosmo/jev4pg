@@ -6,7 +6,7 @@ from decimal import Decimal
 from itertools import combinations
 import time
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from ..evaluators import ProviderError
 from sqlglot import exp
@@ -59,6 +59,10 @@ class CompositionalPlanner:
     def __init__(self, catalog, decisions):
         self.catalog, self.decisions = catalog, decisions
         self.trace, self.issues = [], []
+        from .planning_samples import PlanningSamples
+
+        self.samples = PlanningSamples(catalog)
+        self.value_evidence = []
 
     def ask(self, tenant, state, questions):
         result = self.decisions.ask(tenant, state, questions)
@@ -69,25 +73,25 @@ class CompositionalPlanner:
         }
 
     def domain(self, tenant, dataset, column):
-        with self.catalog.db.transaction(tenant) as connection:
-            if self.catalog.db.engine.dialect.name == "postgresql":
-                connection.execute(text("SET LOCAL statement_timeout = '3000ms'"))
-            source = self.catalog.table(dataset, connection).c[column]
-            values = (
-                connection.execute(
-                    select(source).where(source.is_not(None)).distinct().order_by(source).limit(513)
-                )
-                .scalars()
-                .all()
-            )
-        if len(values) > 512:
-            self.issues.append(
-                {
-                    "code": "value_domain_bounded",
-                    "detail": f"Literal lookup for {dataset['name']}.{column} was limited to 512 distinct values; inspect the proposed filter.",
-                }
-            )
-        return [serial(value) for value in values[:512] if len(str(value)) <= 160]
+        sample = self.samples.column(tenant, dataset, column)
+        evidence = sample.evidence(column, 512)
+        self.record_values(dataset, column, evidence)
+        return evidence["exact_values"]
+
+    def record_values(self, dataset, column, evidence, lookup=None):
+        entry = {
+            "table": dataset["name"],
+            "column": column,
+            **{k: v for k, v in evidence.items() if k not in {"examples", "exact_values"}},
+        }
+        if lookup:
+            entry["literal_lookup"] = {k: v for k, v in lookup.items() if k != "values"}
+        self.value_evidence[:] = [
+            item
+            for item in self.value_evidence
+            if (item["table"], item["column"]) != (dataset["name"], column)
+        ]
+        self.value_evidence.append(entry)
 
     def ground_value(self, tenant, state, field, candidates, key, context=None):
         candidates = list(dict.fromkeys(str(value) for value in candidates))
@@ -147,19 +151,11 @@ class CompositionalPlanner:
             ][:6]
             if not any(name != key for name in names):
                 continue
-            with self.catalog.db.transaction(tenant) as connection:
-                if self.catalog.db.engine.dialect.name == "postgresql":
-                    connection.execute(text("SET LOCAL statement_timeout = '1000ms'"))
-                table = self.catalog.table(dataset, connection)
-                rows = connection.execute(
-                    select(*[table.c[name] for name in dict.fromkeys([key, *names])]).limit(512)
-                ).mappings()
-                for row in rows:
-                    value = str(row[key])
-                    if value in candidates and value not in context:
-                        context[value] = {
-                            name: str(row[name])[:100] for name in names if name != key
-                        }
+            sample = self.samples.sample(tenant, dataset, list(dict.fromkeys([key, *names])))
+            for row in sample.rows:
+                value = str(row[key])
+                if value in candidates and value not in context:
+                    context[value] = {name: str(row[name])[:100] for name in names if name != key}
         return context
 
     def plan(self, tenant, question, datasets, legacy):
@@ -230,7 +226,7 @@ class CompositionalPlanner:
             for link in dataset["links"]
             if link["target_id"] in by_id
         ]
-        links.extend(proposed_links(self.catalog, tenant, datasets, links))
+        links.extend(proposed_links(self.catalog, tenant, datasets, links, samples=self.samples))
         state = {
             "request": question,
             "catalog": [
@@ -247,6 +243,9 @@ class CompositionalPlanner:
         }
         if hasattr(self, "value_hints"):
             state["observed_categories"] = self.value_hints(tenant, fields, by_name)
+            state["value_evidence_rule"] = (
+                "Observed examples are samples, not a closed vocabulary. Missing examples do not prove absence or define the query population."
+            )
         labels = {"none": "Not needed", **{key: field.label for key, field in fields.items()}}
         intent = self.ask(
             tenant,
@@ -918,6 +917,7 @@ class CompositionalPlanner:
                 "refinement": refinement,
             },
             "_unresolved": self.issues,
+            "value_evidence": self.value_evidence,
         }
         if audit["complete"] < 0.8:
             raise PlanReviewRequired(plan, "The complete relational proposal needs review.")

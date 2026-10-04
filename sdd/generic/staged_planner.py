@@ -4,7 +4,6 @@ from dataclasses import asdict
 import time
 
 from sqlglot import exp
-from sqlalchemy import func, select, text
 
 from .assignment import assign_unique
 from .output_contracts import output_tuple
@@ -105,18 +104,7 @@ class StagedPlanner(ParallelPlanner):
                     c for c in dataset["columns"] if c["name"].casefold() in {"id", "code", "key"}
                 ]
                 for column in identifiers[:1]:
-                    with self.catalog.db.transaction(tenant) as connection:
-                        if self.catalog.db.engine.dialect.name == "postgresql":
-                            connection.execute(text("SET LOCAL statement_timeout = '1000ms'"))
-                        source = self.catalog.table(dataset, connection)
-                        count, present, distinct = connection.execute(
-                            select(
-                                func.count(),
-                                func.count(source.c[column["name"]]),
-                                func.count(func.distinct(source.c[column["name"]])),
-                            ).select_from(source)
-                        ).one()
-                    if count and count == present == distinct:
+                    if self.samples.unique(tenant, dataset, column["name"]) is True:
                         copied["primary_key"] = [column["name"]]
                         copied["_observed_key"] = True
             local.append(copied)
@@ -137,7 +125,9 @@ class StagedPlanner(ParallelPlanner):
         connected, inferred = {root}, []
         for _ in range(4):
             ordered = sorted(local, key=lambda d: (d["name"] not in connected, d["name"]))
-            hypotheses = proposed_links(self.catalog, tenant, ordered, [*approved, *inferred])
+            hypotheses = proposed_links(
+                self.catalog, tenant, ordered, [*approved, *inferred], samples=self.samples
+            )
             inferred.extend(
                 link for link in hypotheses if link.source in connected or link.target in connected
             )
@@ -230,7 +220,7 @@ class StagedPlanner(ParallelPlanner):
             for link in d["links"]
             if link["target_id"] in by_id
         ]
-        links.extend(proposed_links(self.catalog, tenant, focused, links))
+        links.extend(proposed_links(self.catalog, tenant, focused, links, samples=self.samples))
         labels = {"none": "Not required", **{k: f.label for k, f in fields.items()}}
         state = {
             "request": question,

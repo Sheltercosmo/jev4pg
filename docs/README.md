@@ -40,6 +40,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Native Compose](NATIVE_DEPLOYMENT.md) | Optimized Rust image, registry setup, upgrades and recovery. |
 | [Providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
+| [Planning context](PLANNING_CONTEXT.md) | Bounded source samples, indexed literal lookup, completeness and parallel collection. |
 | [Performance and cost](PERFORMANCE_AND_COST.md) | Usage accounting, tuning and measurement scope. |
 | [Architecture](ARCHITECTURE.md) | Components, languages and data boundaries. |
 | [Stage placement](JEV_PLANNING_STAGES.md) | Dependencies and reasons for parallel placement. |

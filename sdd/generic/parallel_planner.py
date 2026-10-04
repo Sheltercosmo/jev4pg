@@ -6,7 +6,6 @@ from dataclasses import asdict
 from datetime import date
 import re
 
-from sqlalchemy import String, cast, func, literal, select, text
 
 from .analytic_program import AnalyticProgram
 from .catalog import serial
@@ -15,7 +14,8 @@ from ..evaluators import decision_identity
 from .jev import choice, noul, selected
 from .planning_review import PlanReviewRequired
 from .planning_phases import placement
-from .value_evidence import retrieval_tokens, rank_values
+from .value_evidence import rank_values
+from .planning_samples import mentioned
 
 
 def chunks(items, size):
@@ -27,8 +27,10 @@ class ParallelPlanner(CompositionalPlanner):
     def __init__(self, catalog, decisions):
         super().__init__(catalog, decisions)
         self.graph = {"strategy": "parallel_evidence_constraints", "rounds": [], "schema": {}}
+        self.graph["value_sources"] = self.value_evidence
         self.contracts = {}
         self.observed = {}
+        self.observed_complete = {}
 
     def evaluate(self, tenant, jobs, stage):
         record = {
@@ -646,54 +648,29 @@ class ParallelPlanner(CompositionalPlanner):
 
     def value_hints(self, tenant, fields, datasets):
         hints, self.mentioned_values = {}, {}
+        grouped = {}
+        for field in fields.values():
+            if not field.feature_id:
+                grouped.setdefault(field.table, []).append(field.name)
+        self.samples.many(tenant, [(datasets[name], columns) for name, columns in grouped.items()])
         for key, field in fields.items():
             if field.feature_id:
                 continue
-            with self.catalog.db.transaction(tenant) as connection:
-                if self.catalog.db.engine.dialect.name == "postgresql":
-                    connection.execute(text("SET LOCAL statement_timeout = '1000ms'"))
-                column = self.catalog.table(datasets[field.table], connection).c[field.name]
-                values = (
-                    connection.execute(
-                        select(column).where(column.is_not(None)).distinct().limit(13)
-                    )
-                    .scalars()
-                    .all()
+            dataset = datasets[field.table]
+            evidence = self.samples.column(tenant, dataset, field.name).evidence(field.name, 13)
+            values = evidence["exact_values"]
+            matches = (
+                [v for v in values if mentioned(self.request, v)] if field.kind == "text" else []
+            )
+            if field.kind == "text" and not evidence["complete"]:
+                matches.extend(
+                    self.samples.matches(tenant, dataset, field.name, self.request)["values"]
                 )
-                matches = []
-                if field.kind == "text":
-                    source = cast(column, String)
-                    locate = (
-                        func.strpos
-                        if self.catalog.db.engine.dialect.name == "postgresql"
-                        else func.instr
-                    )
-                    matches = (
-                        connection.execute(
-                            select(source)
-                            .where(
-                                func.length(source).between(3, 100),
-                                locate(func.lower(literal(self.request)), func.lower(source)) > 0,
-                            )
-                            .distinct()
-                            .limit(32)
-                        )
-                        .scalars()
-                        .all()
-                    )
-                    matches = [
-                        v
-                        for v in matches
-                        if re.search(
-                            r"(?<!\w)" + re.escape(str(v).casefold()) + r"(?!\w)",
-                            self.request.casefold(),
-                        )
-                    ]
-                if matches:
-                    self.observed.setdefault((field.table, field.name), set()).update(
-                        map(str, matches)
-                    )
-                    self.mentioned_values[key] = matches
+            matches = list(dict.fromkeys(matches))
+            if matches:
+                self.observed.setdefault((field.table, field.name), set()).update(map(str, matches))
+                self.mentioned_values[key] = matches
+            self.observed_complete[field.table, field.name] = evidence["complete"]
             if len(values) <= 12 or matches:
                 hints[key] = list(
                     dict.fromkeys(
@@ -847,64 +824,20 @@ class ParallelPlanner(CompositionalPlanner):
         return variants
 
     def domain(self, tenant, dataset, column):
-        with self.catalog.db.transaction(tenant) as connection:
-            if self.catalog.db.engine.dialect.name == "postgresql":
-                connection.execute(text("SET LOCAL statement_timeout = '3000ms'"))
-            source = cast(self.catalog.table(dataset, connection).c[column], String)
-            locate = (
-                func.strpos if self.catalog.db.engine.dialect.name == "postgresql" else func.instr
-            )
-            matches = (
-                connection.execute(
-                    select(source)
-                    .where(
-                        func.length(source).between(1, 160),
-                        locate(func.lower(literal(self.request)), func.lower(source)) > 0,
-                    )
-                    .distinct()
-                    .limit(64)
-                )
-                .scalars()
-                .all()
-            )
-            tokens = retrieval_tokens(self.request)
-            near = []
-            for token in tokens[:24]:
-                near.extend(
-                    connection.execute(
-                        select(source)
-                        .where(func.lower(source).contains(token))
-                        .distinct()
-                        .order_by(source)
-                        .limit(64)
-                    )
-                    .scalars()
-                    .all()
-                )
-            near = list(dict.fromkeys(near))
-            values = (
-                connection.execute(
-                    select(source).where(source.is_not(None)).distinct().order_by(source).limit(513)
-                )
-                .scalars()
-                .all()
-            )
-        near = rank_values(self.request, near)[:32]
-        if len(values) > 512:
-            self.issues.append(
-                {
-                    "code": "value_domain_bounded",
-                    "detail": f"{dataset['name']}.{column}: exact request matches plus a bounded value dictionary were considered.",
-                }
-            )
-        result = list(
-            dict.fromkeys(
-                serial(value)
-                for value in [*matches, *near, *values[:512]]
-                if len(str(value)) <= 160
-            )
+        sample = self.samples.column(tenant, dataset, column)
+        evidence = sample.evidence(column, 512)
+        definitions = {c["name"]: c for c in dataset["columns"]}
+        lookup = (
+            self.samples.matches(tenant, dataset, column, self.request)
+            if definitions[column]["type"] == "text"
+            else {"values": []}
         )
+        result = list(
+            dict.fromkeys([*lookup["values"], *rank_values(self.request, evidence["exact_values"])])
+        )
+        self.record_values(dataset, column, evidence, lookup)
         self.observed[dataset["name"], column] = set(map(str, result))
+        self.observed_complete[dataset["name"], column] = evidence["complete"]
         return result
 
     def ground_value(self, tenant, state, field, candidates, key, context=None):
@@ -921,7 +854,11 @@ class ParallelPlanner(CompositionalPlanner):
         candidates = rank_values(self.request, candidates)
         candidates.sort(key=lambda v: v not in actual)
         # Preserve numeric thresholds; observed category spellings outrank unverified copies.
-        if field.kind in ("text", "boolean") and actual:
+        if (
+            field.kind in ("text", "boolean")
+            and actual
+            and self.observed_complete.get((field.table, field.name), False)
+        ):
             candidates = [v for v in candidates if v in actual]
         for candidate in actual:
             for raw in map(str, candidates):

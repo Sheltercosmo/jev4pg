@@ -4,7 +4,6 @@ from copy import deepcopy
 import math
 import re
 
-from sqlalchemy import select, func, text
 from sqlalchemy.exc import SQLAlchemyError
 import time
 
@@ -91,11 +90,14 @@ def words(name):
     } - {"id", "code", "key", "list", "data", "table"}
 
 
-def proposed_links(catalog, tenant, datasets, approved):
+def proposed_links(catalog, tenant, datasets, approved, *, samples=None):
     """Read-only hypotheses; observed overlap never promotes them to foreign keys."""
     known = {
         (link.source, link.source_column, link.target, link.target_column) for link in approved
     }
+    from .planning_samples import PlanningSamples
+
+    samples = samples or PlanningSamples(catalog)
     domains, unique = {}, {}
     started = time.perf_counter()
 
@@ -104,26 +106,14 @@ def proposed_links(catalog, tenant, datasets, approved):
         if key not in domains:
             if len(domains) >= 32 or time.perf_counter() - started > 1.5:
                 return set(), False
-            with catalog.db.transaction(tenant) as connection:
-                if catalog.db.engine.dialect.name == "postgresql":
-                    connection.execute(text("SET LOCAL statement_timeout = '500ms'"))
-                source = catalog.table(dataset, connection).c[column["name"]]
-                values = (
-                    connection.execute(
-                        select(source)
-                        .where(source.is_not(None))
-                        .distinct()
-                        .order_by(source)
-                        .limit(513)
-                    )
-                    .scalars()
-                    .all()
-                )
-                count, distinct = connection.execute(
-                    select(func.count(source), func.count(func.distinct(source)))
-                ).one()
-            domains[key] = {str(value) for value in values}
-            unique[key] = count == distinct and bool(count)
+            sample = samples.column(tenant, dataset, column["name"])
+            evidence = sample.evidence(column["name"], 512)
+            domains[key] = {str(value) for value in evidence["exact_values"]}
+            unique[key] = (
+                True
+                if dataset["primary_key"] == [column["name"]]
+                else samples.unique(tenant, dataset, column["name"], nullable=True)
+            )
         return domains[key], unique[key]
 
     result = []
@@ -173,7 +163,7 @@ def proposed_links(catalog, tenant, datasets, approved):
                         continue
                     try:
                         right_values, is_unique = profile(target, right)
-                        if not is_unique:
+                        if is_unique is not True:
                             continue
                         left_values, _ = profile(source, left)
                     except SQLAlchemyError:

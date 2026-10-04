@@ -23,8 +23,6 @@ from sqlalchemy import (
     update,
     text,
     ForeignKeyConstraint,
-    func,
-    literal as bound_literal,
 )
 from sqlalchemy.schema import AddConstraint
 from ..ledger import Ledger, uid, now
@@ -402,56 +400,43 @@ class Catalog:
             raise ValueError("Import or attach a dataset before querying")
         if max_datasets is not None and len(datasets) > max_datasets:
             raise ValueError("Select at most 20 datasets for one planning request")
-        result = []
-        with self.db.transaction(tenant) as cx:
-            from .source_catalog import validate_sources
+        from .planning_samples import PlanningSamples
+        from .source_catalog import source_transaction
 
-            if self.db.engine.dialect.name == "postgresql":
-                cx.execute(text("SET LOCAL statement_timeout = '3000ms'"))
-            validate_sources(cx, datasets)
-            for d in datasets:
-                columns = []
-                table = self.table(d, cx) if include_values else None
-                for c in d["columns"]:
-                    info = dict(c)
-                    if include_values and c["type"] in ("text", "boolean", "date"):
-                        info["values"] = [
-                            serial(v)
-                            for v in cx.execute(
-                                select(table.c[c["name"]])
-                                .distinct()
-                                .order_by(table.c[c["name"]])
-                                .limit(12)
-                            ).scalars()
-                            if v is not None and len(str(v)) <= 80
-                        ]
-                    if include_values and question and c["type"] == "text":
-                        source = table.c[c["name"]]
-                        locate = (
-                            func.strpos
-                            if self.db.engine.dialect.name == "postgresql"
-                            else func.instr
-                        )
-                        matches = (
-                            cx.execute(
-                                select(source)
-                                .where(
-                                    func.length(source).between(2, 80),
-                                    locate(func.lower(bound_literal(question)), func.lower(source))
-                                    > 0,
-                                )
-                                .distinct()
-                                .order_by(source)
-                                .limit(12)
-                            )
-                            .scalars()
-                            .all()
-                        )
-                        info["values"] = list(dict.fromkeys([*matches, *info.get("values", [])]))[
-                            :20
-                        ]
-                    columns.append(info)
-                result.append({**d, "columns": columns})
+        sampler = PlanningSamples(self)
+        requests = [
+            (d, [c["name"] for c in d["columns"] if c["type"] in ("text", "boolean", "date")])
+            for d in datasets
+        ]
+        samples = sampler.many(tenant, requests) if include_values else []
+        result = []
+        if not include_values:
+            with source_transaction(self.db, tenant, datasets):
+                pass
+        for index, d in enumerate(datasets):
+            columns = []
+            for c in d["columns"]:
+                info = dict(c)
+                if include_values and c["type"] in ("text", "boolean", "date"):
+                    evidence = samples[index].evidence(c["name"], 12)
+                    matches = (
+                        sampler.matches(tenant, d, c["name"], question)
+                        if question and c["type"] == "text"
+                        else {"values": []}
+                    )
+                    info["values"] = list(
+                        dict.fromkeys([*matches["values"], *evidence["exact_values"]])
+                    )[:20]
+                    info["value_evidence"] = {
+                        **{
+                            k: v
+                            for k, v in evidence.items()
+                            if k not in {"examples", "exact_values"}
+                        },
+                        "literal_lookup": {k: v for k, v in matches.items() if k != "values"},
+                    }
+                columns.append(info)
+            result.append({**d, "columns": columns})
         if include_features:
             from .features import FeatureRegistry
 
