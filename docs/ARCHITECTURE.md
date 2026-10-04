@@ -8,12 +8,26 @@ jevsd-pg has three main responsibilities: interpret the request, establish the e
 | --- | --- | --- |
 | HTTP service | `sdd/api.py`, `sdd/generic/api.py` | Authentication, tenant context and public query routes. |
 | Catalog | `sdd/generic/catalog.py` | Dataset schemas, field descriptions, keys and relationships. |
+| Existing sources | `sdd/generic/source_catalog.py` | Read-only relation attachments, physical contracts and snapshot guards. |
 | Query planning | `sdd/generic/planner.py` and adjacent planner modules | JEV planning, typed stages, hybrid proposals and review. |
 | SQL execution | `sdd/generic/sql.py` | SQL validation, semantic predicates, result coverage and mutation previews. |
+| Native query compilation | `sdd/generic/native_sql.py`, `native_relational.py`, `native_conditionals.py` | Authorized source relations, shared stages and conditional SQL routing. |
+| Native semantic execution | `native/core/`, `native/pg/` | Bounded Rust evaluation, concurrent provider I/O, typed decisions and observation replay. |
+| Native probability embeddings | `native/core/src/embedding.rs` | Fixed question bases, complete answer distributions and compatible local distance comparisons. |
 | Semantic features | `sdd/generic/features.py` | Definition revisions, evidence reuse, human corrections and materialization. |
 | Operator API | `sdd/operators/service.py` | Operator contracts, authorization and dispatch. |
 | Operator runtime | `sdd/operators/runtime.py`, `budget.py`, `types.py` | Batching, concurrency, reservations and explicit output states. |
 | Workspace | `sdd/web/` | Separate English and Simplified Chinese interfaces. |
+
+The Rust execution path is an opt-in development feature; Python remains the default semantic engine. PostgreSQL executes relational SQL in both paths. See the [native usage guide](../native/README.md) and [execution stage dependencies](JEV_PLANNING_STAGES.md).
+
+## Implementation languages
+
+PostgreSQL owns storage, transactions, indexes and relational execution through its existing native engine. The Rust extension runs semantic scans, shared request scheduling, conditional decisions and evidence reuse inside PostgreSQL. It can be called directly from SQL without the Python service.
+
+Python handles the HTTP API, catalog integration, natural-language planning and compilation of application queries into native plans. Maintained semantic features, semantic mutation reviews and operators without a native strategy still use the Python runtime. The web workspace uses JavaScript, HTML and CSS. Shell scripts handle installation and service startup.
+
+Release v0.6.0 and the default Compose stack use the Python semantic runtime and queued SQL interface. The Rust extension is built and enabled separately. Installing the application from `main` does not automatically enable native execution.
 
 ## Hybrid stage placement
 

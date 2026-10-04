@@ -42,4 +42,29 @@ def check_database(db, sql_interface=None):
             ).scalar()
             if extension != "0.1.0":
                 raise ValueError("Install the matching jevsd_pg SQL extension")
+        if os.getenv("SDD_SEMANTIC_ENGINE") == "native":
+            native = connection.execute(
+                text("SELECT extversion FROM pg_extension WHERE extname='jev_native'")
+            ).scalar()
+            if native != "0.1.0":
+                raise ValueError("Install the matching jev_native Rust extension")
+            admission = connection.execute(
+                text(
+                    "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class "
+                    "WHERE oid=to_regclass('public.native_query_admissions')"
+                )
+            ).scalar()
+            executable = connection.execute(
+                text(
+                    "SELECT has_schema_privilege(current_user,'jev_native','USAGE') "
+                    "AND has_function_privilege(current_user,'jev_native.scan(text,jsonb,jsonb)','EXECUTE')"
+                    " AND has_function_privilege(current_user,to_regprocedure('jev_native.scan_many(jsonb,jsonb)'),'EXECUTE')"
+                    " AND has_function_privilege(current_user,to_regprocedure('jev_native.execute_plan(jsonb,jsonb)'),'EXECUTE')"
+                    " AND has_function_privilege(current_user,to_regprocedure('jev_native.embed(text,jsonb,jsonb)'),'EXECUTE')"
+                )
+            ).scalar()
+            if not admission or not executable:
+                raise ValueError(
+                    "Run migrate --native-interface to install native admission and runtime grants"
+                )
     return {"database": "ready", "schema_version": version, "sql_interface": bool(required)}

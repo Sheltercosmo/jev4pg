@@ -155,9 +155,14 @@ def _sql_facts(sql, packet):
                 for k in ("where", "having")
                 if node.args.get(k)
             )
+        set_scopes = (
+            scope.set_operation_scopes
+            if hasattr(scope, "set_operation_scopes")
+            else scope.union_scopes
+        )
         inputs.extend(
             scope_outputs[id(child)]
-            for child in [*scope.subquery_scopes, *scope.union_scopes]
+            for child in [*scope.subquery_scopes, *set_scopes]
             if id(child) in scope_outputs
         )
         grain = unknown_grain

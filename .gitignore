@@ -25,3 +25,5 @@ node_modules/
 
 .secrets/
 backups/
+native/target/
+native/verification.json

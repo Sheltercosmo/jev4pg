@@ -1,31 +1,45 @@
 # Performance and cost
 
-On the version 0.5.0 tutorial, JEV matched GPT-5.6 Terra's SQL results without LLM generation. Terra was slightly faster; hybrid added semantic review.
+The native preview changes where semantic work runs and how it is shared. It has deterministic Rust and PostgreSQL integration tests, but no published end-to-end speed, cost or retrieval-quality comparison for this native version. The earlier tutorial results do not measure the native executor.
 
-## Simple queries
+## Where calls are spent
 
-| Method | Matching SQL proposals | Median time |
-| --- | ---: | ---: |
-| JEV 1.13.0 | 11/11 | 5.51 s |
-| GPT-5.6 Terra | 11/11 | 4.94 s |
-| JEV + GPT-5.6 Terra | 11/11 | 7.21 s |
+| Operation | Provider work |
+| --- | --- |
+| Exact SQL filtering, joins and arithmetic | None. PostgreSQL performs the calculation. |
+| Native scan or embedding | Missing questions sharing one context are batched in a request. Independent contexts run concurrently within configured limits. |
+| Compatible observation reuse | No new inference for the reused observation. Persistent reuse requires the evidence registry. |
+| `decide`, `answer_matrix`, `embedding_distance` | None. These apply policy, project distributions or compare stored matrices locally. |
+| Hybrid planning | One SQL generation by default; a supported repair can add one. JEV context selection and review have separate usage. |
 
-Measured on 3 October 2026 using eight basic objectives and three paired checks for paraphrasing, Simplified Chinese and schema renaming. The two small synthetic datasets cover aggregation, filtering and ordering. This tutorial does not establish parity on complex SQL.
+Sharing context reduces repeated input; concurrency overlaps independent requests. Neither guarantees a fixed speedup. Distinct questions still count as separate judgments. SQL rollback cannot undo provider usage.
 
-All JEV and hybrid proposals required review. Their SQL was executed inside the evaluation to score the answers. Timing includes planning and SQLite execution; Terra also includes CLI startup. Both Terra modes used low reasoning effort. These are single-run measurements.
+## Read usage correctly
 
-The [tutorial](../examples/nl2sql/README.md) provides the data and runner. [Detailed results](../examples/nl2sql/results.json) contain every generated query, scoring rules, usage and source hashes.
+Native results include `usage`, `receipt` and `policy`. Usage records cumulative admitted requests, judgments, input bytes and reused rows for the invocation. Take the maximum counters over the complete result; do not sum repeated row counters. Admission is not provider billing: a request can fail after admission.
 
-## Cost
+For API operators and hybrid queries, inspect returned usage and plan details. Separate LLM generation, JEV selection and review, and data execution. Record missing or failed work even when a proposal remains available for review.
 
-Actual charges were not measured. Using the [Terra API rates](https://developers.openai.com/api/docs/models/gpt-5.6-terra) checked on 3 October 2026, recorded LLM usage corresponds to about $0.10 for the baseline and $0.13 for hybrid across 11 queries, before JEV charges. These estimates do not represent Codex subscription billing.
+Dollar cost depends on the configured service or local hardware. `SDD_JEV_INPUT_USD_PER_MILLION` controls the application's input-token estimate; its default `0.042` is an accounting assumption, not a provider quote. Include output charges and local compute separately. Native byte counters are not token counts or a billing estimate.
 
-JEV charges depend on your provider. Set `SDD_JEV_INPUT_USD_PER_MILLION` to its input-token rate. The default `0.042` is an accounting assumption; include any output or local compute costs separately. The recorded token counts remain available in the result file for recalculation.
+## Reduce unnecessary work
 
-## Tuning
+Put exact filters and only required fields inside native source SQL. An outer LIMIT does not promise to reduce provider work. Use a compact question basis for embeddings, preserve its identity, embed each search input once and compare stored vectors locally.
 
-* Reuse compatible evidence to avoid repeating model judgments. Provider, revision, source or question changes can require fresh evaluation.
-* Adjust `SDD_JEV_CONCURRENCY` and `SDD_PLANNING_WORKERS` to control parallel requests and planning work. Both default to 4 and allow up to 16.
-* Set operator budgets for requests, judgments, tokens and estimated cost. Use `JEV.EXPLAIN_PLAN` to estimate missing work before dispatch.
+Use `scan_many` or a shared stage plan for independent populations. Configure the [evidence registry](NATIVE_EVIDENCE.md) for reuse across connections. Changing source content, questions or evaluator revision can require new observations.
 
-[Hybrid configuration](HYBRID_QUERY.md) controls optional concept and repair calls. [Provider setup](PROVIDERS.md) covers local batching and concurrency. [Operator usage](JEV_OPERATORS.md) explains budgets and result completeness.
+Native `concurrency` defaults to 4 and is limited to 16 per invocation. `max_requests`, `max_judgments`, `max_rows` and `max_input_bytes` bound different resources. The registry adds shared admission across sessions. Synchronous native calls hold a PostgreSQL backend during inference; size connection pools accordingly. Attached view sources need an additional guard connection.
+
+See [native limits](../native/README.md#states-and-limits), [hybrid configuration](HYBRID_QUERY.md) and [operator budgets](JEV_OPERATORS.md).
+
+## Reproduce and compare
+
+The [NL2SQL tutorial](../examples/nl2sql/README.md) supplies synthetic data, references and a runner for JEV, LLM and hybrid planning. Validate the references without model calls:
+
+```bash
+python examples/nl2sql/compare.py --validate-only
+```
+
+For native execution, use the [SQL examples](../examples/operators/README.md#native-sql) and PostgreSQL integration workflow as correctness starting points. Its deterministic provider is a test fixture, not a model benchmark.
+
+A useful comparison records the source commit, PostgreSQL and provider versions, schema, row count, question basis, budgets and cache state. Run cold and reused-evidence cases separately. Report result matches, incomplete cases, median and tail latency, provider requests, tokens, peak memory and connection count. Include held proposals in result scoring and preserve failed or unexecuted cases. Language accuracy and embedding retrieval quality need their own untouched test cases.

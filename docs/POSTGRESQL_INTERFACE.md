@@ -1,4 +1,6 @@
-# PostgreSQL interface
+# Queued PostgreSQL interface
+
+This guide covers the `jevsd_pg` extension and asynchronous `jev.*` functions. For direct Rust execution, use the separate [native extension](../native/README.md), with `jev_native.scan`, stage plans and embeddings.
 
 Run JEV operators from `psql` or any PostgreSQL driver. `jev.submit` queues an operator, `jev.result` reads its result, and `jev.cancel` cancels a queued request. The Python worker executes the same operator implementation used by the HTTP API.
 
@@ -26,7 +28,7 @@ Map that login to an application identity:
 docker compose run --rm migrate sql-grant analyst --tenant demo --actor analyst --role reader
 ```
 
-On a native installation, use `jevsd-pg sql-grant` with administrator connection settings. Use `--role reviewer` only for clients allowed to approve or promote definitions. Do not share the runtime login `sdd_app` with SQL clients. The grant command rejects administrative logins and logins with runtime table access.
+On an installation without Docker, use `jevsd-pg sql-grant` with administrator connection settings. Use `--role reviewer` only for clients allowed to approve or promote definitions. Do not share the runtime login `sdd_app` with SQL clients. The grant command rejects administrative logins and logins with runtime table access.
 
 Connect as the client:
 

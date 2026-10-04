@@ -53,6 +53,12 @@ Under Manage data, open Extract entries from text:
 
 The extractor maps exact text spans to typed values. Missing or ambiguous required values hold the import instead of inventing entries. Automatic import is optional and inserts only fully resolved records. Repeating extraction can create duplicates; it is not an update or deduplication operation. See the [text import guide](TEXT_IMPORT.md) for API calls, numeric formats and limits.
 
+## Existing data and native execution
+
+An administrator can [attach existing PostgreSQL tables or views](EXISTING_DATA.md). Attached datasets appear in the selector and are read-only through the workspace. Source permissions and row security determine the accessible population.
+
+The development [Rust extension](../native/README.md) is enabled by the server administrator. With native execution enabled, supported semantic SQL can operate on derived relations and conditional branches. Planning, saved queries and user review keep the same workflow. Native embeddings are currently a SQL interface; use the [embedding guide](NATIVE_EMBEDDINGS.md) for question bases and similarity queries.
+
 ## Use operators directly
 
 The API exposes a catalog at `GET /jev/operators`, examples at `GET /jev/operators/examples`, and execution at `POST /jev/call`. Start with the [operator guide](JEV_OPERATORS.md), then use the [function reference](JEV_FUNCTION_REFERENCE.md) and [runnable examples](../examples/operators/README.md).

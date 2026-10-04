@@ -1,0 +1,6 @@
+comment = 'Native typed semantic execution for PostgreSQL'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/jev_native'
+relocatable = false
+schema = 'jev_native'
+superuser = true

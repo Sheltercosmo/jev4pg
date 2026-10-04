@@ -53,3 +53,39 @@ def test_unproven_rewrites_remain_unchanged(expression, suffix):
     tree = qualify(parse_one(query))
     before = tree.sql()
     assert decorrelate_scalar_aggregate(tree).sql() == before
+
+
+@pytest.mark.parametrize(
+    "predicate",
+    [
+        "EXISTS(SELECT SUM(c.value) FROM readings c WHERE c.bucket=a.bucket AND c.value>999)",
+        "EXISTS(SELECT COUNT(*) FROM readings c WHERE c.bucket=a.bucket)",
+        "NOT EXISTS(SELECT SUM(c.value) FROM readings c WHERE c.bucket=a.bucket)",
+        "EXISTS(SELECT c.value FROM readings c WHERE c.bucket=a.bucket AND c.value>5)",
+    ],
+)
+@pytest.mark.parametrize("aggregate", ["AVG", "SUM", "MIN", "MAX"])
+def test_scalar_rewrite_never_changes_a_sibling_query(predicate, aggregate):
+    with sqlite3.connect(":memory:") as connection:
+        connection.execute("CREATE TABLE readings(id INTEGER,bucket INTEGER,value REAL)")
+        connection.executemany(
+            "INSERT INTO readings VALUES(?,?,?)",
+            [(1, 1, 2), (2, 1, 8), (3, 2, 30), (4, None, 5), (5, 3, None)],
+        )
+        query = (
+            f"SELECT a.id, (SELECT {aggregate}(b.value) FROM readings b "
+            f"WHERE b.bucket=a.bucket) AS x FROM readings a WHERE {predicate} ORDER BY a.id"
+        )
+        transformed = rewrite(query)
+        assert (
+            connection.execute(transformed.sql(dialect="sqlite")).fetchall()
+            == connection.execute(query).fetchall()
+        )
+
+
+def test_rewrite_does_not_capture_an_existing_alias():
+    query = """SELECT _sdd_aggregate_0.id,
+        (SELECT AVG(b.value) FROM readings b WHERE b.bucket=_sdd_aggregate_0.bucket) AS x
+        FROM readings AS _sdd_aggregate_0"""
+    transformed = rewrite(query)
+    assert transformed.args["joins"][0].this.alias != "_sdd_aggregate_0"

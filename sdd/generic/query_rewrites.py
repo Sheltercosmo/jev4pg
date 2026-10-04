@@ -2,7 +2,7 @@
 
 from sqlglot import exp
 from sqlglot.optimizer.scope import traverse_scope
-from sqlglot.optimizer.unnest_subqueries import unnest_subqueries
+from sqlglot.optimizer.unnest_subqueries import decorrelate
 
 
 def decorrelate_scalar_aggregate(tree):
@@ -67,4 +67,18 @@ def decorrelate_scalar_aggregate(tree):
             return tree
         if (predicate.this.table in inner_aliases) == (predicate.expression.table in inner_aliases):
             return tree
-    return unnest_subqueries(tree)
+    used_names = {node.name for node in tree.find_all(exp.Identifier)}
+    alias_index = 0
+
+    def next_alias():
+        nonlocal alias_index
+        while True:
+            name = f"_sdd_aggregate_{alias_index}"
+            alias_index += 1
+            if name not in used_names:
+                used_names.add(name)
+                return name
+
+    # Only this scope passed the proof above; sibling subqueries retain their SQL semantics.
+    decorrelate(query, query.parent_select, scope.external_columns, next_alias)
+    return tree

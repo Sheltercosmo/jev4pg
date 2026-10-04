@@ -15,6 +15,23 @@ jevsd-pg separates language interpretation from data execution. JEV supplies bou
 
 The [workspace guide](USER_GUIDE.md) covers these flows without requiring SQL knowledge. The [text import guide](TEXT_IMPORT.md) explains the row and column descriptions used by extraction.
 
+## Native PostgreSQL functions
+
+The development Rust extension runs directly in PostgreSQL. It does not require the Python service for these functions, and is separate from the asynchronous `jev.*` worker interface.
+
+| Objective | Function | Guide |
+| --- | --- | --- |
+| Evaluate typed questions over a SQL source | `jev_native.scan` | [Native execution](../native/README.md#query) |
+| Share scheduling across independent sources | `jev_native.scan_many` | [Independent sources](../native/README.md#independent-sources) |
+| Compose SQL, semantic and conditional stages | `jev_native.execute_plan` | [Native plans](NATIVE_PLANS.md) |
+| Apply policy to a saved observation | `jev_native.decide` | [Evidence and policy](../native/README.md#save-and-reconsider-evidence) |
+| Require resolved Boolean membership | `jev_native.require_bool` | [Exact membership](../native/README.md#query) |
+| Build a question-by-answer probability matrix | `jev_native.embed` | [Embeddings](NATIVE_EMBEDDINGS.md) |
+| Project saved decisions without inference | `jev_native.answer_matrix` | [Decision reuse](NATIVE_EMBEDDINGS.md#reuse-existing-decisions-and-stage-graphs) |
+| Compare complete compatible embeddings locally | `jev_native.embedding_distance` | [Similarity queries](NATIVE_EMBEDDINGS.md#store-and-search) |
+
+The application can compile supported semantic reads, including derived relations and CASE, into native plans with `SDD_SEMANTIC_ENGINE=native`. Maintained features and semantic mutation review still require Python. See [installation](INSTALLATION.md#native-preview) and the [roadmap](IMPLEMENTATION_PLAN.md).
+
 ## Operator families
 
 Call operators through `POST /jev/call`. A population may be supplied inline or identified by a registered dataset scope. The [function reference](JEV_FUNCTION_REFERENCE.md) documents exact arguments and examples.

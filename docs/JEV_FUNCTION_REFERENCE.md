@@ -1,6 +1,6 @@
 # JEV function reference
 
-Each section gives the `arguments` object for `POST /jev/call`. Set `operator` to the section name:
+The JEV.* sections give the `arguments` object for `POST /jev/call`. Set `operator` to the section name:
 
 ```json
 {
@@ -19,6 +19,23 @@ Inspect `output_state` before reading `value`. Incomplete results use `partial_v
 Optional execution controls belong beside `operator` and `arguments`, for example `"limits": {"max_judgments": 100, "concurrency": 4}`. Do not pass the outer budget as an operator argument. Most population parameters also accept `{"dataset_id":"...","where":{"team":"North"}}`; registered datasets require a primary key. Direct states for NOUL, CHOICE, SCORE and COMPARE are literal input values.
 
 The same complete request examples are available from `GET /jev/operators/examples` and each catalog entry's `usage` field. The source is [examples.json](../sdd/operators/examples.json); rebuild this reference with `python -m scripts.build_operator_docs`.
+
+## Native PostgreSQL functions
+
+These development functions run in the Rust extension through SQL. They are separate from HTTP operators and asynchronous `jev.*` jobs. See [native setup](../native/README.md), [stage plans](NATIVE_PLANS.md) and [embeddings](NATIVE_EMBEDDINGS.md) for complete contracts and runnable examples.
+
+| Function | Purpose |
+| --- | --- |
+| `jev_native.scan(source_sql, questions, options)` | Evaluate typed questions over one SQL source. |
+| `jev_native.scan_many(sources, options)` | Schedule independent sources with shared limits and reuse. |
+| `jev_native.execute_plan(plan, options)` | Execute a shared DAG of SQL, semantic and conditional stages. |
+| `jev_native.decide(source, observation, policy)` | Apply a decision policy to compatible saved evidence without inference. |
+| `jev_native.require_bool(decisions, question_id)` | Read resolved Boolean membership; reject incomplete evidence. |
+| `jev_native.embed(source_sql, basis, options)` | Evaluate a shared question basis and return a probability matrix and vector for each source row. |
+| `jev_native.answer_matrix(basis, decisions, evaluator)` | Project existing typed decisions into the same representation without model calls. |
+| `jev_native.embedding_distance(left, right)` | Compare complete matrices with matching basis and evaluator identities locally. |
+
+## HTTP operators
 
 
 [PROMPT](#jevprompt) · [NOUL](#jevnoul) · [CHOICE](#jevchoice) · [SCORE](#jevscore) · [CLASSIFY](#jevclassify) · [TAG](#jevtag) · [FILTER](#jevfilter) · [RANK](#jevrank) · [COMPARE](#jevcompare) · [RERANK](#jevrerank) · [COMPOSITE_SCORE](#jevcomposite_score) · [EXTRACT](#jevextract) · [EXTRACT_DATE](#jevextract_date) · [FIND](#jevfind) · [STRUCTURE](#jevstructure) · [ROUTE](#jevroute) · [JOIN](#jevjoin) · [ALIGN](#jevalign) · [VERIFY](#jevverify) · [AGGREGATE](#jevaggregate) · [SUMMARY_EXTRACTIVE](#jevsummary_extractive) · [RELATE](#jevrelate) · [COVER](#jevcover) · [TRACE](#jevtrace) · [DISCOVER](#jevdiscover) · [CONTRAST](#jevcontrast) · [RESOLVE](#jevresolve) · [STATE_SCAN](#jevstate_scan) · [MATCH](#jevmatch) · [EVIDENCE_JOIN](#jevevidence_join) · [EVALUATE](#jevevaluate) · [ENSURE_SEMANTICS](#jevensure_semantics) · [MATERIALIZE](#jevmaterialize) · [REFRESH](#jevrefresh) · [REVIEW](#jevreview) · [PROMOTE](#jevpromote) · [SELECT_SCHEMA](#jevselect_schema) · [PLAN_SQL](#jevplan_sql) · [EXPLAIN_PLAN](#jevexplain_plan) · [CLASSIFY_HIERARCHY](#jevclassify_hierarchy) · [WORKFLOW](#jevworkflow) · [EXTRACT_TABLE](#jevextract_table)

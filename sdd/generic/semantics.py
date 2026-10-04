@@ -88,6 +88,8 @@ class Semantics:
                                 "row_key": row_key,
                                 "decision": review["value"],
                                 "source": "human",
+                                "output_state": "UNKNOWN" if review["value"] is None else "VALUE",
+                                "operation_state": "SUCCEEDED",
                             }
                         )
                         continue
@@ -131,6 +133,8 @@ class Semantics:
                                 "probability": probability,
                                 "decision": value,
                                 "span": span,
+                                "output_state": "UNKNOWN" if value is None else "VALUE",
+                                "operation_state": "SUCCEEDED",
                             }
                         )
                         continue
@@ -422,6 +426,10 @@ class Semantics:
                         "decision": value,
                         "span": span,
                         "call_id": call_id,
+                        "output_state": "NOT_EVALUATED"
+                        if error
+                        else ("UNKNOWN" if value is None else "VALUE"),
+                        "operation_state": "FAILED" if error else "SUCCEEDED",
                     }
                 )
 
@@ -527,7 +535,12 @@ class Semantics:
         row_order = {key: index for index, key in enumerate(keys)}
         for spec in specs:
             stats[spec.key]["observations"].sort(key=lambda item: row_order[item["row_key"]])
-            stats[spec.key]["unknown"] = sum(value is None for value in values[spec.key].values())
+            counters = stats[spec.key]
+            counters["unresolved"] = sum(value is None for value in values[spec.key].values())
+            counters["unknown"] = sum(
+                item["output_state"] == "UNKNOWN" for item in counters["observations"]
+            )
+            counters["not_evaluated"] = counters["unresolved"] - counters["unknown"]
             totals.update(
                 {key: value for key, value in stats[spec.key].items() if isinstance(value, int)}
             )

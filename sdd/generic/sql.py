@@ -5,6 +5,7 @@ All scalar literals are bound parameters, never interpolated into executable SQL
 """
 
 import re
+import os
 import time
 from collections import Counter
 from decimal import Decimal
@@ -138,9 +139,12 @@ def col(name, table=None):
 
 
 class SQLService:
-    def __init__(self, db, decisions=None):
+    def __init__(self, db, decisions=None, *, semantic_engine=None):
         self.db, self.catalog, self.decisions = db, Catalog(db), decisions
         self.semantics = Semantics(db, decisions) if decisions else None
+        self.semantic_engine = semantic_engine or os.getenv("SDD_SEMANTIC_ENGINE", "python")
+        if self.semantic_engine not in {"python", "native"}:
+            raise ValueError("SDD_SEMANTIC_ENGINE must be python or native")
 
     def prepare(self, tenant, sql):
         if not isinstance(sql, str) or len(sql) > 30000:
@@ -158,6 +162,17 @@ class SQLService:
             )
         if len(list(tree.walk())) > 2000:
             raise ValueError("SQL expression exceeds the complexity budget")
+        has_semantics = any(
+            function.name.upper() in {"SEMANTIC", "SEMANTIC_FEATURE"}
+            for function in tree.find_all(exp.Anonymous)
+        )
+        if has_semantics and any(
+            table.args.get("alias") and table.args["alias"].args.get("columns")
+            for table in tree.find_all(exp.Table)
+        ):
+            raise ValueError(
+                "Semantic queries do not support table column alias lists; use column aliases in SELECT"
+            )
         for node in tree.walk():
             if isinstance(node, (exp.Command, exp.Into, exp.Placeholder, exp.Parameter, exp.Lock)):
                 raise ValueError(
@@ -212,7 +227,8 @@ class SQLService:
             schema = {
                 d["name"]: {
                     **{
-                        c["name"]: {
+                        c["name"]: c.get("database_type")
+                        or {
                             "text": "TEXT",
                             "integer": "BIGINT",
                             "number": "DECIMAL",
@@ -307,6 +323,8 @@ class SQLService:
         else:
             tables = [tree.this.this if isinstance(tree.this, exp.Schema) else tree.this]
         for node in tables:
+            if node.meta.get("native_relation"):
+                continue
             dataset = authorized[node.name.casefold()]
             logical = node.name
             if not node.alias and not isinstance(tree, exp.Insert):
@@ -478,22 +496,16 @@ class SQLService:
             if digest(serial([row[key] for key in dataset["primary_key"]])) in keys
         ]
 
-    def lower_semantics(
-        self, tenant, tree, bindings, snapshots, budget, accept, reject, progress=None
-    ):
+    def semantic_operators(self, tenant, tree, bindings):
         from .semantic_types import SemanticSpec
         from .features import FeatureRegistry
 
-        details, total = [], Counter()
         scopes = list(traverse_scope(tree))
         operators = []
-        grouped = {}
         for function in list(tree.find_all(exp.Anonymous)):
             name = function.name.upper()
             if name not in ("SEMANTIC", "SEMANTIC_FEATURE"):
                 continue
-            if not self.semantics:
-                raise ValueError("Jev is not configured")
             if (
                 len(function.expressions) != 2
                 or not isinstance(function.expressions[0], exp.Column)
@@ -530,13 +542,23 @@ class SQLService:
                     raise ValueError("Feature source column does not match its reviewed definition")
             else:
                 spec = SemanticSpec(column.name, definition.this)
+            operators.append((function, dataset, alias, spec, parent or tree))
+        return operators
+
+    def lower_semantics(
+        self, tenant, tree, bindings, snapshots, budget, accept, reject, progress=None
+    ):
+        details, total = [], Counter()
+        grouped = {}
+        operators = self.semantic_operators(tenant, tree, bindings)
+        if operators and not self.semantics:
+            raise ValueError("Jev is not configured")
+        for function, dataset, alias, spec, local_tree in operators:
             group = grouped.setdefault(
                 dataset["id"], {"dataset": dataset, "specs": {}, "scopes": {}}
             )
             group["specs"][spec.key] = spec
-            local_tree = parent if parent is not None else tree
             group["scopes"][id(local_tree)] = local_tree
-            operators.append((function, dataset, alias, spec))
         outcomes = {}
         for identity, group in grouped.items():
             dataset = group["dataset"]
@@ -586,7 +608,7 @@ class SQLService:
                         **stats[spec.key],
                     }
                 )
-        for function, dataset, alias, spec in operators:
+        for function, dataset, alias, spec, _ in operators:
             eligible, resolved = outcomes[dataset["id"]]
             keys_by_value = {}
             for row in eligible:
@@ -645,10 +667,30 @@ class SQLService:
             raise ValueError("Invalid execution budget")
         started = time.perf_counter()
         tree, bindings, datasets, target = self.prepare(tenant, sql)
-        native_read = target is None and not any(
+        semantic_query = any(
             node.name.upper() in ("SEMANTIC", "SEMANTIC_FEATURE")
             for node in tree.find_all(exp.Anonymous)
         )
+        native_read = target is None and not semantic_query
+        if self.semantic_engine == "native" and semantic_query:
+            from .native_sql import execute_native
+
+            return execute_native(
+                self,
+                tenant,
+                sql,
+                tree,
+                bindings,
+                datasets,
+                target,
+                request=request,
+                plan=plan,
+                max_evaluations=max_evaluations,
+                accept=accept,
+                reject=reject,
+                started=started,
+                progress=progress,
+            )
         initial = {} if native_read else self.snapshots(tenant, datasets)
         if sum(len(v) for v in initial.values()) > 50000:
             raise ValueError(
@@ -690,7 +732,7 @@ class SQLService:
             and semantic_snapshot != expected_semantic_snapshot
         ):
             raise ValueError("Semantic evidence or review changed; inspect a new mutation preview")
-        complete = not coverage.get("unknown", 0)
+        complete = not coverage.get("unresolved", 0)
         if not complete and (
             tree.find(exp.Subquery)
             or tree.find(exp.Exists)
@@ -720,7 +762,9 @@ class SQLService:
             if self.db.engine.dialect.name == "postgresql" and not mutation_token
             else None
         )
-        with self.db.transaction(tenant, isolation_level=isolation) as connection:
+        from .source_catalog import source_transaction
+
+        with source_transaction(self.db, tenant, datasets, isolation) as connection:
             self.configure_transaction(connection)
             if mutation_token and self.db.engine.dialect.name == "postgresql":
                 table = self.catalog.table(target, connection)
@@ -737,23 +781,19 @@ class SQLService:
                     connection.exec_driver_sql("BEGIN")
                     source_hash = "transaction:" + uid()
                     snapshot_mode = "sqlite_transaction"
-                source_rows = 0
-                for dataset in datasets:
-                    table = self.catalog.table(dataset, connection)
-                    quoted = connection.dialect.identifier_preparer.format_table(table)
-                    source_rows += connection.execute(
-                        text("SELECT COUNT(*) FROM " + quoted)
-                    ).scalar_one()
+                source_rows = None
             else:
                 current = self.snapshots(tenant, datasets, connection)
                 if digest(serial(current)) != source_hash:
                     raise ValueError("Source data changed during evaluation; rerun the query")
                 source_rows = sum(len(v) for v in initial.values())
             manifest = {
+                "execution_backend": "postgresql" if native_read else "python",
                 "dataset_ids": [d["id"] for d in datasets],
                 "source_snapshot": source_hash,
                 "semantic_snapshot": semantic_snapshot,
                 "source_rows": source_rows,
+                "source_rows_state": "NOT_EVALUATED" if source_rows is None else "VALUE",
                 "snapshot_mode": snapshot_mode if native_read else "content_hash",
                 "complete": complete,
                 "semantic_coverage": coverage,

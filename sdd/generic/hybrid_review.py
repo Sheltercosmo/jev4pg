@@ -80,6 +80,7 @@ def review_candidates(tenant, packet, filtered, candidates, decisions):
             "business_knowledge": packet["business_knowledge"],
             "candidate_id": identity,
             "candidate_sql": candidate["sql"],
+            "semantic_rules": compact.get("semantic_rules", []),
             "implemented_operations": [s.model_dump() for s in facts["steps"]],
             "fact_source": "sql_ast; implemented behavior, not verified intent",
         }

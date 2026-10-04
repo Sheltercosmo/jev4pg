@@ -68,5 +68,6 @@ def test_large_ordinary_read_uses_database_snapshot(system, monkeypatch):
     monkeypatch.setattr(service, "snapshots", forbidden)
     answer = service.execute("a", "SELECT SUM(amount) AS total FROM readings")
     assert answer["result"] == [{"total": 50013}]
-    assert answer["manifest"]["source_rows"] == 50003
+    assert answer["manifest"]["source_rows"] is None
+    assert answer["manifest"]["source_rows_state"] == "NOT_EVALUATED"
     assert answer["manifest"]["snapshot_mode"] == "sqlite_transaction"

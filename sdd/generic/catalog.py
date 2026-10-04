@@ -5,6 +5,7 @@ from contextlib import nullcontext
 import re
 from datetime import date, datetime
 from decimal import Decimal
+from uuid import UUID
 from sqlalchemy import (
     MetaData,
     Table,
@@ -43,7 +44,7 @@ TYPES = {
 def serial(value):
     if isinstance(value, (date, datetime)):
         return value.isoformat()
-    if isinstance(value, Decimal):
+    if isinstance(value, (Decimal, UUID)):
         return str(value)
     if isinstance(value, dict):
         return {str(k): serial(v) for k, v in value.items()}
@@ -130,7 +131,20 @@ class Catalog:
         self.db, self.ledger = db, Ledger(db)
 
     def list(self, tenant):
-        return self.ledger.list(tenant, s.datasets)
+        from .source_catalog import describe_relationships
+
+        bindings = {
+            item["dataset_id"]: item for item in self.ledger.list(tenant, s.source_bindings)
+        }
+        datasets = []
+        for dataset in self.ledger.list(tenant, s.datasets):
+            binding = bindings.get(dataset["id"])
+            if binding:
+                if not binding["active"]:
+                    continue
+                dataset["source_binding"] = binding["definition"]
+            datasets.append(dataset)
+        return describe_relationships(datasets)
 
     def get(self, tenant, identity):
         matches = [d for d in self.list(tenant) if identity in (d["id"], d["name"])]
@@ -139,9 +153,33 @@ class Catalog:
         return matches[0]
 
     def table(self, dataset, conn):
+        from .source_catalog import validate_sources
+
+        validate_sources(conn, [dataset])
         return Table(
-            dataset["table_name"], MetaData(), schema=dataset["schema_name"], autoload_with=conn
+            dataset["table_name"],
+            MetaData(),
+            schema=dataset["schema_name"],
+            autoload_with=conn,
+            **(
+                {
+                    "include_columns": [column["name"] for column in dataset["columns"]],
+                    "resolve_fks": False,
+                }
+                if dataset.get("source_binding")
+                else {}
+            ),
         )
+
+    def attach(self, tenant, name, schema_name, table_name, columns=None, description=None):
+        from .source_catalog import attach
+
+        return attach(self, tenant, name, schema_name, table_name, columns, description)
+
+    def detach(self, tenant, identity):
+        from .source_catalog import detach
+
+        return detach(self, tenant, identity)
 
     def create(
         self,
@@ -307,7 +345,9 @@ class Catalog:
             ).first()
             if missing:
                 raise ValueError("Existing rows violate the declared relationship")
-            if self.db.engine.dialect.name == "postgresql":
+            if self.db.engine.dialect.name == "postgresql" and not (
+                left.get("source_binding") or right.get("source_binding")
+            ):
                 # The constraint references a Table bound into the same MetaData.
                 rt = Table(
                     right["table_name"], lt.metadata, schema=right["schema_name"], autoload_with=cx
@@ -338,13 +378,16 @@ class Catalog:
             wanted = {self.get(tenant, x)["id"] for x in selected}
             datasets = [d for d in datasets if d["id"] in wanted]
         if not datasets:
-            raise ValueError("Import a dataset before querying")
+            raise ValueError("Import or attach a dataset before querying")
         if max_datasets is not None and len(datasets) > max_datasets:
             raise ValueError("Select at most 20 datasets for one planning request")
         result = []
         with self.db.transaction(tenant) as cx:
+            from .source_catalog import validate_sources
+
             if self.db.engine.dialect.name == "postgresql":
                 cx.execute(text("SET LOCAL statement_timeout = '3000ms'"))
+            validate_sources(cx, datasets)
             for d in datasets:
                 columns = []
                 table = self.table(d, cx) if include_values else None

@@ -15,6 +15,8 @@ The ordinary suite uses deterministic fixtures and does not call JEV or an LLM. 
 
 Run `ruff check sdd scripts tests` for static checks. Keep formatting changes separate from behavior changes when possible. Browser tests need the `browser-test` extra and Edge. Run `python -m scripts.test_hybrid_ui` and `python -m scripts.test_text_import_ui` for isolated UI checks. `python -m scripts.test_ui_states` requires the service at `http://127.0.0.1:8000`.
 
+The [native execution module](native/README.md) has a separate Rust workspace and PostgreSQL 17 build. From `native`, run `cargo fmt --all --check`, `cargo test --locked -p jev-executor` and `cargo clippy --locked -p jev-executor --all-targets -- -D warnings`. The native CI workflow also installs the extension and runs SQL integration checks with a deterministic provider fixture. Changes to its execution stages belong in [the stage notes](docs/JEV_PLANNING_STAGES.md).
+
 ## Planner and operator changes
 
 A change should address a reusable mechanism, such as entity identity, join multiplicity, time boundaries, output units or missing evidence. Production code must not recognize a benchmark question, database name or expected answer.

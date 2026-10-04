@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 
-from sdd.bootstrap import ensure_login, grant_client, migrate
+from sdd.bootstrap import SCHEMA_VERSION, ensure_login, grant_client, migrate
 from sdd.db import Database
 from sdd.deployment import check_database
 from sdd.sql_worker import SQLWorker
@@ -88,7 +88,7 @@ def result(db, job):
 
 def test_fresh_repeated_install_and_runtime_grants(installation):
     env = installation
-    assert check_database(env["app"], sql_interface=True)["schema_version"] == 1
+    assert check_database(env["app"], sql_interface=True)["schema_version"] == SCHEMA_VERSION
     with pytest.raises(ValueError):
         check_database(env["owner"])
     with pytest.raises(ValueError):

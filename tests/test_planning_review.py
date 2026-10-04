@@ -7,6 +7,7 @@ from sdd.generic.planner import Planner, PlanReviewRequired
 from sdd.generic.planning_review import PlanReviews
 from sdd.generic.sql import SQLService
 from sdd.generic import schema
+from sdd.ledger import digest
 
 
 class Model:
@@ -102,6 +103,36 @@ def test_review_is_actor_tenant_and_option_bound(system):
             reviews.resume("a", "owner", identity, corrections)
     confirmed = reviews.confirm("a", "owner", identity)
     assert confirmed["human_confirmation"]["actor"] == "owner"
+
+
+def test_imported_review_from_before_source_attachments_remains_valid(system):
+    db, catalog, _, _, reviews = system
+    plan = begin(system)
+    stored = reviews.load("a", "owner", plan["review_id"])
+    dataset = catalog.model_catalog("a", ["readings"], include_values=False)[0]
+    stored["_catalog_signature"] = digest(
+        [
+            {
+                key: dataset[key]
+                for key in (
+                    "id",
+                    "name",
+                    "description",
+                    "columns",
+                    "primary_key",
+                    "links",
+                    "writable",
+                )
+            }
+        ]
+    )
+    with db.transaction("a") as connection:
+        connection.execute(
+            update(schema.runs).where(schema.runs.c.id == plan["review_id"]).values(plan=stored)
+        )
+    assert (
+        reviews.confirm("a", "owner", plan["review_id"])["human_confirmation"]["actor"] == "owner"
+    )
 
 
 def test_expired_or_schema_changed_review_cannot_resume(system):

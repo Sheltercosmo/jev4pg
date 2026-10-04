@@ -32,6 +32,52 @@ def test_rule_dependencies_and_schema_bridges_are_preserved():
     assert bridge_tables(tables, {"left", "right"}) == {"left", "bridge", "right"}
 
 
+def test_filter_retains_every_composite_relationship_operand():
+    class Filter(Reviewer):
+        def ask(self, tenant, state, questions):
+            result = super().ask(tenant, state, questions)
+            for field in state.get("fields", []):
+                result["answers"]["check_retrieve_" + field["key"]]["noul"] = (
+                    0.9 if field["name"] in {"label", "amount"} else 0.01
+                )
+            return result
+
+    packet = {
+        "request": "按名称汇总金额",
+        "business_knowledge": [],
+        "catalog": [
+            {
+                "name": "parent",
+                "primary_key": [],
+                "relationships": [],
+                "columns": [
+                    {"name": name, "type": "text"} for name in ["region", "code", "label", "noise"]
+                ],
+            },
+            {
+                "name": "child",
+                "primary_key": [],
+                "relationships": [],
+                "source_relationships": [
+                    {
+                        "target_table": "parent",
+                        "source_columns": ["region", "code"],
+                        "target_columns": ["region", "code"],
+                    }
+                ],
+                "columns": [
+                    {"name": name, "type": "text"} for name in ["region", "code", "amount", "noise"]
+                ],
+            },
+        ],
+    }
+    filtered, _ = filter_context("a", packet, ReviewDecisions(Filter()))
+    assert {
+        table["name"]: {column["name"] for column in table["columns"]}
+        for table in filtered["catalog"]
+    } == {"parent": {"region", "code", "label"}, "child": {"region", "code", "amount"}}
+
+
 def test_filter_removes_irrelevant_fields_but_keeps_uncertain_evidence_and_keys():
     class Filter(Reviewer):
         def ask(self, tenant, state, questions):
