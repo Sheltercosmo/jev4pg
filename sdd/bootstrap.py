@@ -6,9 +6,9 @@ from sqlalchemy import text
 
 from .db import Database
 from .postgres_security import secure
-from .schema import metadata
+from .schema import CATALOG_SCHEMA, metadata
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 NATIVE_EXTENSION_VERSION = "0.2.0"
 IMMUTABLE_TABLES = {
     "source_versions",
@@ -80,29 +80,37 @@ def migrate(
         with db.engine.begin() as connection:
             connection.exec_driver_sql("SET LOCAL search_path=pg_catalog,public,pg_temp")
             connection.execute(text("SELECT pg_advisory_xact_lock(1747654244, 1)"))
-            from .migration_preflight import inspect_installation
+            from .migration_preflight import InstallationConflict, inspect_installation
 
-            inspect_installation(connection, runtime_role, SCHEMA_VERSION)
+            installation = inspect_installation(connection, runtime_role, SCHEMA_VERSION)
             ensure_login(connection, runtime_role, runtime_password)
             role = identifier(connection, runtime_role)
             from .generic import schema as generic_schema  # noqa: F401
             from .operators import schema as operator_schema  # noqa: F401
 
-            metadata.create_all(connection.execution_options(schema_translate_map={None: "public"}))
+            prepare_catalog(connection, installation)
+            create_catalog_tables(connection)
             connection.execute(
                 text(
-                    "CREATE TABLE IF NOT EXISTS public.sdd_schema_version "
+                    "CREATE TABLE IF NOT EXISTS sdd_catalog.sdd_schema_version "
                     "(singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton), "
                     "version integer NOT NULL)"
                 )
             )
             previous = connection.execute(
-                text("SELECT version FROM public.sdd_schema_version")
+                text("SELECT version FROM sdd_catalog.sdd_schema_version")
             ).scalar()
             if previous is not None and previous > SCHEMA_VERSION:
                 raise ValueError("Database schema is newer than this application")
-            connection.exec_driver_sql("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
-            connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA public TO {role}")
+            connection.exec_driver_sql("REVOKE ALL ON SCHEMA sdd_catalog FROM PUBLIC")
+            connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA sdd_catalog TO {role}")
+            if connection.execute(
+                text("SELECT has_schema_privilege(:role,'sdd_catalog','CREATE')"),
+                {"role": runtime_role},
+            ).scalar_one():
+                raise InstallationConflict(
+                    ["default or inherited grants give the runtime login CREATE on sdd_catalog"]
+                )
             connection.exec_driver_sql(f"CREATE SCHEMA IF NOT EXISTS sdd_data AUTHORIZATION {role}")
             connection.exec_driver_sql(f"GRANT USAGE, CREATE ON SCHEMA sdd_data TO {role}")
             for table in metadata.sorted_tables:
@@ -112,16 +120,18 @@ def migrate(
                     if table.name in IMMUTABLE_TABLES
                     else "SELECT, INSERT, UPDATE, DELETE"
                 )
-                connection.exec_driver_sql(f"GRANT {permissions} ON public.{name} TO {role}")
+                connection.exec_driver_sql(f"GRANT {permissions} ON sdd_catalog.{name} TO {role}")
                 if table.name in IMMUTABLE_TABLES:
-                    connection.exec_driver_sql(f"REVOKE UPDATE ON public.{name} FROM {role}")
+                    connection.exec_driver_sql(f"REVOKE UPDATE ON sdd_catalog.{name} FROM {role}")
             secure(db, connection)
             for name in (
                 "sdd_reject_evidence_update",
                 "sdd_protect_concept_definition",
                 "sdd_protect_feature_definition",
             ):
-                connection.exec_driver_sql(f"REVOKE ALL ON FUNCTION public.{name}() FROM PUBLIC")
+                connection.exec_driver_sql(
+                    f"REVOKE ALL ON FUNCTION sdd_catalog.{name}() FROM PUBLIC"
+                )
             if sql_interface:
                 connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jevsd_pg")
                 grant_worker(connection, runtime_role)
@@ -157,12 +167,12 @@ def migrate(
                     grant_native_registry(connection, native_registry_password)
             connection.execute(
                 text(
-                    "INSERT INTO public.sdd_schema_version(singleton, version) VALUES(true, :version) "
+                    "INSERT INTO sdd_catalog.sdd_schema_version(singleton, version) VALUES(true, :version) "
                     "ON CONFLICT (singleton) DO UPDATE SET version = EXCLUDED.version"
                 ),
                 {"version": SCHEMA_VERSION},
             )
-            connection.exec_driver_sql(f"GRANT SELECT ON public.sdd_schema_version TO {role}")
+            connection.exec_driver_sql(f"GRANT SELECT ON sdd_catalog.sdd_schema_version TO {role}")
         result = {"schema_version": SCHEMA_VERSION, "sql_interface": sql_interface}
         if native_interface:
             result["native_interface"] = True
@@ -186,6 +196,49 @@ def check_migration(admin_url, runtime_role="sdd_app"):
             return inspect_installation(connection, runtime_role, SCHEMA_VERSION)
     finally:
         db.engine.dispose()
+
+
+def prepare_catalog(connection, installation):
+    """Move a validated legacy catalog, preserving relation identity and dependencies."""
+    if installation["catalog_schema"] == CATALOG_SCHEMA:
+        return
+    if installation["catalog_schema"] is None:
+        connection.exec_driver_sql("CREATE SCHEMA sdd_catalog")
+        return
+
+    from .migration_preflight import GUARD_FUNCTIONS, VERSION_TWO_TABLES
+
+    owner = connection.execute(
+        text(
+            "SELECT pg_get_userbyid(relowner) FROM pg_class "
+            "WHERE oid='public.sdd_schema_version'::regclass"
+        )
+    ).scalar_one()
+    connection.exec_driver_sql(
+        f"CREATE SCHEMA sdd_catalog AUTHORIZATION {identifier(connection, owner)}"
+    )
+    for table in metadata.sorted_tables:
+        if installation["schema_version"] == 1 and table.name in VERSION_TWO_TABLES:
+            continue
+        name = identifier(connection, table.name)
+        connection.exec_driver_sql(f"ALTER TABLE public.{name} SET SCHEMA sdd_catalog")
+    for name in GUARD_FUNCTIONS:
+        connection.exec_driver_sql(f"ALTER FUNCTION public.{name}() SET SCHEMA sdd_catalog")
+    connection.exec_driver_sql("ALTER TABLE public.sdd_schema_version SET SCHEMA sdd_catalog")
+
+
+def create_catalog_tables(connection):
+    owner, migrator = connection.execute(
+        text(
+            "SELECT pg_get_userbyid(nspowner),current_user FROM pg_namespace "
+            "WHERE nspname='sdd_catalog'"
+        )
+    ).one()
+    if owner != migrator:
+        connection.exec_driver_sql(f"SET LOCAL ROLE {identifier(connection, owner)}")
+    metadata.create_all(connection)
+    if owner != migrator:
+        connection.exec_driver_sql(f"SET LOCAL ROLE {identifier(connection, migrator)}")
 
 
 def grant_native_registry(connection, password):
@@ -248,7 +301,9 @@ def grant_client(admin_url, login, tenant, actor, access="reader"):
                 raise ValueError("Create the PostgreSQL login before granting JEV access")
             ensure_login(connection, login)
             if connection.execute(
-                text("SELECT has_table_privilege(:login, 'public.jev_operator_runs', 'SELECT')"),
+                text(
+                    "SELECT has_table_privilege(:login, 'sdd_catalog.jev_operator_runs', 'SELECT')"
+                ),
                 {"login": login},
             ).scalar_one():
                 raise ValueError("Use a separate SQL client login without runtime table grants")

@@ -2,7 +2,7 @@ from contextlib import contextmanager, nullcontext
 from threading import RLock
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.pool import StaticPool
-from .schema import metadata
+from .schema import CATALOG_SCHEMA, metadata
 
 
 class Database:
@@ -12,6 +12,7 @@ class Database:
         url_text = str(url)
         if url_text.startswith("sqlite"):
             options["connect_args"] = {"check_same_thread": False, "timeout": 30}
+            options["execution_options"] = {"schema_translate_map": {CATALOG_SCHEMA: None}}
             if ":memory:" in url_text:
                 options["poolclass"] = StaticPool
         elif url_text.startswith("postgresql"):
@@ -32,7 +33,10 @@ class Database:
 
         from .operators import schema as operator_schema  # noqa: F401 - register operator tables
 
-        metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            if self.engine.dialect.name == "postgresql":
+                connection.exec_driver_sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG_SCHEMA}")
+            metadata.create_all(connection)
 
     @contextmanager
     def transaction(self, tenant, isolation_level=None, *, before_snapshot=None):

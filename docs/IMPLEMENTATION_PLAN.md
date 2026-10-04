@@ -14,7 +14,8 @@ The native preview moves semantic row execution into PostgreSQL while keeping na
 | Durable evidence | Optional registry storage separates observations from policy, coordinates requests and reuses compatible results. |
 | Probability embeddings | A fixed question basis produces matrices and vectors; projection and compatible distance comparisons run locally. |
 | Native container deployment | A Compose overlay builds the optimized extension, provisions the registry and enables native application reads. Extension 0.2.0 adds backup registration with a 0.1.0 upgrade path. |
-| Application upgrade | A populated v0.6.0 database upgrades to catalog schema 2 on PostgreSQL 17, preserving data, credentials, evidence, history and job states. |
+| Application upgrade | Catalog version 3 relocates validated version 1 and 2 metadata into `sdd_catalog` transactionally. Existing source relations and the SQL queue retain their locations. |
+| Catalog isolation | Runtime metadata is schema-qualified; SQLite translates only that namespace. Fresh installations preserve public-schema objects and grants. |
 | Installation preflight | `migrate --check` inspects ownership and catalog contracts without writes. Migration refuses unmanaged collisions and fixes its schema resolution before installation. |
 | Feature publication checks | Python refresh rechecks source populations, definition and review revisions, prior publication and worker ownership before committing a run reference. |
 
@@ -29,7 +30,7 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 | Maintained features and writes | Native typed generations, source-scope checks, human review overlays and semantic mutations. Python refresh has a publication gate; native refresh still needs its own source contract. |
 | Resource accounting | Measure combined memory, connections and provider admission under concurrent workloads. |
 | Distribution | Published binary packages and images, plus broader migration and recovery testing across hosts and PostgreSQL versions. |
-| Organization adoption | Explicit catalog-schema isolation, a tested external-database deployment path, staged source onboarding, and cross-host restoration. See the [adoption plan](ORGANIZATION_ADOPTION.md). |
+| Organization adoption | A tested external-database deployment path, staged source onboarding, and cross-host restoration. See the [adoption plan](ORGANIZATION_ADOPTION.md). |
 | Evaluation | Frozen comparisons of exact results, latency, memory and provider usage across unrelated schemas; separate language and embedding retrieval evaluations. |
 
 ## Design and evaluation rules

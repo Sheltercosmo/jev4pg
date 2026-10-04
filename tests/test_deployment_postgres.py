@@ -98,7 +98,7 @@ def test_fresh_repeated_install_and_runtime_grants(installation):
             connection.execute(
                 text(
                     "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
-                    "WHERE n.nspname='public' AND c.relkind='r' AND c.relname<>'sdd_schema_version' "
+                    "WHERE n.nspname='sdd_catalog' AND c.relkind='r' AND c.relname<>'sdd_schema_version' "
                     "AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity)"
                 )
             ).scalar_one()
@@ -156,7 +156,7 @@ def test_sql_identity_cannot_be_spoofed(installation):
     for sql in (
         "SELECT * FROM jev.jobs",
         "SELECT * FROM jev.client_roles",
-        "SELECT * FROM public.jev_operator_runs",
+        "SELECT * FROM sdd_catalog.jev_operator_runs",
         "SELECT jev._claim(gen_random_uuid(),60)",
         f'SET ROLE "{env["roles"][0]}"',
     ):

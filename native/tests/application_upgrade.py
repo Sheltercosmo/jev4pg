@@ -25,14 +25,19 @@ from sdd.sql_worker import SQLWorker
 
 
 def fingerprints(connection, names):
-    return {
-        name: connection.execute(
+    result = {}
+    for oid in names:
+        namespace, name = connection.execute(
+            "SELECT n.nspname,c.relname FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.oid=%s",
+            (oid,),
+        ).fetchone()
+        result[oid] = connection.execute(
             sql.SQL(
                 "SELECT count(*),md5(coalesce(string_agg(to_jsonb(t)::text,E'\\n' ORDER BY to_jsonb(t)::text),'')) FROM {}.{} t"
-            ).format(sql.Identifier(name[0]), sql.Identifier(name[1]))
+            ).format(sql.Identifier(namespace), sql.Identifier(name))
         ).fetchone()
-        for name in names
-    }
+    return result
 
 
 def verify_application_upgrade(admin, release_python):
@@ -70,11 +75,14 @@ def verify_application_upgrade(admin, release_python):
                 timeout=90,
             )
             state = json.loads(state_path.read_text(encoding="utf-8"))
-        tables = owner.execute(
-            "SELECT n.nspname,c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
-            "WHERE c.relkind='r' AND n.nspname IN ('public','sdd_data','jev') "
-            "AND c.relname<>'sdd_schema_version' ORDER BY 1,2"
-        ).fetchall()
+        tables = [
+            row[0]
+            for row in owner.execute(
+                "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                "WHERE c.relkind='r' AND n.nspname IN ('public','sdd_data','jev') "
+                "AND c.relname<>'sdd_schema_version' ORDER BY 1"
+            ).fetchall()
+        ]
         before = fingerprints(owner, tables)
         assert len([value for value in before.values() if value[0]]) >= 12
         passwords = owner.execute(
@@ -102,7 +110,8 @@ def verify_application_upgrade(admin, release_python):
         )
         migrate(url, roles[0], sql_interface=True, native_interface=True, native_registry=True)
         assert (
-            owner.execute("SELECT version FROM sdd_schema_version").fetchone()[0] == SCHEMA_VERSION
+            owner.execute("SELECT version FROM sdd_catalog.sdd_schema_version").fetchone()[0]
+            == SCHEMA_VERSION
         )
         assert fingerprints(owner, tables) == before
         assert (
@@ -112,7 +121,10 @@ def verify_application_upgrade(admin, release_python):
             ).fetchall()
             == passwords
         )
-        assert owner.execute("SELECT count(*) FROM dataset_source_bindings").fetchone()[0] == 0
+        assert (
+            owner.execute("SELECT count(*) FROM sdd_catalog.dataset_source_bindings").fetchone()[0]
+            == 0
+        )
         app = Database(url.set(username=roles[0], password=password))
         databases.append(app)
         assert check_database(app, sql_interface=True)["database"] == "ready"

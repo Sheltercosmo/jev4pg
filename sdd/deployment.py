@@ -19,16 +19,20 @@ def check_database(db, sql_interface=None):
         if unsafe:
             raise ValueError("Runtime must use a restricted PostgreSQL role")
         version = connection.execute(
-            text("SELECT version FROM public.sdd_schema_version")
+            text("SELECT version FROM sdd_catalog.sdd_schema_version")
         ).scalar_one()
         if version != SCHEMA_VERSION:
             raise ValueError("Run the migration command for this application version")
+        if connection.execute(
+            text("SELECT has_schema_privilege(current_user,'sdd_catalog','CREATE')")
+        ).scalar_one():
+            raise ValueError("Runtime must not have CREATE on the application catalog schema")
         tables = connection.execute(
             text(
                 "SELECT c.relrowsecurity, c.relforcerowsecurity, "
                 "pg_has_role(current_user, c.relowner, 'MEMBER') AS owns_table "
                 "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
-                "WHERE n.nspname='public' AND c.relname='jev_operator_runs'"
+                "WHERE n.nspname='sdd_catalog' AND c.relname='jev_operator_runs'"
             )
         ).first()
         if not tables or not tables[0] or not tables[1] or tables[2]:
@@ -51,7 +55,7 @@ def check_database(db, sql_interface=None):
             admission = connection.execute(
                 text(
                     "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class "
-                    "WHERE oid=to_regclass('public.native_query_admissions')"
+                    "WHERE oid=to_regclass('sdd_catalog.native_query_admissions')"
                 )
             ).scalar()
             executable = connection.execute(

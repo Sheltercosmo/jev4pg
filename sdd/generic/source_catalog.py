@@ -80,19 +80,22 @@ def source_transaction(db, tenant, datasets, isolation_level=None):
         yield connection
 
 
+def internal_schema(schema_name):
+    return schema_name.startswith("pg_") or schema_name in {
+        "information_schema",
+        "sdd_catalog",
+        "sdd_data",
+        "jev",
+        "jev_native",
+    }
+
+
 def inspect_source(connection, schema_name, table_name, names=None):
     if connection.dialect.name != "postgresql":
         raise ValueError("Source attachments require PostgreSQL")
     relation = qualified(connection, schema_name, table_name)
-    if schema_name.startswith("pg_") or schema_name in {
-        "information_schema",
-        "sdd_data",
-        "jev",
-        "jev_native",
-    }:
+    if internal_schema(schema_name):
         raise ValueError("Attach a user source schema, not an internal schema")
-    if schema_name == "public" and table_name in schema.datasets.metadata.tables:
-        raise ValueError("Application metadata cannot be attached as source data")
     connection.exec_driver_sql(f"SELECT 1 FROM {relation} LIMIT 0").close()
     info = (
         connection.execute(
@@ -123,16 +126,19 @@ def inspect_source(connection, schema_name, table_name, names=None):
         JOIN pg_rewrite r ON r.ev_class=p.oid
         JOIN pg_depend d ON d.classid='pg_rewrite'::regclass AND d.objid=r.oid
         WHERE p.relkind='v' AND d.refclassid='pg_class'::regclass AND d.refobjid<>p.oid
-    ) SELECT c.oid::bigint AS oid,c.relkind AS kind,
+    ) SELECT c.oid::bigint AS oid,c.relkind AS kind,n.nspname AS schema_name,
         CASE WHEN c.relkind='v' THEN pg_get_viewdef(c.oid,true) END AS view_sql,
         CASE WHEN c.relkind='v' THEN c.reloptions ELSE NULL END AS options
-        FROM relations JOIN pg_class c USING(oid) ORDER BY c.oid"""),
+        FROM relations JOIN pg_class c USING(oid)
+        JOIN pg_namespace n ON n.oid=c.relnamespace ORDER BY c.oid"""),
             {"oid": info["oid"]},
         )
         .mappings()
         .all()
     )
     for dependency in dependencies:
+        if internal_schema(dependency["schema_name"]):
+            raise ValueError("Source views must not depend on internal schemas")
         if dependency["kind"] not in {"r", "p", "v", "m"}:
             raise ValueError("Source view dependencies must be local tables or views")
         if dependency["kind"] == "v" and not any(

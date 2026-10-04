@@ -4,7 +4,7 @@ The target is gradual adoption: preserve existing SQL applications and source ow
 
 ## Current support
 
-The development application supports a dedicated PostgreSQL 17 database, restricted runtime roles, tenant policies, mounted secrets, transactional catalog upgrades and read-only source attachments within that database. The native preview adds direct SQL execution and a durable evidence registry. Installation preflight refuses conflicting objects before migration changes anything.
+The development application supports a dedicated PostgreSQL 17 database, restricted runtime roles, tenant policies, mounted secrets, transactional catalog upgrades and read-only source attachments within that database. Its version 3 catalog uses an explicit `sdd_catalog` schema and can coexist with same-named business tables without changing their ownership or grants. The native preview adds direct SQL execution and a durable evidence registry. Installation preflight refuses conflicting objects before migration changes anything.
 
 This is not yet a supported high-availability or cross-database migration product. The Compose stack is a reference deployment. Existing source registration does not provision network access, replicate remote rows or copy remote authorization policies.
 
@@ -13,7 +13,7 @@ This is not yet a supported high-availability or cross-database migration produc
 | Step | Deliverable | Acceptance |
 | --- | --- | --- |
 | Safe installation | Shared read-only preflight, explicit schema resolution and version contracts. | Unmanaged objects remain unchanged; released installations upgrade without data loss. Implemented in development. |
-| Catalog isolation | Explicit application catalog schema and a transactional legacy migration, plus deployment against an externally managed PostgreSQL server. | Custom search paths cannot redirect runtime queries; source ownership and grants remain intact; rollback and restore succeed. |
+| Catalog isolation | Explicit application catalog schema and a transactional legacy migration. | Custom search paths cannot redirect runtime queries; source ownership and grants remain intact; rollback and restore succeed. Implemented in development; existing-server packaging and cross-host recovery remain separate deployment work. |
 | Source onboarding | A declarative, inspectable attachment manifest with selected columns, keys, relationships and tenant scope. | Preview performs metadata reads only; apply is atomic and repeatable; schema drift requires an explicit new binding. |
 | Remote sources | Separate source adapters for federated reads and replicated local data, each declaring consistency and freshness. | Two-server tests cover disconnects, schema changes, source authorization, duplicate keys and stale evidence. |
 | Operations | Documented connection and inference budgets, metrics, cancellation, rolling service changes, backup restoration and extension distribution. | Concurrent workloads stay within limits; uncertain calls are not silently repeated; recovery is verified on a second host. |

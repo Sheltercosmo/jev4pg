@@ -70,7 +70,9 @@ jevsd-pg migrate --check
 
 This read-only command checks installation ownership, supported catalog versions, table contracts, tenant policies and runtime-role memberships. It returns JSON and exits nonzero on a conflict. It neither calls a model nor creates roles. It does not test extension availability, provider connectivity or backup recovery; use the matching installation procedure and readiness checks for those.
 
-The same check runs inside migration before any installation changes. An unrelated same-named table, function or `sdd_data` schema stops installation. Existing versioned installations must match their table, owner and tenant-policy contracts; changing the version row alone does not authorize adoption. Inspect the reported objects and use a dedicated database when they belong to another application. Do not delete them to make the check pass. Migration uses explicit `public` objects regardless of the administrator's search path.
+The same check runs inside migration before any installation changes. Development catalog version 3 keeps metadata, evidence and history in `sdd_catalog`, separate from imported rows in `sdd_data`. Runtime statements name the catalog explicitly; custom search paths and temporary tables cannot redirect them. Installation leaves business tables, functions and the `public` schema's grants unchanged. Source access still requires explicit PostgreSQL grants and attachment registration.
+
+An unmanaged `sdd_catalog` or `sdd_data` schema stops installation. A legacy `public.sdd_schema_version` marker must describe a supported version 1 or 2 installation before migration can move its objects. Conflicting markers, owners or tenant policies stop the upgrade. Inspect the reported objects; do not delete them to make the check pass. Catalog isolation is a deployment foundation, not a claim of tested shared-database capacity or availability.
 
 Remove administrator credentials from the service environment. Set `SDD_ENV=production`, `SDD_SQL_INTERFACE=1`, and start the services under your process supervisor:
 
@@ -116,7 +118,7 @@ Application, catalog and extension versions are separate:
 | Source | Application | Catalog schema | Optional native extension |
 | --- | --- | --- | --- |
 | Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
-| Development `main` | 0.7.0.dev0 | 2 | 0.2.0 preview |
+| Development `main` | 0.7.0.dev0 | 3 | 0.2.0 preview |
 
 Back up the database and retain its role credentials first. Check out the desired release, then run:
 
@@ -127,16 +129,20 @@ docker compose run --rm migrate
 docker compose up -d --wait
 ```
 
-The current migration is additive and preserves source data and evidence. It does not rotate passwords. Never run two migration versions against the same database at once. Before adopting this deployment on an existing installation, test migration and restore on a database copy. Do not repoint Compose at an unrelated database volume.
+Stop the API, workers and administrative writes before upgrading. Catalog version 3 moves validated version 1 or 2 tables and guard functions from `public` into `sdd_catalog` in one transaction. PostgreSQL retains their identities, rows, indexes, constraints and grants. Imported source tables, existing attachments and the `jev` job queue remain in their original schemas. Passwords are preserved. A failure rolls back the migration; an already committed upgrade has no automatic downgrade. Restore the pre-upgrade backup with the old application if rollback is required.
+
+Older application processes expect the public catalog and cannot run alongside version 3. Update any administrator scripts that directly query internal tables to use `sdd_catalog`. Do not add compatibility views in `public`. Never run two migration versions against the same database at once. Test migration and restore on a database copy before deployment, and do not repoint Compose at an unrelated database volume. A legacy upgrade does not undo public-schema grants changed by earlier releases; the administrator remains responsible for those grants.
 
 On a development build, check the installed application version with `jevsd-pg --version`, or `docker compose exec app jevsd-pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
 
 ```sql
-SELECT version FROM sdd_schema_version;
+SELECT version FROM sdd_catalog.sdd_schema_version;
 SELECT extname, extversion
 FROM pg_extension
 WHERE extname IN ('jevsd_pg', 'jev_native');
 ```
+
+For an installation that has not yet upgraded from catalog version 1 or 2, query `public.sdd_schema_version` instead.
 
 Use the [native update procedure](NATIVE_DEPLOYMENT.md#updates-and-backups) when the Rust extension is installed. The default and native Compose projects use separate volumes; starting the native project does not upgrade an existing default project.
 

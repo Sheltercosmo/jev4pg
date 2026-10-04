@@ -105,7 +105,7 @@ def verify_conditional_application(service, catalog, tenant, observations):
     )
     with service.db.transaction(tenant) as connection:
         stored = connection.execute(
-            text("SELECT manifest FROM dataset_query_runs WHERE id=:id"), {"id": held["run_id"]}
+            text("SELECT manifest FROM sdd_catalog.dataset_query_runs WHERE id=:id"), {"id": held["run_id"]}
         ).scalar_one()
         assert stored["result_operation_state"] == "BLOCKED_BY_DEPENDENCY"
     checks.append(

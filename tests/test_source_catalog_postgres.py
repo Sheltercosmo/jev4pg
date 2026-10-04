@@ -223,8 +223,8 @@ def test_source_privileges_are_required_and_internal_tables_are_rejected(source)
         connection.exec_driver_sql(f'REVOKE SELECT ON "{name}".records FROM "{role}"')
     with pytest.raises(DBAPIError):
         attach(source)
-    with pytest.raises(ValueError, match="metadata"):
-        source["catalog"].attach("tenant-a", "metadata", "public", "dataset_catalog")
+    with pytest.raises(ValueError, match="internal"):
+        source["catalog"].attach("tenant-a", "metadata", "sdd_catalog", "dataset_catalog")
     with pytest.raises(ValueError, match="internal"):
         source["catalog"].attach("tenant-a", "system", "pg_catalog", "pg_class")
 
@@ -252,17 +252,19 @@ def test_composite_foreign_keys_reach_planning_without_partial_join_rules(source
 def test_inconsistent_version_does_not_rewrite_existing_catalog(source):
     dataset = attach(source)
     with source["owner"].engine.begin() as connection:
-        connection.exec_driver_sql("UPDATE sdd_schema_version SET version=1")
+        connection.exec_driver_sql("UPDATE sdd_catalog.sdd_schema_version SET version=1")
     with pytest.raises(ValueError, match="migration"):
         check_database(source["app"])
-    with pytest.raises(ValueError, match="predates"):
+    with pytest.raises(ValueError, match="supported installation"):
         migrate(source["url"], source["roles"][0], sql_interface=True)
     with source["owner"].engine.begin() as connection:
         assert (
-            connection.exec_driver_sql("SELECT version FROM public.sdd_schema_version").scalar_one()
+            connection.exec_driver_sql(
+                "SELECT version FROM sdd_catalog.sdd_schema_version"
+            ).scalar_one()
             == 1
         )
-        connection.exec_driver_sql("UPDATE public.sdd_schema_version SET version=2")
+        connection.exec_driver_sql("UPDATE sdd_catalog.sdd_schema_version SET version=3")
     assert check_database(source["app"])["schema_version"] == SCHEMA_VERSION
     assert (
         source["catalog"].get("tenant-a", dataset["id"])["source_binding"]

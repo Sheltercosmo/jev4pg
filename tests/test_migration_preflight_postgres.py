@@ -41,11 +41,11 @@ def objects(engine):
     with engine.connect() as connection:
         return connection.execute(
             text(
-                "SELECT c.relname,c.relowner,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity, "
+                "SELECT n.nspname,c.relname,c.relowner,c.relacl::text,c.relrowsecurity,c.relforcerowsecurity, "
                 "p.polname,pg_get_expr(p.polqual,p.polrelid) "
                 "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
                 "LEFT JOIN pg_policy p ON p.polrelid=c.oid "
-                "WHERE n.nspname='public' ORDER BY c.relname,p.polname"
+                "WHERE n.nspname IN ('public','sdd_catalog') ORDER BY n.nspname,c.relname,p.polname"
             )
         ).all()
 
@@ -54,18 +54,24 @@ def objects(engine):
 def test_unmanaged_objects_are_untouched(target, collision):
     url, engine, role, _ = target
     with engine.begin() as connection:
+        if collision in {"table", "function"}:
+            connection.exec_driver_sql("CREATE SCHEMA sdd_catalog")
         if collision == "table":
-            connection.exec_driver_sql("CREATE TABLE public.source_records(id text,tenant text)")
-            connection.exec_driver_sql("INSERT INTO public.source_records VALUES('old','业务数据')")
             connection.exec_driver_sql(
-                "ALTER TABLE public.source_records ENABLE ROW LEVEL SECURITY"
+                "CREATE TABLE sdd_catalog.source_records(id text,tenant text)"
             )
             connection.exec_driver_sql(
-                "CREATE POLICY tenant_isolation ON public.source_records USING(true)"
+                "INSERT INTO sdd_catalog.source_records VALUES('old','业务数据')"
+            )
+            connection.exec_driver_sql(
+                "ALTER TABLE sdd_catalog.source_records ENABLE ROW LEVEL SECURITY"
+            )
+            connection.exec_driver_sql(
+                "CREATE POLICY tenant_isolation ON sdd_catalog.source_records USING(true)"
             )
         elif collision == "function":
             connection.exec_driver_sql(
-                "CREATE FUNCTION public.sdd_reject_evidence_update() RETURNS int LANGUAGE sql AS 'SELECT 9'"
+                "CREATE FUNCTION sdd_catalog.sdd_reject_evidence_update() RETURNS int LANGUAGE sql AS 'SELECT 9'"
             )
         elif collision == "schema":
             connection.exec_driver_sql("CREATE SCHEMA sdd_data")
@@ -87,13 +93,13 @@ def test_unmanaged_objects_are_untouched(target, collision):
             is None
         )
         if collision == "table":
-            assert connection.exec_driver_sql("SELECT * FROM public.source_records").all() == [
+            assert connection.exec_driver_sql("SELECT * FROM sdd_catalog.source_records").all() == [
                 ("old", "业务数据")
             ]
         elif collision == "function":
             assert (
                 connection.exec_driver_sql(
-                    "SELECT public.sdd_reject_evidence_update()"
+                    "SELECT sdd_catalog.sdd_reject_evidence_update()"
                 ).scalar_one()
                 == 9
             )
@@ -119,7 +125,7 @@ def test_check_is_read_only_and_custom_search_path_cannot_redirect_installation(
             )
         ).scalar_one()
         assert connection.execute(
-            text("SELECT to_regclass('public.source_records') IS NOT NULL")
+            text("SELECT to_regclass('sdd_catalog.source_records') IS NOT NULL")
         ).scalar_one()
 
 
@@ -153,38 +159,20 @@ def test_changed_installation_contract_is_not_silently_repaired(target, change):
     with engine.begin() as connection:
         if change == "owner":
             connection.exec_driver_sql(f'CREATE ROLE "{parent}"')
-            connection.exec_driver_sql(f'ALTER TABLE public.source_records OWNER TO "{parent}"')
+            connection.exec_driver_sql(
+                f'ALTER TABLE sdd_catalog.source_records OWNER TO "{parent}"'
+            )
         elif change == "policy":
             connection.exec_driver_sql(
-                "ALTER POLICY tenant_isolation ON public.source_records USING(true)"
+                "ALTER POLICY tenant_isolation ON sdd_catalog.source_records USING(true)"
             )
         elif change == "column":
             connection.exec_driver_sql(
-                "ALTER TABLE public.source_records ADD COLUMN business_value text"
+                "ALTER TABLE sdd_catalog.source_records ADD COLUMN business_value text"
             )
         else:
-            connection.exec_driver_sql("UPDATE public.sdd_schema_version SET version=999")
+            connection.exec_driver_sql("UPDATE sdd_catalog.sdd_schema_version SET version=999")
     before = objects(engine)
     with pytest.raises(InstallationConflict):
         migrate(url, role)
     assert objects(engine) == before
-
-
-def test_version_one_contract_upgrades_without_changing_rows(target):
-    url, engine, role, _ = target
-    migrate(url, role, secrets.token_urlsafe(32))
-    with engine.begin() as connection:
-        connection.exec_driver_sql(
-            "DROP TABLE public.native_query_admissions,public.dataset_source_bindings"
-        )
-        connection.exec_driver_sql("UPDATE public.sdd_schema_version SET version=1")
-        connection.exec_driver_sql(
-            "INSERT INTO public.source_records VALUES('a','团队','1','legacy',NULL)"
-        )
-    assert check_migration(url, role)["schema_version"] == 1
-    migrate(url, role)
-    assert check_migration(url, role)["schema_version"] == 2
-    with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT * FROM public.source_records").all() == [
-            ("a", "团队", "1", "legacy", None)
-        ]

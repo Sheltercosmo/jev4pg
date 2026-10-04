@@ -57,7 +57,7 @@ def verify_derived_application(service, catalog, tenant, observations):
     assert result["result"] == [{"amount": "900719925474099312346.123456789"}]
     with service.db.transaction(tenant) as connection:
         saved = connection.execute(
-            text("SELECT result FROM dataset_query_runs WHERE id=:id"), {"id": result["run_id"]}
+            text("SELECT result FROM sdd_catalog.dataset_query_runs WHERE id=:id"), {"id": result["run_id"]}
         ).scalar_one()
         assert saved == result["result"]
     checks.append(
@@ -86,7 +86,7 @@ def verify_derived_application(service, catalog, tenant, observations):
     assert held["manifest"]["semantic_coverage"]["resolved"] == 0
     with service.db.transaction(tenant) as connection:
         saved = connection.execute(
-            text("SELECT manifest FROM dataset_query_runs WHERE id=:id"), {"id": held["run_id"]}
+            text("SELECT manifest FROM sdd_catalog.dataset_query_runs WHERE id=:id"), {"id": held["run_id"]}
         ).scalar_one()
         assert saved["result_output_state"] == "NOT_EVALUATED"
     checks.append(

@@ -15,7 +15,8 @@ from sqlalchemy import (
     Index,
 )
 
-metadata = MetaData()
+CATALOG_SCHEMA = "sdd_catalog"
+metadata = MetaData(schema=CATALOG_SCHEMA)
 
 
 def table(name, *columns, **kw):

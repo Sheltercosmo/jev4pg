@@ -183,7 +183,7 @@ def main():
                 == 3
             )
             assert (
-                connection.execute(text("SELECT count(*) FROM dataset_catalog")).scalar_one() == 1
+                connection.execute(text("SELECT count(*) FROM sdd_catalog.dataset_catalog")).scalar_one() == 1
             )
         restored.dispose()
     engine.dispose()

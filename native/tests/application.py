@@ -281,7 +281,7 @@ def verify_application(connection, observations):
         with db.transaction(tenant) as cx:
             assert (
                 cx.execute(
-                    text("SELECT requests FROM native_query_admissions WHERE id=:id"),
+                    text("SELECT requests FROM sdd_catalog.native_query_admissions WHERE id=:id"),
                     {"id": result["manifest"]["admission_id"]},
                 ).scalar_one()
                 == 2
@@ -508,7 +508,7 @@ def verify_application(connection, observations):
             row = (
                 cx.execute(
                     text(
-                        "SELECT reserved,requests,state FROM native_query_admissions WHERE tenant=:tenant"
+                        "SELECT reserved,requests,state FROM sdd_catalog.native_query_admissions WHERE tenant=:tenant"
                     ),
                     {"tenant": cancel_tenant},
                 )
@@ -518,7 +518,7 @@ def verify_application(connection, observations):
             assert dict(row) == {"reserved": 2, "requests": None, "state": "UNCERTAIN"}
             assert (
                 cx.execute(
-                    text("SELECT calls FROM tenant_daily_usage WHERE tenant=:tenant"),
+                    text("SELECT calls FROM sdd_catalog.tenant_daily_usage WHERE tenant=:tenant"),
                     {"tenant": cancel_tenant},
                 ).scalar_one()
                 == 2
@@ -559,14 +559,14 @@ def verify_application(connection, observations):
         with db.transaction(failure_tenant) as cx:
             reservation = cx.execute(
                 text(
-                    "SELECT reserved,requests,state FROM native_query_admissions WHERE tenant=:tenant"
+                    "SELECT reserved,requests,state FROM sdd_catalog.native_query_admissions WHERE tenant=:tenant"
                 ),
                 {"tenant": failure_tenant},
             ).one()
             assert tuple(reservation) == (40, None, "UNCERTAIN")
             assert (
                 cx.execute(
-                    text("SELECT calls FROM tenant_daily_usage WHERE tenant=:tenant"),
+                    text("SELECT calls FROM sdd_catalog.tenant_daily_usage WHERE tenant=:tenant"),
                     {"tenant": failure_tenant},
                 ).scalar_one()
                 == 40
@@ -591,7 +591,7 @@ def verify_application(connection, observations):
             with db.transaction("quota-client") as cx:
                 assert (
                     cx.execute(
-                        text("SELECT calls FROM tenant_daily_usage WHERE tenant='quota-client'")
+                        text("SELECT calls FROM sdd_catalog.tenant_daily_usage WHERE tenant='quota-client'")
                     ).scalar_one()
                     == 2
                 )

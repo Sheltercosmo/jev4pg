@@ -1,5 +1,7 @@
 # Installation ownership
 
+Catalog version 3 extends this decision with [explicit schema isolation](0007-catalog-isolation.md). The public-layout rules below apply to validated legacy installations.
+
 ## Decision
 
 Check the target before applying application migrations. A read-only CLI check and the transactional migration share one installation inspector. A version row alone cannot authorize changes to other objects.
