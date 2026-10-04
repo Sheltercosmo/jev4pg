@@ -13,6 +13,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 
 from sdd.bootstrap import ensure_login
+from sdd.generic.remote_expressions import review_expressions
 
 
 pytestmark = pytest.mark.skipif(
@@ -99,7 +100,9 @@ def remote():
                 connection.exec_driver_sql(
                     f'GRANT EXECUTE ON FUNCTION jev_remote.acquire(regclass) TO "{role}"'
                 )
-                connection.exec_driver_sql(f'GRANT SELECT ON jev_remote.active_guards TO "{role}"')
+                connection.exec_driver_sql(
+                    f'GRANT SELECT ON jev_remote.active_guards,jev_remote.symbols TO "{role}"'
+                )
                 connection.exec_driver_sql(
                     f'GRANT SELECT ON ALL TABLES IN SCHEMA exports TO "{role}"'
                 )
@@ -134,6 +137,9 @@ def remote():
             connection.exec_driver_sql("""CREATE FOREIGN TABLE remote.entries (
                 id integer,principal name,note text COLLATE "C",amount numeric(38,10))
                 SERVER source OPTIONS(schema_name 'legacy',table_name 'entries')""")
+            connection.exec_driver_sql("""CREATE FOREIGN TABLE remote.symbols (
+                kind text,oid bigint,definition jsonb)
+                SERVER source OPTIONS(schema_name 'jev_remote',table_name 'symbols')""")
             connection.exec_driver_sql(f'GRANT USAGE ON SCHEMA remote TO "{local_role}"')
             connection.exec_driver_sql(
                 f'GRANT SELECT ON ALL TABLES IN SCHEMA remote TO "{local_role}"'
@@ -400,7 +406,7 @@ def test_expression_dependencies_remain_unknown_until_reviewed(remote):
         assert acquire(connection, "invoker")["contract"]["dependency_state"] == "UNKNOWN"
         assert acquire(connection, "partitioned")["contract"]["dependency_state"] == "VALUE"
         policies = acquire(connection, "entries")["contract"]["relations"][0]["policies"]
-        assert policies[0]["name"] == "scope" and "CURRENT_USER" in policies[0]["using"]
+        assert policies[0]["name"] == "scope" and "SQLVALUEFUNCTION" in policies[0]["using_tree"]
 
 
 def expose(remote, source, alias, columns):
@@ -454,7 +460,10 @@ def test_builtin_dynamic_sql_requires_review_without_execution(remote):
     with remote["local"].begin() as connection:
         contract = acquire(connection, "dynamic")["contract"]
         assert contract["dependency_state"] == "UNKNOWN"
-        assert "query_to_xml" in contract["relations"][0]["view_sql"]
+        assert "FUNCEXPR" in contract["relations"][0]["view_tree"]
+        result = inspect_expressions(connection, contract)
+        assert result.output_state == "UNKNOWN"
+        assert any("query_to_xml" in issue for issue in result.raw["issues"])
 
 
 def test_immutable_user_function_rejected_before_constant_folding(remote):
@@ -501,3 +510,282 @@ def test_lost_guard_after_main_locks_is_detected(remote):
     finally:
         guard.invalidate()
         guard.close()
+
+
+def inspect_expressions(connection, contract):
+    def lookup(requested):
+        rows = connection.execute(
+            text("SELECT kind,oid,definition FROM remote.symbols WHERE oid=ANY(:oids)"),
+            {"oids": sorted({oid for _, oid in requested})},
+        ).mappings()
+        return {(row["kind"], row["oid"]): row["definition"] for row in rows}
+
+    return review_expressions(contract, lookup)
+
+
+@pytest.mark.parametrize("source", ["entries", "invoker", "stored", "partitioned", "unkeyed"])
+def test_resolved_expression_review_admits_builtin_footprints(remote, source):
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, source)
+        contract = acquire(main, source)["contract"]
+        assert proof(main, pinned["guard"])
+        result = inspect_expressions(main, contract)
+        assert result.output_state == "VALUE", result.json()
+        assert result.value is True
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT id,lower(note) AS note,amount/2 AS amount FROM legacy.entries WHERE id>0",
+        "WITH x AS (SELECT *,row_number() OVER(PARTITION BY note ORDER BY amount DESC) AS rn "
+        "FROM legacy.entries) SELECT note,sum(amount) FILTER(WHERE rn=1) AS amount FROM x GROUP BY note",
+        "SELECT note,avg(amount)::numeric(12,2) AS amount,count(*) AS n FROM legacy.entries "
+        "GROUP BY note HAVING count(*)>0 ORDER BY note",
+        "SELECT CASE WHEN amount IS NULL THEN 0 ELSE greatest(amount,1) END AS amount,"
+        "coalesce(note,'无') COLLATE \"C\" AS note FROM legacy.entries",
+        "SELECT id,note FROM legacy.entries e WHERE EXISTS(SELECT 1 FROM legacy.unkeyed u WHERE u.note=e.note)",
+        "SELECT id FROM legacy.entries UNION SELECT id FROM legacy.partitioned",
+    ],
+)
+def test_resolved_relational_expressions(remote, query):
+    name = "shape_" + uuid.uuid4().hex[:8]
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql(f"CREATE VIEW legacy.{name} WITH(security_invoker=true) AS {query}")
+    expose(remote, "legacy." + name, name, "placeholder int")
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, name)
+        contract = acquire(main, name)["contract"]
+        assert proof(main, pinned["guard"])
+        result = inspect_expressions(main, contract)
+        assert result.output_state == "VALUE", result.json()
+
+
+def test_custom_type_metadata_does_not_call_output_function(remote):
+    missing = "/jev_missing_" + uuid.uuid4().hex
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("""CREATE TYPE legacy.opaque_text;
+            CREATE FUNCTION legacy.opaque_in(cstring) RETURNS legacy.opaque_text
+                AS 'textin' LANGUAGE internal IMMUTABLE STRICT;
+            CREATE FUNCTION legacy.opaque_out(legacy.opaque_text) RETURNS cstring
+                AS 'pg_read_file_all' LANGUAGE internal VOLATILE STRICT;
+            CREATE TYPE legacy.opaque_text (INPUT=legacy.opaque_in,OUTPUT=legacy.opaque_out,
+                INTERNALLENGTH=variable,ALIGNMENT=int4,STORAGE=extended)""")
+        owner.exec_driver_sql(f"""CREATE VIEW legacy.typed_constant WITH(security_invoker=true)
+            AS SELECT '{missing}'::legacy.opaque_text AS value""")
+    expose(remote, "legacy.typed_constant", "typed_constant", "value text")
+    with remote["local"].begin() as connection:
+        contract = acquire(connection, "typed_constant")["contract"]
+        assert contract["columns"][0]["type_name"] == "opaque_text"
+        assert inspect_expressions(connection, contract).output_state == "UNKNOWN"
+    with remote["owner"].begin() as owner:
+        with pytest.raises(DBAPIError, match="could not open file"):
+            owner.exec_driver_sql("SELECT pg_get_viewdef('legacy.typed_constant'::regclass)")
+
+
+def test_materialized_metadata_does_not_plan_poisoned_index(remote):
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("""CREATE MATERIALIZED VIEW legacy.indexed_stored AS SELECT 1 AS id;
+            CREATE FUNCTION legacy.index_value() RETURNS integer LANGUAGE plpgsql IMMUTABLE AS
+                $$BEGIN RETURN 1; END$$;
+            CREATE INDEX ON legacy.indexed_stored ((legacy.index_value()));
+            CREATE OR REPLACE FUNCTION legacy.index_value() RETURNS integer LANGUAGE plpgsql IMMUTABLE AS
+                $$BEGIN RAISE EXCEPTION 'index expression planned'; END$$""")
+    expose(remote, "legacy.indexed_stored", "indexed_stored", "id int")
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, "indexed_stored")
+        contract = acquire(main, "indexed_stored")["contract"]
+        assert proof(main, pinned["guard"])
+        assert inspect_expressions(main, contract).output_state == "UNKNOWN"
+        with remote["owner"].begin() as writer:
+            writer.exec_driver_sql("SET LOCAL lock_timeout='100ms'")
+            with pytest.raises(DBAPIError, match="lock timeout"):
+                writer.exec_driver_sql("DROP MATERIALIZED VIEW legacy.indexed_stored")
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("SET LOCAL enable_seqscan=off")
+        with pytest.raises(DBAPIError, match="index expression planned"):
+            owner.exec_driver_sql("SELECT * FROM legacy.indexed_stored WHERE id>0")
+
+
+@pytest.mark.parametrize(
+    "query,columns,expected",
+    [
+        (
+            'SELECT id AS ":id",note AS "说明\u2003内容" FROM legacy.entries ORDER BY id',
+            '":id" int,"说明\u2003内容" text',
+            [(1, "完成"), (2, "pending")],
+        ),
+        (
+            "WITH entries AS (SELECT id,note FROM legacy.entries) "
+            "SELECT * FROM (SELECT id,note FROM entries WHERE id=1) chosen",
+            "id int,note text",
+            [(1, "完成")],
+        ),
+        (
+            "SELECT e.id,u.note FROM legacy.entries e JOIN legacy.unkeyed u USING(note)",
+            "id int,note text",
+            [(1, "完成")],
+        ),
+        (
+            "SELECT id,lag(id) OVER(ORDER BY id) AS previous FROM legacy.entries ORDER BY id",
+            "id int,previous int",
+            [(1, None), (2, 1)],
+        ),
+    ],
+)
+def test_expression_validation_executes_as_mapped_reader(remote, query, columns, expected):
+    name = "validated_" + uuid.uuid4().hex[:8]
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql(f"CREATE VIEW legacy.{name} WITH(security_invoker=true) AS {query}")
+    expose(remote, "legacy." + name, name, columns)
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, name)
+        contract = acquire(main, name)["contract"]
+        assert proof(main, pinned["guard"])
+        result = inspect_expressions(main, contract)
+        assert result.output_state == "VALUE", result.json()
+        assert main.exec_driver_sql(f"SELECT * FROM remote.{name} ORDER BY 1").all() == expected
+
+
+def test_policy_subquery_closure_and_rows(remote):
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("""CREATE TABLE legacy.allowed (id int, principal name);
+            CREATE TABLE legacy.protected (id int, note text);
+            INSERT INTO legacy.protected VALUES(1,'visible'),(2,'hidden');
+            ALTER TABLE legacy.protected ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY lookup ON legacy.protected USING(EXISTS(
+                SELECT 1 FROM legacy.allowed a WHERE a.id=protected.id AND a.principal=CURRENT_USER))""")
+        owner.execute(text("INSERT INTO legacy.allowed VALUES(1,:role)"), {"role": remote["role"]})
+        owner.exec_driver_sql(f'GRANT SELECT ON legacy.allowed TO "{remote["role"]}"')
+    expose(remote, "legacy.protected", "protected", "id int,note text")
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, "protected")
+        contract = acquire(main, "protected")["contract"]
+        assert proof(main, pinned["guard"])
+        assert {item["table"] for item in contract["relations"]} == {"protected", "allowed"}
+        result = inspect_expressions(main, contract)
+        assert result.output_state == "VALUE", result.json()
+        assert main.exec_driver_sql("SELECT * FROM remote.protected").all() == [(1, "visible")]
+
+
+def test_materialized_permission_and_prepared_statement_cleanup(remote):
+    with remote["direct"].begin() as reader:
+        reader.exec_driver_sql("SELECT * FROM jev_remote.acquire('legacy.stored'::regclass)").all()
+        assert (
+            reader.exec_driver_sql(
+                "SELECT count(*) FROM pg_prepared_statements WHERE starts_with(name,'jev_guard_')"
+            ).scalar_one()
+            == 0
+        )
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql(f'REVOKE SELECT ON legacy.stored FROM "{remote["role"]}"')
+    try:
+        with remote["direct"].begin() as reader:
+            with pytest.raises(DBAPIError, match="permission denied"):
+                reader.exec_driver_sql(
+                    "SELECT * FROM jev_remote.acquire('legacy.stored'::regclass)"
+                )
+    finally:
+        with remote["owner"].begin() as owner:
+            owner.exec_driver_sql(f'GRANT SELECT ON legacy.stored TO "{remote["role"]}"')
+
+
+@pytest.mark.parametrize(
+    "query,columns,expected",
+    [
+        (
+            'WITH ":源" AS (SELECT id AS "[" FROM legacy.entries) '
+            'SELECT "[" FROM ":源" WHERE "[" IN (SELECT id FROM legacy.entries WHERE note=\'完成\')',
+            '"[" int',
+            [(1,)],
+        ),
+        (
+            "SELECT id,to_char(DATE '2026-01-01'+id*INTERVAL '1 day','YYYY-MM-DD') AS day "
+            "FROM legacy.entries",
+            "id int,day text",
+            [(1, "2026-01-02"), (2, "2026-01-03")],
+        ),
+        (
+            "SELECT note,count(*) AS n FROM legacy.entries GROUP BY GROUPING SETS ((note),())",
+            "note text,n bigint",
+            [("完成", 1), ("pending", 1), (None, 2)],
+        ),
+    ],
+)
+def test_expression_frozen_unseen_results(remote, query, columns, expected):
+    name = "frozen_" + uuid.uuid4().hex[:8]
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql(f"CREATE VIEW legacy.{name} WITH(security_invoker=true) AS {query}")
+    expose(remote, "legacy." + name, name, columns)
+    with remote["local"].begin() as guard, remote["local"].begin() as main:
+        pinned = acquire(guard, name)
+        contract = acquire(main, name)["contract"]
+        assert proof(main, pinned["guard"])
+        result = inspect_expressions(main, contract)
+        assert result.output_state == "VALUE", result.json()
+        rows = main.exec_driver_sql(f"SELECT * FROM remote.{name}").all()
+        assert sorted(map(tuple, rows), key=repr) == sorted(expected, key=repr)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT CASE WHEN false THEN query_to_xml('SELECT 1/0',false,false,'') ELSE NULL END AS value",
+        "SELECT id FROM legacy.entries WHERE id IN (1,2)",
+        "SELECT 'ok'::legacy.frozen_domain AS value",
+    ],
+)
+def test_expression_frozen_unseen_holds(remote, query):
+    name = "held_" + uuid.uuid4().hex[:8]
+    with remote["owner"].begin() as owner:
+        if "frozen_domain" in query:
+            owner.exec_driver_sql("CREATE DOMAIN legacy.frozen_domain AS text CHECK(VALUE<>'')")
+        owner.exec_driver_sql(f"CREATE VIEW legacy.{name} WITH(security_invoker=true) AS {query}")
+    expose(remote, "legacy." + name, name, "value text")
+    with remote["local"].begin() as connection:
+        result = inspect_expressions(connection, acquire(connection, name)["contract"])
+        assert result.output_state == "UNKNOWN", result.json()
+        assert result.value is None and result.operation_state == "SUCCEEDED"
+
+
+def test_expression_frozen_core_namespace_is_not_core_identity(remote):
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("""CREATE FUNCTION pg_catalog.lower(integer) RETURNS text
+            LANGUAGE plpgsql IMMUTABLE AS $$BEGIN RAISE EXCEPTION 'spoofed builtin executed'; END$$;
+            CREATE VIEW legacy.spoofed WITH(security_invoker=true) AS SELECT lower(1) AS value""")
+    expose(remote, "legacy.spoofed", "spoofed", "value text")
+    with remote["local"].begin() as connection:
+        result = inspect_expressions(connection, acquire(connection, "spoofed")["contract"])
+        assert result.output_state == "UNKNOWN", result.json()
+        assert any("Non-core remote symbol" in issue for issue in result.raw["issues"])
+
+
+def test_expression_frozen_optimizer_expressions_remain_held(remote):
+    with remote["owner"].begin() as owner:
+        owner.exec_driver_sql("""CREATE FUNCTION legacy.check_value(int) RETURNS bool
+            LANGUAGE plpgsql IMMUTABLE AS $$BEGIN RETURN true; END$$;
+            CREATE TABLE legacy.checked (id int,CHECK(legacy.check_value(0)));
+            CREATE STATISTICS legacy.checked_stats ON (legacy.check_value(id)) FROM legacy.checked;
+            CREATE OR REPLACE FUNCTION legacy.check_value(int) RETURNS bool
+            LANGUAGE plpgsql IMMUTABLE AS $$BEGIN RAISE EXCEPTION 'optimizer expression executed'; END$$""")
+    expose(remote, "legacy.checked", "checked", "id int")
+    with remote["local"].begin() as connection:
+        contract = acquire(connection, "checked")["contract"]
+        assert contract["dependency_state"] == "UNKNOWN"
+        assert {item["kind"] for item in contract["relations"][0]["expressions"]} == {
+            "check",
+            "statistics",
+        }
+        result = inspect_expressions(connection, contract)
+        assert result.output_state == "UNKNOWN", result.json()
+
+
+def test_expression_frozen_missing_relation_is_not_certified(remote):
+    with remote["local"].begin() as connection:
+        contract = acquire(connection, "invoker")["contract"]
+        contract["relations"] = [
+            item for item in contract["relations"] if item["oid"] == contract["oid"]
+        ]
+        result = inspect_expressions(connection, contract)
+        assert result.output_state == "UNKNOWN", result.json()
+        assert any("outside the guarded closure" in issue for issue in result.raw["issues"])

@@ -30,6 +30,7 @@ DECLARE
     key_hi bigint;
     key_lo bigint;
     token uuid;
+    prepared_name text;
     expression_review boolean := false;
 BEGIN
     IF pg_is_in_recovery() THEN
@@ -76,9 +77,12 @@ BEGIN
                    AND d.refobjid<>parent.oid
             ) child
         )
-        SELECT c.oid, c.relkind, n.nspname, c.relname, c.reloptions,
+        SELECT c.oid, c.relkind, c.relam, n.nspname, c.relname, c.reloptions,
                c.relrowsecurity, c.relforcerowsecurity,
-               CASE WHEN c.relkind='v' THEN pg_get_viewdef(c.oid, false) END AS view_sql
+               CASE WHEN c.relkind='v' THEN (
+                   SELECT ev_action::text FROM pg_rewrite
+                    WHERE ev_class=c.oid AND rulename='_RETURN'
+               ) END AS view_tree
           FROM relations JOIN pg_class c USING(oid)
           JOIN pg_namespace n ON n.oid=c.relnamespace ORDER BY c.oid
     LOOP
@@ -92,6 +96,9 @@ BEGIN
              WHERE option IN ('security_invoker=true','security_invoker=on','security_invoker=1')
         ) THEN
             RAISE EXCEPTION 'Every remote view requires security_invoker=true';
+        END IF;
+        IF dependency.relam NOT IN (0,2) THEN
+            RAISE EXCEPTION 'Remote acquisition requires PostgreSQL heap storage';
         END IF;
         IF EXISTS (
             SELECT FROM pg_depend d
@@ -108,18 +115,37 @@ BEGIN
         END IF;
         dependencies := dependencies || jsonb_build_array(jsonb_build_object(
             'oid', dependency.oid::bigint, 'schema', dependency.nspname,
-            'table', dependency.relname, 'kind', dependency.relkind,
+            'table', dependency.relname, 'kind', dependency.relkind, 'access_method', dependency.relam,
             'options', dependency.reloptions,
-            'view_sql', dependency.view_sql,
+            'view_tree', dependency.view_tree,
+            'expressions', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+                'kind', e.kind, 'oid', e.oid::bigint, 'tree', e.tree
+            ) ORDER BY e.kind,e.oid),'[]') FROM (
+                SELECT 'index' AS kind, indexrelid AS oid, indexprs::text AS tree
+                  FROM pg_index WHERE indrelid=dependency.oid AND indexprs IS NOT NULL
+                UNION ALL
+                SELECT 'index_predicate', indexrelid, indpred::text
+                  FROM pg_index WHERE indrelid=dependency.oid AND indpred IS NOT NULL
+                UNION ALL
+                SELECT 'check', oid, conbin::text FROM pg_constraint
+                  WHERE conrelid=dependency.oid AND contype='c'
+                UNION ALL
+                SELECT 'statistics', oid, stxexprs::text FROM pg_statistic_ext
+                  WHERE stxrelid=dependency.oid AND stxexprs IS NOT NULL
+                UNION ALL
+                SELECT 'partition', partrelid, partexprs::text FROM pg_partitioned_table
+                  WHERE partrelid=dependency.oid AND partexprs IS NOT NULL
+            ) e),
             'policies', (SELECT coalesce(jsonb_agg(jsonb_build_object(
                 'name', polname, 'command', polcmd, 'permissive', polpermissive, 'roles', polroles,
-                'using', pg_get_expr(polqual,polrelid), 'check', pg_get_expr(polwithcheck,polrelid)
+                'using_tree', polqual::text, 'check_tree', polwithcheck::text
             ) ORDER BY polname),'[]') FROM pg_policy WHERE polrelid=dependency.oid),
             'row_security', dependency.relrowsecurity,
             'force_row_security', dependency.relforcerowsecurity
         ));
         expression_review := expression_review OR dependency.relkind='v'
-            OR EXISTS(SELECT FROM pg_policy WHERE polrelid=dependency.oid);
+            OR EXISTS(SELECT FROM pg_policy WHERE polrelid=dependency.oid)
+            OR jsonb_array_length(dependencies->-1->'expressions')>0;
     END LOOP;
 
     -- Inspect every dependency before the optimizer can evaluate view expressions.
@@ -127,7 +153,20 @@ BEGIN
         AS r(oid bigint, schema text, "table" text, kind text)
     LOOP
         IF dependency.kind='m' THEN
-            EXECUTE format('SELECT 1 FROM %I.%I LIMIT 0', dependency.schema, dependency."table");
+            IF NOT has_table_privilege(dependency.oid::oid,'SELECT') THEN
+                RAISE EXCEPTION 'SELECT permission denied for remote materialized view';
+            END IF;
+            prepared_name := 'jev_guard_' || replace(gen_random_uuid()::text,'-','');
+            BEGIN
+                EXECUTE format('PREPARE %I AS SELECT 1 FROM ONLY %I.%I',
+                    prepared_name, dependency.schema, dependency."table");
+                EXECUTE format('DEALLOCATE %I', prepared_name);
+            EXCEPTION WHEN OTHERS OR query_canceled THEN
+                IF EXISTS(SELECT FROM pg_prepared_statements WHERE name=prepared_name) THEN
+                    EXECUTE format('DEALLOCATE %I', prepared_name);
+                END IF;
+                RAISE;
+            END;
         ELSE
             EXECUTE format('LOCK TABLE %I.%I IN ACCESS SHARE MODE', dependency.schema, dependency."table");
         END IF;
@@ -141,11 +180,13 @@ BEGIN
 
     SELECT jsonb_agg(jsonb_build_object(
         'name', a.attname, 'position', a.attnum, 'type_oid', a.atttypid::bigint,
-        'database_type', format_type(a.atttypid,a.atttypmod), 'modifier', a.atttypmod,
+        'type_schema', n.nspname, 'type_name', t.typname, 'modifier', a.atttypmod,
         'collation', a.attcollation::bigint, 'nullable', NOT a.attnotnull,
         'description', col_description(a.attrelid,a.attnum)
     ) ORDER BY a.attnum) INTO columns
-      FROM pg_attribute a WHERE a.attrelid=source AND a.attnum>0 AND NOT a.attisdropped;
+      FROM pg_attribute a JOIN pg_type t ON t.oid=a.atttypid
+      JOIN pg_namespace n ON n.oid=t.typnamespace
+     WHERE a.attrelid=source AND a.attnum>0 AND NOT a.attisdropped;
     SELECT coalesce(jsonb_agg(jsonb_build_object(
         'name', conname, 'kind', contype, 'columns', conkey,
         'target_oid', confrelid::bigint, 'target_columns', confkey,
@@ -165,7 +206,8 @@ BEGIN
         EXIT WHEN pg_try_advisory_xact_lock(key_hi::bit(32)::integer, key_lo::bit(32)::integer);
     END LOOP;
     contract := jsonb_build_object(
-        'protocol', 1, 'origin', origin, 'oid', source::oid::bigint,
+        'protocol', 2, 'server_version', current_setting('server_version_num')::integer,
+        'origin', origin, 'oid', source::oid::bigint,
         'name', source_name, 'kind', source_kind, 'columns', columns,
         'constraints', constraints, 'relations', dependencies,
         'dependency_state', CASE WHEN expression_review THEN 'UNKNOWN' ELSE 'VALUE' END,
@@ -179,6 +221,40 @@ BEGIN
 END
 $$;
 
+-- Raw catalog fields only: deparsing constants or type modifiers can call user code.
+CREATE VIEW jev_remote.symbols WITH(security_invoker=true, security_barrier=true) AS
+SELECT 'function'::text AS kind, p.oid::bigint AS oid, jsonb_build_object(
+    'namespace', p.pronamespace::bigint, 'name', p.proname, 'kind', p.prokind,
+    'language', p.prolang::bigint, 'arguments', p.proargtypes::oid[],
+    'result', p.prorettype::bigint, 'variadic', p.provariadic::bigint,
+    'returns_set', p.proretset, 'volatility', p.provolatile,
+    'security_definer', p.prosecdef, 'config', p.proconfig,
+    'defaults', p.pronargdefaults, 'support', p.prosupport::oid::bigint,
+    'implementation', p.prosrc, 'library', p.probin,
+    'aggregate', CASE WHEN a.aggfnoid IS NOT NULL THEN jsonb_build_object(
+        'kind', a.aggkind, 'types', jsonb_build_array(a.aggtranstype::bigint,a.aggmtranstype::bigint),
+        'functions', jsonb_build_array(a.aggtransfn::oid::bigint,a.aggfinalfn::oid::bigint,
+            a.aggcombinefn::oid::bigint,a.aggserialfn::oid::bigint,a.aggdeserialfn::oid::bigint,
+            a.aggmtransfn::oid::bigint,a.aggminvtransfn::oid::bigint,a.aggmfinalfn::oid::bigint),
+        'sort_operator', a.aggsortop::bigint
+    ) END
+) AS definition FROM pg_proc p LEFT JOIN pg_aggregate a ON a.aggfnoid=p.oid
+UNION ALL
+SELECT 'operator', o.oid::bigint, jsonb_build_object(
+    'namespace', o.oprnamespace::bigint, 'name', o.oprname,
+    'left', o.oprleft::bigint, 'right', o.oprright::bigint, 'result', o.oprresult::bigint,
+    'function', o.oprcode::oid::bigint, 'restriction', o.oprrest::oid::bigint,
+    'join', o.oprjoin::oid::bigint
+) FROM pg_operator o
+UNION ALL
+SELECT 'type', t.oid::bigint, jsonb_build_object(
+    'namespace', t.typnamespace::bigint, 'name', t.typname, 'kind', t.typtype,
+    'base', t.typbasetype::bigint, 'element', t.typelem::bigint, 'relation', t.typrelid::bigint,
+    'functions', jsonb_build_array(t.typinput::oid::bigint,t.typoutput::oid::bigint,
+        t.typreceive::oid::bigint,t.typsend::oid::bigint,t.typmodin::oid::bigint,
+        t.typmodout::oid::bigint,t.typsubscript::oid::bigint)
+) FROM pg_type t;
+
 CREATE VIEW jev_remote.active_guards WITH(security_invoker=true, security_barrier=true) AS
 SELECT l.pid, l.classid::bigint AS key_hi, l.objid::bigint AS key_lo,
        l.database::bigint AS database, a.usesysid::bigint AS role
@@ -190,6 +266,7 @@ SELECT l.pid, l.classid::bigint AS key_hi, l.objid::bigint AS key_lo,
 REVOKE ALL ON FUNCTION jev_remote.acquire(regclass) FROM PUBLIC;
 REVOKE ALL ON FUNCTION jev_remote.fence_ddl() FROM PUBLIC;
 REVOKE ALL ON jev_remote.active_guards FROM PUBLIC;
+REVOKE ALL ON jev_remote.symbols FROM PUBLIC;
 
 CREATE EVENT TRIGGER jev_remote_schema_gate ON ddl_command_start
 EXECUTE FUNCTION jev_remote.fence_ddl();

@@ -49,5 +49,5 @@ jobs:
         run: |
           python -m pip install -r requirements.lock.txt
           python -m pip install --no-deps .
-      - name: Qualify remote locks and source contracts
-        run: python -m pytest tests/test_remote_guard_postgres.py -q --tb=short
+      - name: Qualify remote locks and expression contracts
+        run: python -m pytest tests/test_remote_guard_postgres.py tests/test_remote_expressions.py -q --tb=short
