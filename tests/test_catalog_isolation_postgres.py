@@ -15,7 +15,12 @@ from sdd.generic.catalog import Catalog
 from sdd.generic.history import QueryHistory
 from sdd.generic.sql import SQLService
 from sdd.ledger import Ledger
-from sdd.migration_preflight import GUARD_FUNCTIONS, VERSION_TWO_TABLES, InstallationConflict
+from sdd.migration_preflight import (
+    GUARD_FUNCTIONS,
+    VERSION_TWO_TABLES,
+    VERSION_FOUR_TABLES,
+    InstallationConflict,
+)
 from sdd.operators.service import OperatorService
 from test_migration_preflight_postgres import target as target
 from test_operator_runtime import Model
@@ -132,7 +137,9 @@ def legacy_layout(engine, version):
     """Build old layouts for rollback fault injection; released-source upgrades run separately."""
     with engine.begin() as connection:
         for table in schema.metadata.sorted_tables:
-            if version == 1 and table.name in VERSION_TWO_TABLES:
+            if table.name in VERSION_FOUR_TABLES or (
+                version == 1 and table.name in VERSION_TWO_TABLES
+            ):
                 connection.exec_driver_sql(f'DROP TABLE sdd_catalog."{table.name}"')
             else:
                 connection.exec_driver_sql(
@@ -257,7 +264,7 @@ def test_new_upgrade_tables_keep_the_original_catalog_owner(target):
     with engine.begin() as connection:
         connection.exec_driver_sql(f'CREATE ROLE "{parent}"')
         for table in schema.metadata.sorted_tables:
-            if table.name not in VERSION_TWO_TABLES:
+            if table.name not in VERSION_TWO_TABLES | VERSION_FOUR_TABLES:
                 connection.exec_driver_sql(f'ALTER TABLE public."{table.name}" OWNER TO "{parent}"')
         connection.exec_driver_sql(f'ALTER TABLE public.sdd_schema_version OWNER TO "{parent}"')
         for name in GUARD_FUNCTIONS:

@@ -5,6 +5,7 @@ from sqlalchemy import inspect, text
 from .schema import CATALOG_SCHEMA, metadata
 
 VERSION_TWO_TABLES = {"native_query_admissions", "dataset_source_bindings"}
+VERSION_FOUR_TABLES = {"dataset_query_jobs"}
 GUARD_FUNCTIONS = (
     "sdd_reject_evidence_update",
     "sdd_protect_concept_definition",
@@ -107,11 +108,13 @@ def inspect_installation(connection, runtime_role, target_version):
     if signature != [("singleton", "BOOLEAN", False), ("version", "INTEGER", False)]:
         raise InstallationConflict([f"{marker_name} has an unexpected contract"])
     versions = connection.execute(text(f"SELECT singleton,version FROM {marker_name}")).all()
-    supported = (1, 2) if legacy_marker else (3,)
+    supported = (1, 2) if legacy_marker else (3, 4)
     if len(versions) != 1 or versions[0][0] is not True or versions[0][1] not in supported:
         raise InstallationConflict([f"{marker_name} is not a supported installation"])
     previous = versions[0][1]
     expected = set(tables) - (VERSION_TWO_TABLES if previous == 1 else set())
+    if previous < 4:
+        expected -= VERSION_FOUR_TABLES
     if catalog_exists and namespaces[CATALOG_SCHEMA] != marker["owner"]:
         conflicts.append("sdd_catalog and its tables must have the same owner")
     if (

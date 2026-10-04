@@ -675,12 +675,15 @@ class SQLService:
         expected_semantic_snapshot=None,
         progress=None,
         control=None,
+        expected_catalog=None,
     ):
         checkpoint()
         if not 0 <= max_evaluations <= 1000 or not 1 <= max_affected <= 1000:
             raise ValueError("Invalid execution budget")
         started = time.perf_counter()
         tree, bindings, datasets, target = self.prepare(tenant, sql)
+        if expected_catalog is not None and self.catalog_hash(datasets) != expected_catalog:
+            raise ValueError("Queued query sources changed; submit a new request")
         semantic_query = any(
             node.name.upper() in ("SEMANTIC", "SEMANTIC_FEATURE")
             for node in tree.find_all(exp.Anonymous)
@@ -1040,6 +1043,10 @@ class SQLService:
         from .features import FeatureRegistry
 
         FeatureRegistry(self.db).enqueue(tenant, target["id"], connection)
+
+    @staticmethod
+    def catalog_hash(datasets):
+        return digest(serial(sorted(datasets, key=lambda item: item["id"])))
 
     def save(self, connection, tenant, request, sql, compiled, params, plan, manifest, rows):
         identity = uid()

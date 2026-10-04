@@ -93,6 +93,27 @@ query_history = table(
     Column("created_at", String(40), nullable=False),
     Column("updated_at", String(40), nullable=False),
 )
+query_jobs = table(
+    "dataset_query_jobs",
+    Column("actor", String(100), nullable=False),
+    Column("actor_role", String(16), nullable=False),
+    Column("idempotency_key", String(128), nullable=False),
+    Column("request_hash", String(64), nullable=False),
+    Column("request", JSON, nullable=False),
+    Column("dataset_ids", JSON, nullable=False),
+    Column("catalog_hash", String(64), nullable=False),
+    Column("state", String(24), nullable=False),
+    Column("lease_token", String(64)),
+    Column("lease_until", Float, nullable=False),
+    Column("outcome", JSON),
+    Column("error", String(100)),
+    Column("created_at", String(40), nullable=False),
+    Column("updated_at", String(40), nullable=False),
+    UniqueConstraint("tenant", "actor", "idempotency_key"),
+)
+Index("ix_query_jobs_claim", query_jobs.c.tenant, query_jobs.c.state, query_jobs.c.created_at)
+Index("ix_query_jobs_lease", query_jobs.c.tenant, query_jobs.c.state, query_jobs.c.lease_until)
+Index("ix_query_jobs_recent", query_jobs.c.tenant, query_jobs.c.actor, query_jobs.c.created_at)
 Index(
     "ix_query_history_recent",
     query_history.c.tenant,

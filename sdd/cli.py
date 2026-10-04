@@ -46,6 +46,11 @@ def main():
     sql_worker.add_argument("--concurrency", type=int, default=2)
     sql_worker.add_argument("--once", action="store_true")
     sql_worker.add_argument("--heartbeat-file", default="/tmp/jev-sql-worker.heartbeat")
+    query_worker = sub.add_parser("query-worker", help="Execute durable application queries")
+    query_worker.add_argument("--tenant", action="append", required=True)
+    query_worker.add_argument("--concurrency", type=int, default=2)
+    query_worker.add_argument("--once", action="store_true")
+    query_worker.add_argument("--heartbeat-file")
     ready = sub.add_parser("ready", help="Check database configuration without calling a model")
     ready.add_argument("--worker-heartbeat")
     attachment = sub.add_parser(
@@ -240,6 +245,24 @@ def main():
             run(
                 db,
                 service.decisions,
+                concurrency=args.concurrency,
+                once=args.once,
+                heartbeat_path=args.heartbeat_file,
+            )
+        finally:
+            db.engine.dispose()
+    elif args.command == "query-worker":
+        from .deployment import check_database
+        from .generic.api import services
+        from .query_worker import run
+
+        check_database(db)
+        _, service, _ = services(executor)
+        try:
+            run(
+                db,
+                service.decisions,
+                args.tenant,
                 concurrency=args.concurrency,
                 once=args.once,
                 heartbeat_path=args.heartbeat_file,

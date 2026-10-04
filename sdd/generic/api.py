@@ -15,6 +15,8 @@ from .sql import SQLService
 from . import schema as s
 from .planning_review import PlanReviews
 from .history import QueryHistory
+from .query_requests import QueryInput, QueryJobInput
+from .query_jobs import QueryJobs, QueryJobConflict
 from ..query_control import QueryControl, QueryInterrupted
 
 
@@ -50,17 +52,6 @@ class CsvInput(Strict):
     null_empty: bool = True
     columns: list[ColumnInput] | None = Field(default=None, min_length=1, max_length=64)
     fingerprint: str | None = Field(default=None, max_length=64)
-
-
-class QueryInput(Strict):
-    parent_history_id: str | None = Field(default=None, max_length=64)
-    sql: str = Field(min_length=1, max_length=30000)
-    max_evaluations: int = Field(default=100, ge=0, le=1000)
-    accept: float = Field(default=0.8, ge=0, le=1)
-    reject: float = Field(default=0.2, ge=0, le=1)
-    allow_all: bool = False
-    max_affected: int = Field(default=1000, ge=1, le=1000)
-    timeout_seconds: float | None = Field(default=None, ge=0.1, le=3600, allow_inf_nan=False)
 
 
 class RowFilter(Strict):
@@ -416,6 +407,39 @@ def mount(app, executor, identity, reviewer):
             execute,
             parent_id=body.parent_history_id,
         )
+
+    jobs = QueryJobs(executor.db, sql)
+
+    @app.post("/data/query-jobs", status_code=202, tags=["Query jobs"])
+    def submit_query_job(body: QueryJobInput, p=Depends(identity)):
+        try:
+            return jobs.submit(
+                p["tenant"],
+                p["name"],
+                p["role"],
+                body.model_dump(exclude={"idempotency_key"}),
+                body.idempotency_key,
+            )
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from None
+        except QueryJobConflict as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @app.get("/data/query-jobs", tags=["Query jobs"])
+    def recent_query_jobs(
+        limit: int = Query(default=20, ge=1, le=50),
+        before: str | None = Query(default=None, max_length=64),
+        p=Depends(identity),
+    ):
+        return jobs.recent(p["tenant"], p["name"], limit, before)
+
+    @app.get("/data/query-jobs/{job_id}", tags=["Query jobs"])
+    def query_job(job_id: str, p=Depends(identity)):
+        return jobs.get(p["tenant"], p["name"], job_id)
+
+    @app.post("/data/query-jobs/{job_id}/cancel", tags=["Query jobs"])
+    def cancel_query_job(job_id: str, p=Depends(identity)):
+        return jobs.cancel(p["tenant"], p["name"], job_id)
 
     @app.post("/data/mutations/{token}/commit", tags=["Generic query"])
     def commit(token: str, p=Depends(reviewer)):

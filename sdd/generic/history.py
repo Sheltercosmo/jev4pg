@@ -289,6 +289,9 @@ class QueryHistory:
 
     @staticmethod
     def redact_dataset(connection, tenant, dataset_id):
+        from .query_jobs import QueryJobs
+
+        QueryJobs.redact_dataset(connection, tenant, dataset_id)
         redaction = (
             update(schema.query_history)
             .where(schema.query_history.c.tenant == tenant)

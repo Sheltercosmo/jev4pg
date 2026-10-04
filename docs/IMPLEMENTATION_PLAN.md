@@ -14,7 +14,8 @@ The native preview moves semantic row execution into PostgreSQL while keeping na
 | Durable evidence | Optional registry storage separates observations from policy, coordinates requests and reuses compatible results. |
 | Probability embeddings | A fixed question basis produces matrices and vectors; projection and compatible distance comparisons run locally. |
 | Native container deployment | A Compose overlay builds the optimized extension, provisions the registry and enables native application reads. Extension 0.2.0 adds backup registration with a 0.1.0 upgrade path. |
-| Application upgrade | Catalog version 3 relocates validated version 1 and 2 metadata into `sdd_catalog` transactionally. Existing source relations and the SQL queue retain their locations. |
+| Application upgrade | Catalog version 4 adds durable application query jobs. Upgrades retain version 3 catalog objects and relocate validated version 1 and 2 metadata into `sdd_catalog` transactionally. |
+| Application query jobs | Durable SQL submission, actor-scoped idempotency, separate workers, running cancellation and lease-fenced result publication. |
 | Catalog isolation | Runtime metadata is schema-qualified; SQLite translates only that namespace. Fresh installations preserve public-schema objects and grants. |
 | Installation preflight | `migrate --check` inspects ownership and catalog contracts without writes. Migration refuses unmanaged collisions and fixes its schema resolution before installation. |
 | Feature publication checks | Python refresh rechecks source populations, definition and review revisions, prior publication and worker ownership before committing a run reference. |
@@ -29,7 +30,7 @@ Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES
 
 Planning now uses [bounded shared value evidence](PLANNING_CONTEXT.md), concurrent table samples and index-checked literal probes. Sample completeness controls whether data can support a uniqueness hypothesis. These limits reduce preparation work; large-population semantic evaluation and durable bulk jobs remain unqualified.
 
-The application now provides [execution controls](QUERY_CONTROL.md) for SQL reads and mutation previews: connection-scoped cancellation, API deadlines and retained history. This is the execution primitive for future query jobs. Durable submission, cross-process cancellation, worker recovery and resumable bulk work still need their own lifecycle and publication contracts.
+The application provides [execution controls](QUERY_CONTROL.md) and [durable query jobs](QUERY_JOBS.md) for SQL reads and mutation previews. Jobs survive API disconnects, support cross-process cancellation and refuse publication by expired workers. Failed claims are not automatically retried. Queue retention, background natural-language planning, resumable bulk work and broader deployment qualification remain open.
 
 | Area | Needed before a native production release |
 | --- | --- |

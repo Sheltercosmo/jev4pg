@@ -264,7 +264,9 @@ def test_inconsistent_version_does_not_rewrite_existing_catalog(source):
             ).scalar_one()
             == 1
         )
-        connection.exec_driver_sql("UPDATE sdd_catalog.sdd_schema_version SET version=3")
+        connection.exec_driver_sql(
+            f"UPDATE sdd_catalog.sdd_schema_version SET version={SCHEMA_VERSION}"
+        )
     assert check_database(source["app"])["schema_version"] == SCHEMA_VERSION
     assert (
         source["catalog"].get("tenant-a", dataset["id"])["source_binding"]

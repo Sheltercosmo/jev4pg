@@ -8,7 +8,7 @@ from .db import Database
 from .postgres_security import secure
 from .schema import CATALOG_SCHEMA, metadata
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 NATIVE_EXTENSION_VERSION = "0.2.0"
 IMMUTABLE_TABLES = {
     "source_versions",
@@ -206,7 +206,7 @@ def prepare_catalog(connection, installation):
         connection.exec_driver_sql("CREATE SCHEMA sdd_catalog")
         return
 
-    from .migration_preflight import GUARD_FUNCTIONS, VERSION_TWO_TABLES
+    from .migration_preflight import GUARD_FUNCTIONS, VERSION_TWO_TABLES, VERSION_FOUR_TABLES
 
     owner = connection.execute(
         text(
@@ -218,6 +218,8 @@ def prepare_catalog(connection, installation):
         f"CREATE SCHEMA sdd_catalog AUTHORIZATION {identifier(connection, owner)}"
     )
     for table in metadata.sorted_tables:
+        if table.name in VERSION_FOUR_TABLES:
+            continue
         if installation["schema_version"] == 1 and table.name in VERSION_TWO_TABLES:
             continue
         name = identifier(connection, table.name)
