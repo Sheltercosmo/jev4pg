@@ -17,6 +17,8 @@ Run `ruff check sdd scripts tests` for static checks. Keep formatting changes se
 
 The [native execution module](native/README.md) has a separate Rust workspace and PostgreSQL 17 build. From `native`, run `cargo fmt --all --check`, `cargo test --locked -p jev-executor` and `cargo clippy --locked -p jev-executor --all-targets -- -D warnings`. The native CI workflow also installs the extension and runs SQL integration checks with a deterministic provider fixture. Changes to its execution stages belong in [the stage notes](docs/JEV_PLANNING_STAGES.md).
 
+Native CI checks both extension and application upgrades against pinned published versions. The application fixture runs through an isolated v0.6.0 installation before the current migration and compatibility checks. Preserve that separation when extending upgrade coverage; fixtures created only by the new code cannot prove compatibility with the release.
+
 ## Planner and operator changes
 
 A change should address a reusable mechanism, such as entity identity, join multiplicity, time boundaries, output units or missing evidence. Production code must not recognize a benchmark question, database name or expected answer.

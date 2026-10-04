@@ -28,3 +28,4 @@ backups/
 native/target/
 native/verification.json
 .native-baseline/
+.application-baseline/

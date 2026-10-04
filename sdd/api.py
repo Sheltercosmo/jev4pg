@@ -9,6 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 from .ir import Strict, Plan
+from . import __version__
 from .config import runtime, api_tokens
 from . import schema as s
 from .planner import preview
@@ -130,7 +131,7 @@ def create_app(executor=None, tokens=None):
 
     app = FastAPI(
         title="jevsd-pg",
-        version="0.6.0",
+        version=__version__,
         lifespan=lifespan,
         description="Query, inspect evidence, review decisions, and govern reusable concepts. Tenant is bound to the bearer token.",
     )
@@ -174,7 +175,7 @@ def create_app(executor=None, tokens=None):
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": "0.6.0"}
+        return {"status": "ok", "version": __version__}
 
     @app.get("/ready")
     def ready():

@@ -40,6 +40,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Architecture](ARCHITECTURE.md) | Components, languages and data boundaries. |
 | [Stage placement](JEV_PLANNING_STAGES.md) | Dependencies and reasons for parallel placement. |
 | [Roadmap](IMPLEMENTATION_PLAN.md) | Implemented native capabilities and remaining release work. |
+| [Changelog](../CHANGELOG.md) | Changes since the packaged release and current version identifiers. |
 | [Dependencies](DEPENDENCIES.md) | Libraries and external services. |
 | [Contributing](../CONTRIBUTING.md) | Development checks and contribution requirements. |
 

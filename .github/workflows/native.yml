@@ -65,9 +65,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - uses: actions/checkout@v4
+        with:
+          repository: Sheltercosmo/jevsd-pg
+          ref: 19f109dc966b8bd11fd741f9b40594c1609c281e
+          path: .application-baseline
+      - name: Install published application baseline
+        run: |
+          python -m venv .runtime/release-venv
+          .runtime/release-venv/bin/python -m pip install -r .application-baseline/requirements.lock.txt
+          .runtime/release-venv/bin/python -m pip install --no-deps .application-baseline
+          sudo install -m 644 .application-baseline/sdd/postgres/jevsd_pg* /usr/share/postgresql/17/extension/
       - name: Verify direct PostgreSQL execution
         env:
           SDD_TEST_NATIVE_UPGRADE: '1'
+          SDD_TEST_RELEASE_PYTHON: ${{ github.workspace }}/.runtime/release-venv/bin/python
         run: |
           python -m pip install -e '.[test]' 'psycopg[binary]==3.2.9'
           python native/tests/postgres.py
