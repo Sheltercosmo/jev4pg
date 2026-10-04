@@ -2,8 +2,10 @@
   <img src="docs/assets/readme-banner.png" width="1000" alt="jevsd-pg: Natural language. Semantic SQL. Pangolin mascot with three parallel data paths." />
 </p>
 
+<h1 align="center">jevsd-pg</h1>
+
 <p align="center">
-  <strong>A self-developing SQL database with JEV based semantic operators and natural language queries</strong>
+  <strong>Natural language to SQL and semantic operators for PostgreSQL</strong>
 </p>
 
 <p align="center">
@@ -20,7 +22,7 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural-language queries with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
+jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural language to SQL (text-to-SQL) in English and Simplified Chinese with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
 
 The execution model makes each model call count: independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused. Choose JEV planning or combine LLM plan generation with JEV context selection and review. Inspect generated SQL and refine previous queries through the web workspace, HTTP API or SQL clients. A shared provider interface supports compatible hosted services and local adapters.
 
@@ -34,7 +36,7 @@ Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-lan
 
 | Capability | How it works |
 | --- | --- |
-| Natural-language queries | Ask in English or Simplified Chinese, review the SQL and correct saved plans. |
+| Natural language to SQL | Ask in English or Simplified Chinese, review the SQL and correct saved plans. |
 | Semantic SQL | Filter and classify text alongside ordinary SQL. Native execution supports shared stages, derived relations and conditional branches. |
 | Probability embeddings | Evaluate a fixed question basis, store each answer distribution and compare compatible records locally. |
 | Reusable evidence | Save model observations separately from decision thresholds; reuse compatible evidence without another model call. |
@@ -43,6 +45,8 @@ Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-lan
 | Reviewed database changes | Preview inserts, updates and deletes, then commit separately. |
 
 The self-developing layer stores definitions, evidence and corrections as reusable database features. New definitions require review before promotion. The [provider interface](docs/PROVIDERS.md) supports TypeSafe, compatible hosted endpoints and local adapters.
+
+Previously published as **JevSDSQL**; the current repository and package are named **jevsd-pg**.
 
 ## Choose an installation
 
