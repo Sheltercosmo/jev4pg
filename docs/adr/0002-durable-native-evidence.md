@@ -1,6 +1,6 @@
 # Durable native evidence and request coordination
 
-Status: implemented in the native development branch; PostgreSQL integration verified. Release acceptance gates remain open.
+Status: implemented in the native preview. Production release requirements remain open.
 
 A semantic query can roll back after a provider has returned or charged for work. Storing its request ownership inside the source transaction would erase that history. Repeated queries also need compatible evidence without copying source populations into Python.
 
@@ -18,6 +18,8 @@ Registry helpers are private SECURITY DEFINER functions with a fixed search path
 
 No protocol can infer whether a cancelled external request was billed. Exactly-once external effects require provider-supported idempotency or reconciliation. The native registry prevents automatic redispatch of uncertain work. A persistence error also cannot erase a known VALUE or UNKNOWN: the result keeps its observation and exposes an unconfirmed storage receipt.
 
-An external coordinator or background worker may later finish work after a source backend dies or reduce connection pressure. Those changes must preserve the registry's identity, fencing and state contracts. Automatic reuse across differently packed question batches, maintained-feature publication and dependent native stages remain separate integration work.
+Dependent native stages share this registry through one execution plan. Native extension 0.2.0 registers observations, request state, counters and sequences for PostgreSQL backups. Recovery preserves uncertain attempts instead of silently permitting new dispatches.
+
+An external coordinator or background worker may later finish work after a source backend dies or reduce connection pressure. Those changes must preserve the registry's identity, fencing and state contracts. Automatic reuse across differently packed question batches and maintained-feature publication remain separate integration work.
 
 References: [PostgreSQL transaction isolation](https://www.postgresql.org/docs/17/transaction-iso.html), [Tokio PostgreSQL client](https://docs.rs/tokio-postgres/latest/tokio_postgres/).
