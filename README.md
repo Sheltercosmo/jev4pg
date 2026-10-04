@@ -26,9 +26,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with **natural-language queries in English and Simplified Chinese**.
+jev4pg brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
 
-**Define once, reuse across queries.** Turn business concepts into reviewed definitions that power reports, work queues and applications. JEV combines **parallel evaluation and evidence reuse**, preserving typed decisions and answer probabilities so compatible results can serve future queries without repeating inference. PostgreSQL handles joins, windows and exact arithmetic. Reviewed definitions and corrections build a **self-developing semantic layer** your team can inspect and improve.
+**Explainable embeddings** represent data through named questions and answer probabilities, making similarity inspectable. The native preview combines these with **parallel execution and input deduplication**: independent work runs concurrently, while repeated values with the same context and questions share judgments, preserving every source row.
+
+**Evidence caching** retains raw observations for compatible queries and threshold changes, with source and evaluator identity checks. **Controlled retries and reviewable fallbacks** keep errors, uncertainty and skipped work explicit, and preserve legal SQL proposals for correction. Reviewed definitions and corrections build a **self-developing semantic layer** your team can reuse across reports and applications. PostgreSQL handles joins, windows and exact arithmetic.
 
 See it in action at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
