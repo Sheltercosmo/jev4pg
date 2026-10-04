@@ -56,6 +56,24 @@ def test_secret_generation_is_repeatable_without_rotation(tmp_path):
     assert before["postgres_password"] != before["app_password"]
 
 
+def test_native_configuration_adds_a_separate_persistent_secret(tmp_path):
+    directory = configure(tmp_path / "secrets", prompt=False)
+    original = {path.name: path.read_bytes() for path in directory.iterdir()}
+    configure(directory, prompt=False, native=True)
+    native = (directory / "native_registry_password").read_bytes()
+    assert len(native.strip()) >= 24 and native not in original.values()
+    configure(directory, prompt=False, native=True)
+    assert (directory / "native_registry_password").read_bytes() == native
+    assert all((directory / name).read_bytes() == data for name, data in original.items())
+
+
+def test_registry_requires_native_installation():
+    from sdd.bootstrap import migrate
+
+    with pytest.raises(ValueError, match="native-interface"):
+        migrate("postgresql+psycopg://unused", native_registry=True)
+
+
 def test_readiness_fails_without_exposing_connection_details(monkeypatch):
     db = Database("sqlite:///:memory:")
     db.initialize()

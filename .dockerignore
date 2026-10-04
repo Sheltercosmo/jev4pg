@@ -8,5 +8,14 @@
 !sdd/**
 !deploy/
 !deploy/postgres.Dockerfile
+!deploy/native.Dockerfile
+!deploy/native-entrypoint.sh
+!native/
+!native/Cargo.toml
+!native/Cargo.lock
+!native/core/
+!native/core/**
+!native/pg/
+!native/pg/**
 **/__pycache__/
 **/*.pyc

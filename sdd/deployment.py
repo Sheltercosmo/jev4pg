@@ -2,7 +2,7 @@
 
 import os
 from sqlalchemy import text
-from .bootstrap import SCHEMA_VERSION
+from .bootstrap import SCHEMA_VERSION, NATIVE_EXTENSION_VERSION
 
 
 def check_database(db, sql_interface=None):
@@ -46,7 +46,7 @@ def check_database(db, sql_interface=None):
             native = connection.execute(
                 text("SELECT extversion FROM pg_extension WHERE extname='jev_native'")
             ).scalar()
-            if native != "0.1.0":
+            if native != NATIVE_EXTENSION_VERSION:
                 raise ValueError("Install the matching jev_native Rust extension")
             admission = connection.execute(
                 text(

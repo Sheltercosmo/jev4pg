@@ -6,6 +6,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        if self.headers.get("Authorization"):
+            self.send_error(400, "Unexpected credential on the public test endpoint")
+            return
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         answers = {}
         for key, question in request["questions"].items():

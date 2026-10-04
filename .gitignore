@@ -27,3 +27,4 @@ node_modules/
 backups/
 native/target/
 native/verification.json
+.native-baseline/

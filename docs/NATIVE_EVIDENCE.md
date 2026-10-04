@@ -4,7 +4,11 @@ The development Rust executor can reuse committed observations and coordinate JE
 
 ## Configure
 
-Install the current native extension, then create a dedicated login as an administrator:
+The [native Compose stack](NATIVE_DEPLOYMENT.md) provisions a dedicated registry login and mounts its password automatically. The steps below configure an existing PostgreSQL server.
+
+For an application deployment, set `SDD_NATIVE_REGISTRY_PASSWORD_FILE` to a protected file containing a password of at least 24 characters. Run `jevsd-pg migrate --native-interface --native-registry` with the usual administrator and runtime credentials. This creates the restricted login and grants below; existing passwords are preserved. Configure the server's provider file afterward as described below.
+
+For standalone SQL use, install the current native extension, then create a dedicated login as an administrator:
 
 ```sql
 CREATE ROLE jev_registry LOGIN CONNECTION LIMIT 8;
@@ -99,5 +103,7 @@ SELECT jev_native.reconcile_attempt(
 ```
 
 Use `CLOSED` when no retry is wanted. Reconciliation retires the old token; its late response cannot overwrite a newer attempt. A valid late response can settle an uncertain attempt that has not been retired. Deadline expiry alone never grants permission to send again.
+
+Native extension 0.2.0 includes registry tables and sequence state in PostgreSQL backups. Upgrade an installed 0.1.0 extension before relying on a new dump for recovery. Restored attempts retain their state and counters; database and cluster identity changes prevent silent evidence reuse for a different source. See [updates and backups](NATIVE_DEPLOYMENT.md#updates-and-backups).
 
 Raw observations are immutable. Registry writes use private functions granted only to the dedicated login. Retention, maintained-feature bindings, administrative UI and provider-supported idempotency remain integration work. The [architecture decision](adr/0002-durable-native-evidence.md) records these boundaries.

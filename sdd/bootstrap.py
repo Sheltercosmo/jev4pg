@@ -9,6 +9,7 @@ from .postgres_security import secure
 from .schema import metadata
 
 SCHEMA_VERSION = 2
+NATIVE_EXTENSION_VERSION = "0.2.0"
 IMMUTABLE_TABLES = {
     "source_versions",
     "evaluator_revisions",
@@ -67,7 +68,11 @@ def migrate(
     runtime_password=None,
     sql_interface=False,
     native_interface=False,
+    native_registry=False,
+    native_registry_password=None,
 ):
+    if native_registry and not native_interface:
+        raise ValueError("Native registry setup requires --native-interface")
     db = Database(admin_url)
     if db.engine.dialect.name != "postgresql":
         raise ValueError("PostgreSQL is required for deployment")
@@ -117,7 +122,20 @@ def migrate(
                 connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jevsd_pg")
                 grant_worker(connection, runtime_role)
             if native_interface:
-                connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jev_native")
+                connection.exec_driver_sql(
+                    f"CREATE EXTENSION IF NOT EXISTS jev_native VERSION '{NATIVE_EXTENSION_VERSION}'"
+                )
+                installed = connection.execute(
+                    text("SELECT extversion FROM pg_extension WHERE extname='jev_native'")
+                ).scalar_one()
+                if installed == "0.1.0":
+                    connection.exec_driver_sql(
+                        f"ALTER EXTENSION jev_native UPDATE TO '{NATIVE_EXTENSION_VERSION}'"
+                    )
+                elif installed != NATIVE_EXTENSION_VERSION:
+                    raise ValueError(
+                        "Install the native extension version matching this application"
+                    )
                 connection.exec_driver_sql(f"GRANT USAGE ON SCHEMA jev_native TO {role}")
                 connection.exec_driver_sql(
                     f"GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO {role}"
@@ -131,6 +149,8 @@ def migrate(
                 connection.exec_driver_sql(
                     f"GRANT EXECUTE ON FUNCTION jev_native.embed(text,jsonb,jsonb) TO {role}"
                 )
+                if native_registry:
+                    grant_native_registry(connection, native_registry_password)
             connection.execute(
                 text(
                     "INSERT INTO public.sdd_schema_version(singleton, version) VALUES(true, :version) "
@@ -142,9 +162,42 @@ def migrate(
         result = {"schema_version": SCHEMA_VERSION, "sql_interface": sql_interface}
         if native_interface:
             result["native_interface"] = True
+        if native_registry:
+            result["native_registry"] = True
         return result
     finally:
         db.engine.dispose()
+
+
+def grant_native_registry(connection, password):
+    login = "jev_registry"
+    ensure_login(connection, login, password)
+    unsafe = connection.execute(
+        text(
+            "SELECT NOT rolcanlogin OR EXISTS (SELECT 1 FROM pg_roles r "
+            "WHERE r.rolname<>:role AND pg_has_role(:role,r.oid,'MEMBER')) "
+            "OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' "
+            "AND c.relkind IN ('r','p','v','m','f') "
+            "AND has_table_privilege(:role,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')) "
+            "FROM pg_roles WHERE rolname=:role"
+        ),
+        {"role": login},
+    ).scalar_one()
+    if unsafe:
+        raise ValueError(
+            "Native registry needs a dedicated login without memberships or source access"
+        )
+    connection.exec_driver_sql("ALTER ROLE jev_registry CONNECTION LIMIT 8")
+    connection.exec_driver_sql("GRANT USAGE ON SCHEMA jev_native TO jev_registry")
+    for signature in (
+        "_registry_lookup(text,text[],integer)",
+        "_registry_claim(text,text,text,integer,integer,integer,integer,boolean)",
+        "_registry_finish(uuid,jsonb,text)",
+    ):
+        connection.exec_driver_sql(
+            f"GRANT EXECUTE ON FUNCTION jev_native.{signature} TO jev_registry"
+        )
 
 
 def grant_worker(connection, runtime_role):

@@ -5,7 +5,7 @@ Choose the application deployment or the native execution preview:
 | Path | Requirements | Execution |
 | --- | --- | --- |
 | Released application, v0.6.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Python service and worker; asynchronous `jev.*` SQL jobs. |
-| Native preview on `main` | PostgreSQL 17 on Linux, Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+| Native preview on `main` | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
 
 The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
@@ -72,7 +72,7 @@ Run these as separate processes. On Windows choose a writable heartbeat path, su
 
 ## Native preview
 
-Use a checkout of `main` and follow the [native build guide](../native/README.md#build). Install `jev_native` on the PostgreSQL server, configure its provider through `JEV_NATIVE_CONFIG_FILE` in the server environment, then grant SQL callers access. Direct SQL use does not require the Python application.
+Use a checkout of `main`. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
 
 For application integration, install Python from that same checkout and run:
 
@@ -80,7 +80,7 @@ For application integration, install Python from that same checkout and run:
 jevsd-pg migrate --native-interface
 ```
 
-Set `SDD_SEMANTIC_ENGINE=native` in the application environment and start the service. This enables supported semantic reads through `/ask` and `/data/sql`. It does not switch all operators to Rust. Maintained semantic features and semantic mutation review require the default Python engine. The [roadmap](IMPLEMENTATION_PLAN.md) lists remaining native packaging and upgrade work; use a separate database for preview evaluation.
+Set `SDD_SEMANTIC_ENGINE=native` in the application environment and start the service. This enables supported semantic reads through `/ask` and `/data/sql`. It does not switch all operators to Rust. Maintained semantic features and semantic mutation review require the default Python engine. The [roadmap](IMPLEMENTATION_PLAN.md) lists remaining release work; use a separate database for preview evaluation.
 
 The application and native extension configure providers separately. The Rust executor calls a compatible HTTP endpoint; a local Python adapter needs an HTTP wrapper to serve it. See [providers](PROVIDERS.md) and [native configuration](../native/README.md#configure).
 
