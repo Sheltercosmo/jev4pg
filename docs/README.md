@@ -44,6 +44,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Query controls](QUERY_CONTROL.md) | Application cancellation handles, execution deadlines and retained query history. |
 | [Query jobs](QUERY_JOBS.md) | Durable SQL submission, idempotent retries, workers, cancellation and recovery. |
 | [Performance and cost](PERFORMANCE_AND_COST.md) | Usage accounting, tuning and measurement scope. |
+| [BIRD Challenging comparison](benchmarks/BIRD_CHALLENGING_100.md) | Historical 100-question comparison of JEV, GPT-5.6 Terra and hybrid planning. |
 | [Architecture](ARCHITECTURE.md) | Components, languages and data boundaries. |
 | [Stage placement](JEV_PLANNING_STAGES.md) | Dependencies and reasons for parallel placement. |
 | [Roadmap](IMPLEMENTATION_PLAN.md) | Implemented native capabilities and remaining release work. |

@@ -1,0 +1,165 @@
+{
+  "status": "historical Python planner evaluation; not rerun on v0.7.0; not a native-executor or official leaderboard score",
+  "measured_at": "2026-09-23T07:06:29.540844+00:00",
+  "cases": 100,
+  "databases": 11,
+  "attempts": 300,
+  "scorable_cases": 99,
+  "source": "https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106",
+  "source_revision": "3c11fb193e5439b338e23677fa0aae11e8b85db9",
+  "difficulty": "challenging",
+  "language": "English",
+  "llm_model": "gpt-5.6-terra",
+  "reasoning_effort": "low",
+  "jev_model": "jev-1.13.0",
+  "runtime_sha256": "5bb3f8c2db573f9b04c78911b2445f2eda088efa9f30956fc79c896f9e19435b",
+  "archived_manifest_sha256": "1d1eddbc5fbbf5133695474c88be6bacf02df06bd9afffa29475a5bb107a6733",
+  "archived_metrics_sha256": "9b0e89a5532deace78bfda5c64785a8b1ecbdb1ba2ae908247ce053d2d4f86ce",
+  "prices_usd_per_million": {
+    "llm_input": 2,
+    "llm_cached_input": 0.2,
+    "llm_output": 12,
+    "llm_cache_write": 2.5,
+    "jev_input": 0.042
+  },
+  "cost_basis": "Frozen API-equivalent rates, not subscription charges or current quotations; missing usage is unpriced.",
+  "methods": {
+    "jev": {
+      "n": 100,
+      "scored": 99,
+      "answer_correct": 20,
+      "answer_percent": 20.2,
+      "product_correct": 20,
+      "holds": 100,
+      "total_usd": 0.38886729000000003,
+      "unknown_usage_calls": 0,
+      "llm_calls": 0,
+      "jev_calls": 2623,
+      "llm_input_tokens": 0,
+      "llm_cached_input_tokens": 0,
+      "llm_output_tokens": 0,
+      "jev_input_tokens": 9258745,
+      "latency": {
+        "isolated": {
+          "n": 6,
+          "correct_n": 1,
+          "correct_p50_seconds": 10.656,
+          "p50_seconds": 8.67,
+          "p95_seconds": 16.509,
+          "planning_p50_seconds": 8.632,
+          "execution_p50_seconds": 0.038
+        },
+        "concurrency_3": {
+          "n": 94,
+          "correct_n": 19,
+          "correct_p50_seconds": 6.082,
+          "p50_seconds": 8.547,
+          "p95_seconds": 26.795,
+          "planning_p50_seconds": 8.223,
+          "execution_p50_seconds": 0.039
+        }
+      },
+      "cases_with_parallel_jev": 100,
+      "jev_peak_concurrency_max": 4,
+      "llm_calls_histogram": {
+        "0": 100
+      }
+    },
+    "llm": {
+      "n": 100,
+      "scored": 99,
+      "answer_correct": 39,
+      "answer_percent": 39.4,
+      "product_correct": 38,
+      "holds": 0,
+      "total_usd": 3.2619827999999997,
+      "unknown_usage_calls": 0,
+      "llm_calls": 100,
+      "jev_calls": 0,
+      "llm_input_tokens": 2064381,
+      "llm_cached_input_tokens": 745984,
+      "llm_output_tokens": 39666,
+      "jev_input_tokens": 0,
+      "latency": {
+        "isolated": {
+          "n": 6,
+          "correct_n": 3,
+          "correct_p50_seconds": 7.665,
+          "p50_seconds": 7.465,
+          "p95_seconds": 8.604,
+          "planning_p50_seconds": 7.421,
+          "execution_p50_seconds": 0.052
+        },
+        "concurrency_3": {
+          "n": 94,
+          "correct_n": 35,
+          "correct_p50_seconds": 6.757,
+          "p50_seconds": 8.676,
+          "p95_seconds": 38.847,
+          "planning_p50_seconds": 8.291,
+          "execution_p50_seconds": 0.035
+        }
+      },
+      "cases_with_parallel_jev": 0,
+      "jev_peak_concurrency_max": 0,
+      "llm_calls_histogram": {
+        "1": 100
+      }
+    },
+    "hybrid": {
+      "n": 100,
+      "scored": 99,
+      "answer_correct": 34,
+      "answer_percent": 34.3,
+      "product_correct": 34,
+      "holds": 100,
+      "total_usd": 2.839274264,
+      "unknown_usage_calls": 1,
+      "llm_calls": 104,
+      "jev_calls": 732,
+      "llm_input_tokens": 1635784,
+      "llm_cached_input_tokens": 769792,
+      "llm_output_tokens": 69413,
+      "jev_input_tokens": 2866092,
+      "latency": {
+        "isolated": {
+          "n": 6,
+          "correct_n": 1,
+          "correct_p50_seconds": 12.128,
+          "p50_seconds": 8.7,
+          "p95_seconds": 11.97,
+          "planning_p50_seconds": 8.498,
+          "execution_p50_seconds": 0.026
+        },
+        "concurrency_3": {
+          "n": 94,
+          "correct_n": 33,
+          "correct_p50_seconds": 9.831,
+          "p50_seconds": 14.229,
+          "p95_seconds": 54.164,
+          "planning_p50_seconds": 13.409,
+          "execution_p50_seconds": 0.041
+        }
+      },
+      "cases_with_parallel_jev": 99,
+      "jev_peak_concurrency_max": 4,
+      "llm_calls_histogram": {
+        "1": 96,
+        "2": 4
+      }
+    }
+  },
+  "highlights": {
+    "jev_estimated_cost_reduction_percent": 88.1,
+    "hybrid_llm_input_reduction_percent": 20.8,
+    "hybrid_catalog_field_retention_percent": 40.3
+  },
+  "limits": [
+    "One timed-out reference excluded from matched accuracy, not timing or cost.",
+    "All JEV and hybrid proposals were held and scored read-only.",
+    "Ten references have unverified ordering; no empty reference matches.",
+    "One LLM SQL match exceeded the application's 1000-row cap.",
+    "One hybrid request has missing usage and is unpriced.",
+    "Single attempt per method and question; no serial ablation."
+  ]
+}

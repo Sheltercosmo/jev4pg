@@ -16,6 +16,7 @@
 <p align="center">
   <a href="https://jev4pg.com">Website</a> ·
   <a href="#why-choose-jev4pg">Advantages</a> ·
+  <a href="#bird-challenging-100-questions-11-databases">Benchmark</a> ·
   <a href="#what-you-can-build">What you can build</a> ·
   <a href="https://jev4pg.com/guide/">Project guide</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
@@ -25,15 +26,29 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg turns the meaning in your data into reusable SQL capabilities. Define what “needs follow-up” means, query it like a column, and carry that definition into the next queue, report or application. Its 41 JEV operators cover semantic filtering, extraction, ranking, matching and verification, alongside natural-language queries in English and Simplified Chinese.
+jev4pg brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build smarter search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
 
-JEV answers constrained questions about your data and retains typed decisions and answer probabilities. jev4pg makes that work reusable: share reviewed definitions across queries, reuse compatible evidence, and evaluate independent questions in parallel. PostgreSQL handles joins, windows and exact arithmetic. The self-developing layer grows through reviewed definitions and corrections that your application can keep using.
+Define business concepts once and reuse them across queries, reports and applications. JEV evaluates independent questions in parallel and preserves typed decisions and answer probabilities, so compatible evidence can serve future queries without repeating inference. PostgreSQL handles joins, windows and exact arithmetic. The self-developing semantic layer grows through reviewed definitions and corrections, keeping your team's knowledge inspectable and reusable.
 
 Explore the interactive demos at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
 <p align="center">
   <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
+
+## BIRD Challenging: 100 questions, 11 databases
+
+The project's historical evaluation tackles the hardest difficulty category in [BIRD's cleaned development benchmark](https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106). Across 100 questions, JEV planned with **zero LLM generation calls** at 88.1% lower estimated token cost than the LLM baseline. Hybrid selected context with JEV and used **20.8% fewer LLM input tokens**.
+
+| Method | SQL answer matches | Median time | Estimated cost / 100 attempts |
+| --- | ---: | ---: | ---: |
+| JEV 1.13.0 | 20/99 (20.2%) | 8.55 s | $0.389 |
+| GPT-5.6 Terra | 39/99 (39.4%) | 8.68 s | $3.262 |
+| JEV + GPT-5.6 Terra | 34/99 (34.3%) | 14.23 s | $2.839 |
+
+These are efficiency tradeoffs: the LLM baseline matched more answers, and hybrid took longer. All held proposals were scored; one unavailable reference leaves 99 scorable questions. Medians cover 94 cases with up to three cases in flight. Costs use frozen accounting rates; one hybrid request has unreported usage.
+
+Measured on the frozen Python planner on 23 September 2026. This is a local historical comparison, not an official leaderboard score or a measurement of v0.7.0 or the Rust preview. [Methodology and archived metrics](docs/benchmarks/BIRD_CHALLENGING_100.md).
 
 ## Why choose jev4pg
 

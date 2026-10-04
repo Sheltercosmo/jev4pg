@@ -2,6 +2,10 @@
 
 The native preview changes where semantic work runs and how it is shared. It has deterministic Rust and PostgreSQL integration tests, but no published end-to-end speed, cost or retrieval-quality comparison for this native version. The earlier tutorial results do not measure the native executor.
 
+## BIRD Challenging comparison
+
+The [archived 100-question BIRD evaluation](benchmarks/BIRD_CHALLENGING_100.md) compares JEV, GPT-5.6 Terra and hybrid planning across 11 databases. It records SQL answer matches, latency, calls and estimated token cost, including held proposals. Hybrid used 20.8% fewer LLM input tokens; the LLM baseline matched more answers. The measurements describe the frozen Python planner from 23 September 2026, not v0.7.0 or the native preview.
+
 ## Where calls are spent
 
 | Operation | Provider work |
