@@ -130,24 +130,44 @@ class Catalog:
     def __init__(self, db):
         self.db, self.ledger = db, Ledger(db)
 
-    def list(self, tenant):
+    def list(self, tenant, *, connection=None):
         from .source_catalog import describe_relationships
 
-        bindings = {
-            item["dataset_id"]: item for item in self.ledger.list(tenant, s.source_bindings)
-        }
+        with (
+            nullcontext(connection)
+            if connection is not None
+            else self.db.transaction(tenant) as current
+        ):
+            records = [
+                dict(item)
+                for item in current.execute(
+                    select(
+                        s.datasets,
+                        s.source_bindings.c.definition.label("_binding"),
+                        s.source_bindings.c.active.label("_active"),
+                    )
+                    .outerjoin(
+                        s.source_bindings,
+                        (s.source_bindings.c.dataset_id == s.datasets.c.id)
+                        & (s.source_bindings.c.tenant == s.datasets.c.tenant),
+                    )
+                    .where(s.datasets.c.tenant == tenant)
+                ).mappings()
+            ]
         datasets = []
-        for dataset in self.ledger.list(tenant, s.datasets):
-            binding = bindings.get(dataset["id"])
-            if binding:
-                if not binding["active"]:
+        for dataset in records:
+            binding, active = dataset.pop("_binding"), dataset.pop("_active")
+            if binding is not None:
+                if not active:
                     continue
-                dataset["source_binding"] = binding["definition"]
+                dataset["source_binding"] = binding
             datasets.append(dataset)
         return describe_relationships(datasets)
 
-    def get(self, tenant, identity):
-        matches = [d for d in self.list(tenant) if identity in (d["id"], d["name"])]
+    def get(self, tenant, identity, *, connection=None):
+        matches = [
+            d for d in self.list(tenant, connection=connection) if identity in (d["id"], d["name"])
+        ]
         if len(matches) != 1:
             raise ValueError("Unknown or ambiguous dataset in this tenant")
         return matches[0]

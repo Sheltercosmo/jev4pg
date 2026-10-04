@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "name": "customers",
+      "schema": "business",
+      "table": "customers",
+      "columns": ["id", "name"],
+      "description": "Customer identities"
+    },
+    {
+      "name": "orders",
+      "schema": "business",
+      "table": "orders",
+      "columns": ["id", "customer_id", "total", "created_at"]
+    }
+  ]
+}

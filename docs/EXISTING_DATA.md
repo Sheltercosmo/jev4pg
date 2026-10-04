@@ -2,6 +2,8 @@
 
 Development feature. An attachment registers an existing relation without copying rows or changing ownership. Queries read the source in place. The runtime login needs PostgreSQL access; the catalog determines which logical datasets each workspace tenant can use.
 
+For multiple sources and deployment automation, use a [reviewed source manifest](SOURCE_MANIFESTS.md). It provides metadata-only preview, atomic apply and explicit rebinding without copying data.
+
 ## Attach a relation
 
 Run the matching migration first:
@@ -77,7 +79,7 @@ GRANT SELECT ON business.public_messages TO sdd_app;
 
 The runtime login also needs access to the underlying invoker-view sources. Materialized views expose their stored snapshot; jevsd-pg does not refresh them or reinterpret their original source policies. Foreign tables and custom types require an explicit supported integration or a local typed representation.
 
-Execution verifies relation identity, selected column contracts, keys, comments and view definitions before semantic dispatch. Changed contracts stop the query. Unregistered added columns do not enter the catalog. View definitions are retained as fingerprints rather than copied SQL text.
+Execution verifies cluster, database and runtime-role identity, relation identity, selected column contracts, keys, comments and view definitions before semantic dispatch. Changed contracts stop the query. Unregistered added columns do not enter the catalog. View definitions are retained as fingerprints rather than copied SQL text. Attachments created without the database identity require an explicit rebind; matching relation OIDs cannot authorize a restored source.
 
 Table locks precede the query's repeatable-read snapshot. Views and materialized views use one additional guard connection for the query's duration. It pins dependencies before the main snapshot starts and closes on success, error or cancellation. A blocking materialized-view refresh waits for these readers. Source row updates remain ordinary PostgreSQL transactions. Include the guard connection in capacity planning.
 

@@ -10,7 +10,7 @@ The development line targets the next release. The packaged application release 
 | [Stage plans](docs/NATIVE_PLANS.md) | Combine SQL, semantic work and conditional branches in a shared DAG. Supported application queries compile into these plans. |
 | [Probability embeddings](docs/NATIVE_EMBEDDINGS.md) | Turn a fixed question basis into named answer probabilities, store matrices and compare compatible vectors without more model calls. |
 | [Persistent evidence](docs/NATIVE_EVIDENCE.md) | Reuse compatible observations across connections and coordinate provider admission. Decision thresholds remain separate from observations. |
-| [Source attachments](docs/EXISTING_DATA.md) | Query authorized PostgreSQL tables and views without importing their rows. Attachments remain read-only through the application. |
+| [Source attachments](docs/EXISTING_DATA.md) | Query authorized PostgreSQL tables and views without importing their rows. [Source manifests](docs/SOURCE_MANIFESTS.md) add reviewed batch adoption, atomic apply and explicit rebinding after a restore. |
 | [Native deployment](docs/NATIVE_DEPLOYMENT.md) | Build the extension with Docker Compose and provision restricted registry access. Native 0.2.0 adds registry backup support and an upgrade from 0.1.0. |
 | [External PostgreSQL](docs/EXTERNAL_POSTGRESQL.md) | Deploy the application against an existing server with verified TLS, explicit migration control and bounded connection pools. Catalog version 3 isolates metadata in `sdd_catalog`. |
 

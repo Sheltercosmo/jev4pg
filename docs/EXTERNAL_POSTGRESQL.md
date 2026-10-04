@@ -73,7 +73,7 @@ Pool exhaustion returns HTTP 503 with code `database_capacity`, without connecti
 
 Restore a database backup into an empty database with the original roles and matching extension files, then run migration and readiness checks before starting services. Keep the API, SQL workers and feature maintenance stopped while restoring and reviewing sources. Use the [backup procedure](INSTALLATION.md#backup-and-restore); test it in your own infrastructure.
 
-Imported `sdd_data` tables and saved application state can be restored together. Attachments to business tables also contain PostgreSQL relation identities. OIDs are local to a database cluster: changed OIDs normally invalidate an attachment, and coincident OIDs do not prove continuity. After restoring to another cluster, verify source ownership, row policies and data, detach restored attachments, and explicitly register the authorized sources again. Do not rewrite stored OIDs to make validation pass. Automatic rebinding and cross-host recovery qualification remain separate work.
+Imported `sdd_data` tables and saved application state can be restored together. Source attachments also bind to cluster, database and runtime-role identity, so coincident relation OIDs cannot authorize a restored attachment. After restoring to another cluster, verify source ownership, row policies and data, then use a [reviewed manifest rebind](SOURCE_MANIFESTS.md#accept-schema-drift-or-a-restored-source). Do not rewrite stored identities to make validation pass. Logical restore and rebind are tested between independently initialized local clusters; cross-host recovery and high-availability qualification remain separate work.
 
 ## Development checks
 

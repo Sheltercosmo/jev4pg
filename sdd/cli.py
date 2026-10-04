@@ -64,6 +64,17 @@ def main():
     )
     detachment.add_argument("dataset")
     detachment.add_argument("--tenant", required=True)
+    sources = sub.add_parser("sources", help="Preview or apply a reviewed source manifest")
+    source_actions = sources.add_subparsers(dest="source_action", required=True)
+    source_preview = source_actions.add_parser(
+        "preview", help="Inspect source metadata without writes"
+    )
+    source_preview.add_argument("file", help="Source manifest JSON file")
+    source_preview.add_argument("--tenant", required=True)
+    source_preview.add_argument("--output", required=True, help="New review plan JSON file")
+    source_apply = source_actions.add_parser("apply", help="Apply a reviewed plan atomically")
+    source_apply.add_argument("file", help="Review plan JSON file")
+    source_apply.add_argument("--tenant", required=True)
     worker = sub.add_parser("worker")
     worker.add_argument("--tenant", required=True)
     worker.add_argument("--once", action="store_true")
@@ -93,7 +104,15 @@ def main():
 
         uvicorn.run("sdd.api:create_app", factory=True, host=args.host, port=args.port)
         return
-    if args.command in {"migrate", "sql-grant", "extension-files", "ready", "attach", "detach"}:
+    if args.command in {
+        "migrate",
+        "sql-grant",
+        "extension-files",
+        "ready",
+        "attach",
+        "detach",
+        "sources",
+    }:
         from .config import load_env, database_url, secret
         from .bootstrap import migrate, check_migration, grant_client, extension_files
         from .migration_preflight import InstallationConflict
@@ -132,7 +151,41 @@ def main():
 
                 db = Database(database_url())
                 try:
-                    if args.command in {"attach", "detach"}:
+                    if args.command == "sources":
+                        from .generic.catalog import Catalog
+                        from .generic.source_manifest import SourceOnboarding
+
+                        with Path(args.file).open("rb") as input_file:
+                            raw = input_file.read(16 * 1024 * 1024 + 1)
+                        if len(raw) > 16 * 1024 * 1024:
+                            raise ValueError(
+                                "Source manifests and review plans must fit within 16 MiB"
+                            )
+                        document = json.loads(raw)
+                        onboarding = SourceOnboarding(Catalog(db))
+                        if args.source_action == "preview":
+                            result = onboarding.preview(args.tenant, document)
+                            with Path(args.output).open("x", encoding="utf-8") as output:
+                                json.dump(result, output, ensure_ascii=False, indent=2)
+                                output.write("\n")
+                            result = {
+                                "plan": args.output,
+                                "status": "blocked"
+                                if any(entry["action"] == "conflict" for entry in result["sources"])
+                                else "ready",
+                                "fingerprint": result["fingerprint"],
+                                "actions": [
+                                    {
+                                        "name": entry["source"]["name"],
+                                        "action": entry["action"],
+                                        "reason": entry["reason"],
+                                    }
+                                    for entry in result["sources"]
+                                ],
+                            }
+                        else:
+                            result = onboarding.apply(args.tenant, document)
+                    elif args.command in {"attach", "detach"}:
                         from .generic.catalog import Catalog
 
                         catalog = Catalog(db)
@@ -165,13 +218,15 @@ def main():
                     )
                 )
                 parser.exit(1)
-            if args.command in {"attach", "detach"} and isinstance(exc, ValueError):
+            if args.command in {"attach", "detach", "sources"} and isinstance(exc, ValueError):
                 parser.exit(1, f"{args.command} failed: {exc}\n")
             parser.exit(
                 1,
                 f"{args.command} failed ({type(exc).__name__}). Check configuration, database permissions and server logs.\n",
             )
         print(json.dumps(result))
+        if args.command == "sources" and result.get("status") == "blocked":
+            parser.exit(1)
         return
     db, executor = runtime()
     if args.command == "sql-worker":

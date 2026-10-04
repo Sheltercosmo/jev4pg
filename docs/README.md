@@ -11,6 +11,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Query examples](NL2SQL_EXAMPLES.md) | SQL, expected results and a runnable tutorial. |
 | [Query API](NATURAL_LANGUAGE.md) | Planning, review, confirmation and saved queries. |
 | [Existing PostgreSQL data](EXISTING_DATA.md) | Attach tables and views without copying rows. |
+| [Source manifests](SOURCE_MANIFESTS.md) | Review a source batch, apply atomically and rebind after a restore. |
 | [Text imports](TEXT_IMPORT.md) | Row descriptions, typed extraction and import. |
 | [Semantic features](SEMANTIC_FEATURES.md) | Reviewed definitions, corrections and refresh. |
 

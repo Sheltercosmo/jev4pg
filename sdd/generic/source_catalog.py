@@ -86,6 +86,27 @@ def internal_schema(schema_name):
     }
 
 
+def database_identity(connection):
+    if connection.dialect.name != "postgresql":
+        raise ValueError("Source attachments require PostgreSQL")
+    if not connection.exec_driver_sql(
+        "SELECT pg_catalog.has_function_privilege('pg_catalog.pg_control_system()', 'EXECUTE')"
+    ).scalar_one():
+        raise ValueError("Source attachments require access to pg_catalog.pg_control_system()")
+    return dict(
+        connection.exec_driver_sql(
+            "SELECT system_identifier::text AS cluster, "
+            "(SELECT oid::bigint FROM pg_catalog.pg_roles "
+            "WHERE rolname=current_user) AS role, "
+            "(SELECT oid::bigint FROM pg_catalog.pg_database "
+            "WHERE datname=pg_catalog.current_database()) AS database "
+            "FROM pg_catalog.pg_control_system()"
+        )
+        .mappings()
+        .one()
+    )
+
+
 def inspect_source(connection, schema_name, table_name, names=None):
     if connection.dialect.name != "postgresql":
         raise ValueError("Source attachments require PostgreSQL")
@@ -216,6 +237,7 @@ def inspect_source(connection, schema_name, table_name, names=None):
     projection = ",".join(identifier(connection, column["name"]) for column in columns)
     connection.exec_driver_sql(f"SELECT {projection} FROM {relation} LIMIT 0").close()
     definition = {
+        "database_identity": database_identity(connection),
         "oid": info["oid"],
         "kind": info["kind"],
         "view_definition": digest(info["view_sql"]) if info["view_sql"] else None,
@@ -253,10 +275,17 @@ def inspect_source(connection, schema_name, table_name, names=None):
 
 
 def validate_sources(connection, datasets):
+    origin = None
     for dataset in datasets:
         expected = dataset.get("source_binding")
         if not expected:
             continue
+        if origin is None:
+            origin = database_identity(connection)
+        if expected.get("database_identity") != origin:
+            raise ValueError(
+                "Source database identity changed or is missing; explicitly rebind the attachment before querying"
+            )
         current = (
             connection.execute(
                 select(schema.source_bindings).where(
@@ -300,38 +329,59 @@ def attach(catalog, tenant, name, schema_name, table_name, columns=None, descrip
             raise ValueError("Dataset names must be unique ignoring letter case")
         definition, fields, comment = inspect_source(connection, schema_name, table_name, columns)
         identity = uid()
-        record = {
-            "id": identity,
-            "tenant": tenant,
-            "name": name,
-            "description": comment if description is None else description,
-            "schema_name": schema_name,
-            "table_name": table_name,
-            "columns": fields,
-            "primary_key": definition["primary_key"],
-            "writable": 0,
-            "links": [],
-            "created_at": now(),
-        }
-        connection.execute(insert(schema.datasets).values(**record))
-        connection.execute(
-            insert(schema.source_bindings).values(
-                id=uid(),
-                tenant=tenant,
-                dataset_id=identity,
-                definition=definition,
-                active=1,
-                created_at=now(),
-            )
+        insert_attachment(
+            connection,
+            tenant,
+            identity,
+            name,
+            schema_name,
+            table_name,
+            definition,
+            fields,
+            comment if description is None else description,
         )
     return catalog.get(tenant, identity)
 
 
+def insert_attachment(
+    connection, tenant, identity, name, schema_name, table_name, definition, fields, description
+):
+    record = {
+        "id": identity,
+        "tenant": tenant,
+        "name": name,
+        "description": description,
+        "schema_name": schema_name,
+        "table_name": table_name,
+        "columns": fields,
+        "primary_key": definition["primary_key"],
+        "writable": 0,
+        "links": [],
+        "created_at": now(),
+    }
+    connection.execute(insert(schema.datasets).values(**record))
+    connection.execute(
+        insert(schema.source_bindings).values(
+            id=uid(),
+            tenant=tenant,
+            dataset_id=identity,
+            definition=definition,
+            active=1,
+            created_at=now(),
+        )
+    )
+
+
 def detach(catalog, tenant, identity):
-    dataset = catalog.get(tenant, identity)
-    if not dataset.get("source_binding"):
-        raise ValueError("This dataset is imported, not attached")
     with catalog.db.transaction(tenant) as connection:
+        if connection.dialect.name == "postgresql":
+            connection.execute(
+                text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
+                {"key": tenant + ":datasets"},
+            )
+        dataset = catalog.get(tenant, identity, connection=connection)
+        if not dataset.get("source_binding"):
+            raise ValueError("This dataset is imported, not attached")
         connection.execute(
             update(schema.source_bindings)
             .where(
@@ -349,16 +399,22 @@ def detach(catalog, tenant, identity):
 
 
 def describe_relationships(datasets):
+    def identity(binding, oid):
+        return digest(binding.get("database_identity")), oid
+
     by_oid = {}
     for dataset in datasets:
         if dataset.get("source_binding"):
-            by_oid.setdefault(dataset["source_binding"]["oid"], []).append(dataset)
+            binding = dataset["source_binding"]
+            by_oid.setdefault(identity(binding, binding["oid"]), []).append(dataset)
     for dataset in datasets:
         if not dataset.get("source_binding"):
             continue
         dataset["source_relationships"] = []
         for foreign_key in dataset.get("source_binding", {}).get("foreign_keys", []):
-            for target in by_oid.get(foreign_key["target_oid"], []):
+            for target in by_oid.get(
+                identity(dataset["source_binding"], foreign_key["target_oid"]), []
+            ):
                 positions = {
                     column["position"]: column["name"]
                     for column in target["source_binding"]["columns"]
