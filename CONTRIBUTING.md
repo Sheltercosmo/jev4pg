@@ -23,6 +23,12 @@ The [native execution module](native/README.md) has a separate Rust workspace an
 
 Native CI checks both extension and application upgrades against pinned published versions. The application fixture runs through an isolated v0.6.0 installation before the current migration and compatibility checks. Preserve that separation when extending upgrade coverage; fixtures created only by the new code cannot prove compatibility with the release.
 
+## Branches and versions
+
+`main` is the shared development history. Start short-lived `codex/*` branches from it, merge completed work and delete the merged branch. Keep an active branch synchronized with `main`; avoid maintaining separate release copies or replaying the same feature into disconnected histories. Published versions are immutable `vX.Y.Z` tags.
+
+The application version comes from `sdd/_version.py`. Native extension versions and catalog schema versions describe their own upgrade contracts, not alternative editions of the product. Their compatibility belongs in the [installation guide](docs/INSTALLATION.md#upgrade). Record the commit SHA when testing an unreleased build.
+
 ## Planner and operator changes
 
 A change should address a reusable mechanism, such as entity identity, join multiplicity, time boundaries, output units or missing evidence. Production code must not recognize a benchmark question, database name or expected answer.

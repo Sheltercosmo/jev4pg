@@ -115,7 +115,9 @@ Hybrid queries require `SDD_LLM_TRANSPORT`, `SDD_LLM_MODEL` and the correspondin
 
 ## Upgrade
 
-Application, catalog and extension versions are separate:
+Choose a release tag or a development commit first. The application number identifies that build. Catalog and extension numbers describe database upgrade formats; they are not competing project releases. `main` changes over time, so record its commit SHA when deploying a development build.
+
+Application, catalog and extension compatibility:
 
 | Source | Application | Catalog schema | Optional native extension |
 | --- | --- | --- | --- |
