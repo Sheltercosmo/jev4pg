@@ -38,6 +38,22 @@ def main():
     sql_worker.add_argument("--heartbeat-file", default="/tmp/jev-sql-worker.heartbeat")
     ready = sub.add_parser("ready", help="Check database configuration without calling a model")
     ready.add_argument("--worker-heartbeat")
+    attachment = sub.add_parser(
+        "attach", help="Register an existing PostgreSQL relation without copying data"
+    )
+    attachment.add_argument("name", help="Logical dataset name")
+    attachment.add_argument("--tenant", required=True)
+    attachment.add_argument("--schema", required=True)
+    attachment.add_argument("--table", required=True)
+    attachment.add_argument(
+        "--column", action="append", help="Expose only these columns; repeat as needed"
+    )
+    attachment.add_argument("--description")
+    detachment = sub.add_parser(
+        "detach", help="Remove an attachment from the catalog; preserve source data"
+    )
+    detachment.add_argument("dataset")
+    detachment.add_argument("--tenant", required=True)
     worker = sub.add_parser("worker")
     worker.add_argument("--tenant", required=True)
     worker.add_argument("--once", action="store_true")
@@ -67,7 +83,7 @@ def main():
 
         uvicorn.run("sdd.api:create_app", factory=True, host=args.host, port=args.port)
         return
-    if args.command in {"migrate", "sql-grant", "extension-files", "ready"}:
+    if args.command in {"migrate", "sql-grant", "extension-files", "ready", "attach", "detach"}:
         from .config import load_env, database_url, secret
         from .bootstrap import migrate, grant_client, extension_files
 
@@ -99,15 +115,34 @@ def main():
 
                 db = Database(database_url())
                 try:
-                    result = check_database(db)
+                    if args.command in {"attach", "detach"}:
+                        from .generic.catalog import Catalog
+
+                        catalog = Catalog(db)
+                        result = (
+                            catalog.attach(
+                                args.tenant,
+                                args.name,
+                                args.schema,
+                                args.table,
+                                args.column,
+                                args.description,
+                            )
+                            if args.command == "attach"
+                            else catalog.detach(args.tenant, args.dataset)
+                        )
+                    else:
+                        result = check_database(db)
                     if (
-                        args.worker_heartbeat
+                        getattr(args, "worker_heartbeat", None)
                         and time.time() - Path(args.worker_heartbeat).stat().st_mtime > 90
                     ):
                         raise ValueError("SQL worker heartbeat has expired")
                 finally:
                     db.engine.dispose()
         except Exception as exc:
+            if args.command in {"attach", "detach"} and isinstance(exc, ValueError):
+                parser.exit(1, f"{args.command} failed: {exc}\n")
             parser.exit(
                 1,
                 f"{args.command} failed ({type(exc).__name__}). Check configuration, database permissions and server logs.\n",

@@ -13,6 +13,7 @@ from sqlalchemy import text
 from ..ledger import uid
 from .catalog import serial
 from .native_admission import NativeAdmission
+from .source_catalog import source_transaction
 
 
 def _conjuncts(node):
@@ -328,7 +329,7 @@ def execute_native(
     totals, details, steps, relations, evaluators = Counter(), [], [], {}, []
     with (
         NativeAdmission.reserve(service.db, tenant, max_evaluations) as admission,
-        service.db.transaction(tenant, isolation_level="REPEATABLE READ") as connection,
+        source_transaction(service.db, tenant, datasets, "REPEATABLE READ") as connection,
     ):
         service.configure_transaction(connection)
         connection.execute(

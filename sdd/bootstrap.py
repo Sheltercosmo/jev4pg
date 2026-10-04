@@ -8,7 +8,7 @@ from .db import Database
 from .postgres_security import secure
 from .schema import metadata
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 IMMUTABLE_TABLES = {
     "source_versions",
     "evaluator_revisions",

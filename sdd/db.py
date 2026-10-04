@@ -35,7 +35,7 @@ class Database:
         metadata.create_all(self.engine)
 
     @contextmanager
-    def transaction(self, tenant, isolation_level=None):
+    def transaction(self, tenant, isolation_level=None, *, before_snapshot=None):
         if not tenant or len(tenant) > 100:
             raise ValueError("A tenant identity is required")
         engine = (
@@ -45,6 +45,8 @@ class Database:
         )
         guard = self._transaction_lock if self.engine.dialect.name == "sqlite" else nullcontext()
         with guard, engine.begin() as conn:
+            if before_snapshot is not None:
+                before_snapshot(conn)
             if self.engine.dialect.name == "postgresql":
                 conn.execute(
                     text("SELECT set_config('sdd.tenant', :tenant, true)"), {"tenant": tenant}

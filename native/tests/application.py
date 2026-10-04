@@ -618,6 +618,9 @@ def verify_application(connection, observations):
         checks.append(
             "native semantic configuration preserves ordinary mutation preview and confirmation"
         )
+        from catalog_application import verify_catalog_application
+
+        checks.extend(verify_catalog_application(connection, sql, catalog, tenant, observations))
         return checks
     finally:
         db.engine.dispose()

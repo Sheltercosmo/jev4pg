@@ -40,7 +40,7 @@ def bridge_tables(catalog, selected):
     names = {t["name"] for t in catalog}
     graph = {name: set() for name in names}
     for table in catalog:
-        for link in table["relationships"]:
+        for link in [*table["relationships"], *table.get("source_relationships", [])]:
             target = link["target_table"]
             if target in names:
                 graph[table["name"]].add(target)
@@ -164,6 +164,12 @@ def filter_context(tenant, packet, decisions):
                             keys.add(link["source_column"])
                         if link["target_table"] == table["name"]:
                             keys.add(link["target_column"])
+                for link in source.get("source_relationships", []):
+                    if source["name"] in bridges and link["target_table"] in bridges:
+                        if source["name"] == table["name"]:
+                            keys.update(link["source_columns"])
+                        if link["target_table"] == table["name"]:
+                            keys.update(link["target_columns"])
             columns = [
                 c
                 for c in table["columns"]
@@ -175,6 +181,11 @@ def filter_context(tenant, packet, decisions):
                     "columns": columns,
                     "relationships": [
                         r for r in table["relationships"] if r["target_table"] in bridges
+                    ],
+                    "source_relationships": [
+                        r
+                        for r in table.get("source_relationships", [])
+                        if r["target_table"] in bridges
                     ],
                 }
             )

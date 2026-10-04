@@ -5,6 +5,7 @@ Start with installation, then use the workspace guide or API examples for your t
 | Guide | Contents |
 | --- | --- |
 | [Installation](INSTALLATION.md) | Python, PostgreSQL, credentials and service setup. |
+| [Existing data](EXISTING_DATA.md) | Attach PostgreSQL tables and views without importing their rows. |
 | [PostgreSQL interface](POSTGRESQL_INTERFACE.md) | SQL login setup, operator jobs, results and recovery. |
 | [Workspace](USER_GUIDE.md) | Queries, corrections, history and data changes. |
 | [简体中文指南](zh/USER_GUIDE.md) | 简体中文工作区使用说明。 |

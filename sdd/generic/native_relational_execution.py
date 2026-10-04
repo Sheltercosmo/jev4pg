@@ -12,6 +12,7 @@ from sqlalchemy import text
 from .native_admission import NativeAdmission
 from .native_relational import compile_relational_plan
 from .catalog import serial
+from .source_catalog import source_transaction
 
 
 def execute_relational(
@@ -36,7 +37,7 @@ def execute_relational(
         raise ValueError("Invalid native source or statement limits")
     with (
         NativeAdmission.reserve(service.db, tenant, max_evaluations) as admission,
-        service.db.transaction(tenant, isolation_level="REPEATABLE READ") as connection,
+        source_transaction(service.db, tenant, datasets, "REPEATABLE READ") as connection,
     ):
         service.configure_transaction(connection)
         connection.execute(

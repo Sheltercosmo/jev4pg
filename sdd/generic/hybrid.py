@@ -61,6 +61,7 @@ def context_packet(question, datasets, knowledge):
             {**link, "target_table": names.get(link["target_id"], "outside selected scope")}
             for link in dataset["links"]
         ]
+        item["source_relationships"] = dataset.get("source_relationships", [])
     return serial(
         {
             "request": question,

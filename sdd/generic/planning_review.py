@@ -49,7 +49,10 @@ def catalog_signature(datasets):
                         "primary_key",
                         "links",
                         "writable",
+                        "source_binding",
+                        "source_relationships",
                     )
+                    if key in dataset
                 }
                 for dataset in datasets
             ]

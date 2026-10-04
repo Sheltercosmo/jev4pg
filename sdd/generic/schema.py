@@ -33,6 +33,15 @@ datasets = table(
     Column("created_at", String(32), nullable=False),
     UniqueConstraint("tenant", "name"),
 )
+
+source_bindings = table(
+    "dataset_source_bindings",
+    Column("dataset_id", ForeignKey("dataset_catalog.id", ondelete="CASCADE"), nullable=False),
+    Column("definition", JSON, nullable=False),
+    Column("active", Integer, nullable=False),
+    Column("created_at", String(32), nullable=False),
+    UniqueConstraint("dataset_id"),
+)
 evidence = table(
     "dataset_evidence",
     Column("dataset_id", ForeignKey("dataset_catalog.id", ondelete="CASCADE"), nullable=False),

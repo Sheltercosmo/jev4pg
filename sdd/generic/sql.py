@@ -227,7 +227,8 @@ class SQLService:
             schema = {
                 d["name"]: {
                     **{
-                        c["name"]: {
+                        c["name"]: c.get("database_type")
+                        or {
                             "text": "TEXT",
                             "integer": "BIGINT",
                             "number": "DECIMAL",
@@ -761,7 +762,9 @@ class SQLService:
             if self.db.engine.dialect.name == "postgresql" and not mutation_token
             else None
         )
-        with self.db.transaction(tenant, isolation_level=isolation) as connection:
+        from .source_catalog import source_transaction
+
+        with source_transaction(self.db, tenant, datasets, isolation) as connection:
             self.configure_transaction(connection)
             if mutation_token and self.db.engine.dialect.name == "postgresql":
                 table = self.catalog.table(target, connection)

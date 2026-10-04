@@ -95,7 +95,7 @@ def compile_relational_plan(tree, bindings, render):
                 dataset = bindings[id(source)]
                 names = {
                     column["name"]: {
-                        "kind": column["type"],
+                        "kind": column.get("native_kind", column["type"]),
                         "label": column["name"],
                         "nullable": True,
                     }
