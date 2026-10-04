@@ -24,6 +24,10 @@ jevsd-pg adds 41 semantic operators, natural-language queries and reusable evide
 
 Use the web workspace, HTTP API or PostgreSQL clients. Choose JEV planning or hybrid planning, where JEV selects context, an LLM proposes SQL, and JEV reviews it. Inspect the proposal, correct its interpretation and rerun it from history.
 
+<p align="center">
+  <img src="docs/assets/product-tour.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+</p>
+
 ## What you can build
 
 | Capability | How it works |
