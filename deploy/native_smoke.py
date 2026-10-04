@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from sqlalchemy import URL, create_engine, text
@@ -107,8 +108,11 @@ def main():
             data=json.dumps({"sql": query}).encode(),
             headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
         )
-        with urlopen(request, timeout=30) as response:
-            result = json.load(response)
+        try:
+            with urlopen(request, timeout=30) as response:
+                result = json.load(response)
+        except HTTPError as error:
+            raise AssertionError(f"Native query {index}: {error.read().decode()}") from error
         assert result["manifest"]["execution_backend"] == "rust_postgresql", result
         assert [row["id"] for row in result["result"]] == [1, 2, 3], result
         expected = [True, True, True] if index < 2 else [True, False, False]

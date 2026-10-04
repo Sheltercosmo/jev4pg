@@ -15,7 +15,11 @@ class Handler(BaseHTTPRequestHandler):
             if question["type"] != "noul":
                 self.send_error(400, "This deployment fixture only implements Noul")
                 return
-            probability = {"false": 0.05, "unknown": 0.5}.get(question["instructions"], 0.95)
+            instructions = question["instructions"]
+            definition = (
+                instructions.get("definition") if isinstance(instructions, dict) else instructions
+            )
+            probability = {"false": 0.05, "unknown": 0.5}.get(definition, 0.95)
             answers[key] = {"type": "noul", "noul": probability}
         response = json.dumps(
             {

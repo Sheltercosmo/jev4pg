@@ -25,7 +25,7 @@ jobs:
         run: |
           python -m pip install -r requirements.lock.txt
           python -m pip install --no-deps .
-          python -m pytest tests/test_deployment_config.py -q
+          python -m pytest tests/test_deployment_config.py tests/test_deployment_fixture.py -q
       - name: Create disposable credentials
         run: |
           python deploy/configure.py --native --no-prompt
