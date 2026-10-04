@@ -98,8 +98,9 @@ class QueryJobs:
                     updated_at=timestamp,
                 )
                 .on_conflict_do_nothing(index_elements=["tenant", "actor", "idempotency_key"])
-            ).rowcount
-            if added:
+                .returning(table.c.id)
+            ).scalar_one_or_none()
+            if added is not None:
                 conn.execute(
                     insert(schema.query_history).values(
                         id=identity,

@@ -6,10 +6,10 @@ This deployment uses application 0.7.0, catalog schema 4 and native extension 0.
 
 ## Start
 
-Use Docker Compose v2 and Python 3.11+. Clone the development source, then configure and start it:
+Use Docker Compose v2 and Python 3.11+. Clone the tagged source, then configure and start it:
 
 ```bash
-git clone https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py --native
 docker compose -f compose.yaml -f compose.native.yaml build

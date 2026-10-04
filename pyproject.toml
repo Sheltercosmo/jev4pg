@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "jev4pg"
 dynamic = ["version"]
 description = "A self-developing JEV-based SQL database with JEV-powered NL2SQL"
+readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"

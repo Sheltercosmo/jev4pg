@@ -1,6 +1,7 @@
 **
 !Dockerfile
 !pyproject.toml
+!README.md
 !requirements.lock.txt
 !LICENSE
 !NOTICE

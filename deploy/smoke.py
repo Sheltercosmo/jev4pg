@@ -150,7 +150,7 @@ def main():
         time.sleep(0.5)
     assert completed["job_state"] == "SUCCEEDED"
     assert completed["output_state"] == "VALUE"
-    assert completed["result"]["rows"] == [
+    assert completed["result"]["result"] == [
         {"id": 1, "text": "问题仍未解决。"},
         {"id": 2, "text": "Please follow up."},
     ]

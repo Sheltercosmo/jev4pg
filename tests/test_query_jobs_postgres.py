@@ -4,7 +4,7 @@ from pathlib import Path
 import secrets
 import subprocess
 import sys
-from threading import Event, Lock
+from threading import Barrier, Event, Lock
 from time import monotonic, sleep
 
 import pytest
@@ -44,6 +44,44 @@ def population(installation):
 
 def submit(env, key, sql="SELECT COUNT(*) AS n FROM events", **options):
     return QueryJobs(env["app"]).submit("tenant-a", "alice", "reader", {"sql": sql, **options}, key)
+
+
+def test_concurrent_retry_race_uses_persisted_identity(population, monkeypatch):
+    jobs = QueryJobs(population["app"])
+    barrier, prepare = Barrier(6), jobs.sql.prepare
+
+    def prepare_together(*args):
+        value = prepare(*args)
+        barrier.wait(timeout=10)
+        return value
+
+    monkeypatch.setattr(jobs.sql, "prepare", prepare_together)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(
+            pool.map(
+                lambda _: jobs.submit(
+                    "tenant-a",
+                    "racing-actor",
+                    "reader",
+                    {"sql": "SELECT id FROM events WHERE id=7"},
+                    "simultaneous-retry",
+                ),
+                range(6),
+            )
+        )
+    assert len({item["id"] for item in results}) == 1
+    with population["app"].transaction("tenant-a") as conn:
+        histories = (
+            conn.execute(
+                select(schema.query_history.c.id).where(
+                    schema.query_history.c.actor == "racing-actor"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert histories == [results[0]["id"]]
+    jobs.cancel("tenant-a", "racing-actor", results[0]["id"])
 
 
 def test_parallel_retries_and_exclusive_claims(population):

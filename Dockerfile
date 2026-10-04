@@ -1,6 +1,6 @@
 FROM python:3.13-slim-bookworm AS build
 WORKDIR /build
-COPY requirements.lock.txt pyproject.toml LICENSE NOTICE ./
+COPY requirements.lock.txt pyproject.toml README.md LICENSE NOTICE ./
 RUN pip install --no-cache-dir -r requirements.lock.txt
 COPY sdd ./sdd
 RUN pip wheel --no-deps --wheel-dir /wheels .
