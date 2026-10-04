@@ -7,6 +7,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | Guide | Contents |
 | --- | --- |
 | [Workspace](USER_GUIDE.md) | Queries, corrections, history and data changes. |
+| [Large tables and applications](APPLICATIONS.md) | Cursor pagination, bulk loading, limits and a runnable application example in the development preview. |
 | [简体中文指南](zh/USER_GUIDE.md) | 简体中文工作区使用说明。 |
 | [Query examples](NL2SQL_EXAMPLES.md) | SQL, expected results and a runnable tutorial. |
 | [Query API](NATURAL_LANGUAGE.md) | Planning, review, confirmation and saved queries. |

@@ -172,10 +172,11 @@ class Catalog:
             raise ValueError("Unknown or ambiguous dataset in this tenant")
         return matches[0]
 
-    def table(self, dataset, conn):
+    def table(self, dataset, conn, *, source_validated=False):
         from .source_catalog import validate_sources
 
-        validate_sources(conn, [dataset])
+        if not source_validated:
+            validate_sources(conn, [dataset])
         return Table(
             dataset["table_name"],
             MetaData(),

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>jevsd-pg · Database workspace</title>
     <link rel="stylesheet" href="/ask-assets/explore.css" />
+    <link rel="stylesheet" href="/ask-assets/workspace.css" />
     <script src="/ask-assets/locales.js" defer></script>
     <script src="/ask-assets/explore.js" defer></script>
     <script src="/ask-assets/features.js" defer></script>
@@ -12,6 +13,10 @@
     <script src="/ask-assets/planning.js" defer></script>
     <script src="/ask-assets/history.js" defer></script>
     <script src="/ask-assets/text-import.js" defer></script>
+    <script src="/ask-assets/result-grid.js" defer></script>
+    <script src="/ask-assets/workspace.js" defer></script>
+    <script src="/ask-assets/csv-import.js" defer></script>
+    <script src="/ask-assets/table-view.js" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -61,12 +66,20 @@
           <label for="datasets" data-i18n="datasets">Datasets</label
           ><button id="all-datasets" class="text-button" data-i18n="allDatasets">Use all</button>
         </div>
-        <select id="datasets" multiple size="7" data-i18n-aria-label="datasets"></select>
+        <input
+          id="catalog-search"
+          type="search"
+          data-i18n-placeholder="findTables"
+          data-i18n-aria-label="findTables"
+        />
+        <select id="datasets" multiple hidden data-i18n-aria-label="datasets"></select>
+        <div id="catalog-browser" class="catalog-browser"></div>
         <div class="catalog-meta">
           <span id="catalog-count">0</span><span id="scope" data-i18n="scopeAll">All datasets</span>
         </div>
-        <p class="hint" data-i18n="datasetHint">Select multiple with Ctrl or Command.</p>
-        <details class="schema-disclosure">
+        <p class="hint" data-i18n="catalogBrowseHint"></p>
+        <button id="open-csv" type="button" class="secondary" data-i18n="csvTitle"></button>
+        <details class="schema-disclosure" hidden>
           <summary data-i18n="columns">Columns & relationships</summary>
           <pre id="schema" data-i18n="catalogDisconnected">Connect to load your datasets.</pre>
         </details>
@@ -162,6 +175,29 @@
           <p class="hint" data-i18n="guideStatesBody"></p>
         </details>
         <form id="query-form" class="query-panel">
+          <div class="query-documents">
+            <div id="query-tabs" data-i18n-aria-label="queryTabs"></div>
+            <button id="new-query-tab" type="button" class="text-button" data-i18n-title="newQuery">
+              +
+            </button>
+          </div>
+          <div class="document-actions">
+            <input id="query-name" maxlength="80" data-i18n-aria-label="queryName" />
+            <span id="draft-status" class="hint" role="status"></span>
+            <button
+              id="open-sql-file"
+              type="button"
+              class="text-button"
+              data-i18n="openSql"
+            ></button>
+            <button
+              id="save-sql-file"
+              type="button"
+              class="text-button"
+              data-i18n="saveSql"
+            ></button>
+            <input id="sql-file" type="file" accept=".sql,.txt,text/plain" hidden />
+          </div>
           <div class="query-toolbar">
             <h2 class="section-label">
               <span class="index">02</span><span data-i18n="query">Query</span>
@@ -174,11 +210,13 @@
                   <option value="sql">SQL</option>
                 </select></label
               >
-              <label><span class="sr-only" data-i18n="plannerMode">Planner</span>
+              <label
+                ><span class="sr-only" data-i18n="plannerMode">Planner</span>
                 <select id="planner-mode" aria-label="Planner" data-i18n-aria-label="plannerMode">
                   <option value="jev" data-i18n="jevMode">JEV</option>
                   <option value="hybrid" data-i18n="hybridMode">Hybrid · LLM + JEV</option>
-                </select></label>
+                </select></label
+              >
               <label for="budget" data-i18n-title="budgetHint"
                 ><span data-i18n="budget">Evaluation limit</span
                 ><input id="budget" type="number" min="0" max="1000" value="100"
@@ -190,7 +228,7 @@
             <label class="sr-only" for="question" data-i18n="question">Your query</label>
             <textarea
               id="question"
-              rows="3"
+              rows="6"
               maxlength="30000"
               spellcheck="false"
               data-i18n-placeholder="questionPlaceholder"
@@ -299,7 +337,42 @@
               <p data-i18n="emptyHint">Choose your data and run a query to begin.</p>
             </div>
             <p id="answer"></p>
+            <div id="result-tools" class="result-tools" hidden>
+              <input
+                id="result-filter"
+                type="search"
+                data-i18n-placeholder="filterResults"
+                data-i18n-aria-label="filterResults"
+              />
+              <button
+                id="export-csv"
+                type="button"
+                class="secondary"
+                data-i18n="exportCsv"
+              ></button>
+              <button
+                id="export-json"
+                type="button"
+                class="text-button"
+                data-i18n="exportJson"
+              ></button>
+            </div>
             <div id="table"></div>
+            <div id="result-pages" class="result-pages" hidden>
+              <span id="result-range" role="status"></span>
+              <button
+                id="result-prev"
+                type="button"
+                class="text-button"
+                data-i18n="previousPage"
+              ></button>
+              <button
+                id="result-next"
+                type="button"
+                class="text-button"
+                data-i18n="nextPage"
+              ></button>
+            </div>
           </div>
           <div
             id="panel-sql"
@@ -340,20 +413,85 @@ Run a query to inspect its plan and evidence.</pre
           <span class="index">04</span><span data-i18n="dataTools">Manage data</span>
         </h2>
         <div class="tools">
+          <details id="csv-panel" class="tool">
+            <summary data-i18n="csvTitle"></summary>
+            <div class="tool-body">
+              <p data-i18n="csvHint"></p>
+              <label for="csv-file" data-i18n="csvFile"></label>
+              <input
+                id="csv-file"
+                type="file"
+                accept=".csv,.tsv,text/csv,text/tab-separated-values"
+              />
+              <div class="csv-settings">
+                <label
+                  ><span data-i18n="csvName"></span><input id="csv-name" maxlength="120"
+                /></label>
+                <label
+                  ><span data-i18n="csvDelimiter"></span
+                  ><select id="csv-delimiter">
+                    <option value="auto" data-i18n="detectDelimiter"></option>
+                    <option value="," data-i18n="commaDelimiter"></option>
+                    <option value=";" data-i18n="semicolonDelimiter"></option>
+                    <option value="tab" data-i18n="tabDelimiter"></option>
+                    <option value="|" data-i18n="pipeDelimiter"></option></select
+                ></label>
+              </div>
+              <label class="inline-check"
+                ><input id="csv-null" type="checkbox" checked /><span data-i18n="csvNull"></span
+              ></label>
+              <div id="csv-columns" class="csv-columns"></div>
+              <div id="csv-sample" class="csv-sample"></div>
+              <p id="csv-status" role="status"></p>
+              <div class="actions">
+                <button
+                  id="csv-preview"
+                  type="button"
+                  class="secondary"
+                  data-i18n="csvPreview"
+                ></button>
+                <button id="csv-create" type="button" disabled data-i18n="csvCreate"></button>
+              </div>
+            </div>
+          </details>
           <details id="text-import-panel" class="tool">
             <summary data-extract-label="title"></summary>
             <div class="tool-body">
               <p data-extract-label="hint"></p>
               <fieldset id="extract-definition">
-                <label for="extract-destination" data-extract-label="destination"></label><select id="extract-destination"></select>
-                <label for="extract-dataset-name" data-extract-label="name"></label><input id="extract-dataset-name" maxlength="120" />
-                <label for="extract-row" data-extract-label="row"></label><textarea id="extract-row" rows="2" maxlength="4000"></textarea>
-                <label for="extract-mode" data-extract-label="mode"></label><select id="extract-mode"></select>
-                <h3 data-extract-label="columns"></h3><div id="extract-columns"></div>
-                <button id="extract-add-column" type="button" class="secondary" data-extract-label="add"></button>
-                <label for="extract-source" data-extract-label="source"></label><textarea id="extract-source" rows="8" spellcheck="false"></textarea>
-                <div class="actions"><button id="extract-file-button" type="button" class="secondary" data-extract-label="file"></button><span id="extract-file-name"></span></div><input id="extract-file" type="file" accept=".txt,text/plain" hidden />
-                <label class="extract-check"><input id="extract-automatic" type="checkbox" /><span data-extract-label="automatic"></span></label>
+                <label for="extract-destination" data-extract-label="destination"></label
+                ><select id="extract-destination"></select>
+                <label for="extract-dataset-name" data-extract-label="name"></label
+                ><input id="extract-dataset-name" maxlength="120" />
+                <label for="extract-row" data-extract-label="row"></label
+                ><textarea id="extract-row" rows="2" maxlength="4000"></textarea>
+                <label for="extract-mode" data-extract-label="mode"></label
+                ><select id="extract-mode"></select>
+                <h3 data-extract-label="columns"></h3>
+                <div id="extract-columns"></div>
+                <button
+                  id="extract-add-column"
+                  type="button"
+                  class="secondary"
+                  data-extract-label="add"
+                ></button>
+                <label for="extract-source" data-extract-label="source"></label
+                ><textarea id="extract-source" rows="8" spellcheck="false"></textarea>
+                <div class="actions">
+                  <button
+                    id="extract-file-button"
+                    type="button"
+                    class="secondary"
+                    data-extract-label="file"
+                  ></button
+                  ><span id="extract-file-name"></span>
+                </div>
+                <input id="extract-file" type="file" accept=".txt,text/plain" hidden />
+                <label class="extract-check"
+                  ><input id="extract-automatic" type="checkbox" /><span
+                    data-extract-label="automatic"
+                  ></span
+                ></label>
                 <button id="extract-run" type="button" data-extract-label="run"></button>
               </fieldset>
               <p id="extract-status" role="status" aria-live="polite"></p>
@@ -434,5 +572,60 @@ Run a query to inspect its plan and evidence.</pre
         </footer>
       </main>
     </div>
+    <dialog id="cell-dialog" class="cell-dialog">
+      <div class="sidebar-heading">
+        <h2 id="cell-title"></h2>
+        <button id="cell-close" type="button" class="text-button" data-i18n="closeCell"></button>
+      </div>
+      <p id="cell-kind" class="hint"></p>
+      <textarea id="cell-value" rows="12" readonly></textarea>
+      <button id="cell-copy" type="button" class="secondary" data-i18n="copyCell"></button>
+    </dialog>
+    <dialog id="table-browser" class="table-browser-dialog" aria-labelledby="browse-title">
+      <div class="browse-heading">
+        <h2 id="browse-title"></h2>
+        <button id="browse-close" type="button" class="secondary" data-i18n="closeCell"></button>
+      </div>
+      <p class="hint" data-i18n="liveBrowseHint"></p>
+      <form id="browse-filter-form" class="browse-filters">
+        <label
+          ><span data-i18n="filterColumn"></span
+          ><select id="browse-column"></select
+        ></label>
+        <label
+          ><span data-i18n="filterOperator"></span
+          ><select id="browse-op">
+            <option value="eq">=</option>
+            <option value="ne">≠</option>
+            <option value="gte">≥</option>
+            <option value="lte">≤</option>
+            <option value="prefix" data-i18n="prefixFilter"></option>
+            <option value="is_null">IS NULL</option>
+            <option value="not_null">IS NOT NULL</option>
+          </select></label
+        >
+        <label
+          ><span data-i18n="filterValue"></span><input id="browse-value" maxlength="4000"
+        /></label>
+        <button type="submit" data-i18n="applyFilter"></button>
+        <button id="browse-reset" type="button" class="secondary" data-i18n="resetFilter"></button>
+      </form>
+      <details class="browse-projection">
+        <summary data-i18n="chooseColumns"></summary>
+        <div id="browse-columns"></div>
+      </details>
+      <p id="browse-status" class="hint" role="status"></p>
+      <div id="browse-grid" class="browse-grid"></div>
+      <div class="browse-footer">
+        <button id="browse-prev" type="button" class="secondary" data-i18n="previousPage"></button
+        ><button id="browse-next" type="button" class="secondary" data-i18n="nextPage"></button
+        ><button
+          id="browse-export"
+          type="button"
+          class="text-button"
+          data-i18n="exportPage"
+        ></button>
+      </div>
+    </dialog>
   </body>
 </html>

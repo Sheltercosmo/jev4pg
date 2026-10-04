@@ -1,7 +1,7 @@
 """Catalog-driven API. Every route uses the parent application's token identity."""
 
 import os
-from typing import Literal
+from typing import Any, Literal
 from sqlglot.errors import SqlglotError
 from fastapi import Depends, HTTPException, Query
 from pydantic import Field, StrictBool, StrictStr
@@ -42,6 +42,15 @@ class LinkInput(Strict):
     target_column: str
 
 
+class CsvInput(Strict):
+    name: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=5_000_000)
+    delimiter: Literal["auto", ",", ";", "\t", "|"] = "auto"
+    null_empty: bool = True
+    columns: list[ColumnInput] | None = Field(default=None, min_length=1, max_length=64)
+    fingerprint: str | None = Field(default=None, max_length=64)
+
+
 class QueryInput(Strict):
     parent_history_id: str | None = Field(default=None, max_length=64)
     sql: str = Field(min_length=1, max_length=30000)
@@ -50,6 +59,19 @@ class QueryInput(Strict):
     reject: float = Field(default=0.2, ge=0, le=1)
     allow_all: bool = False
     max_affected: int = Field(default=1000, ge=1, le=1000)
+
+
+class RowFilter(Strict):
+    column: str = Field(min_length=1, max_length=63)
+    op: Literal["eq", "ne", "gt", "gte", "lt", "lte", "in", "prefix", "is_null", "not_null"]
+    value: Any = None
+
+
+class ScanInput(Strict):
+    columns: list[str] | None = Field(default=None, min_length=1, max_length=64)
+    filters: list[RowFilter] = Field(default_factory=list, max_length=16)
+    after: list[Any] | None = Field(default=None, min_length=1, max_length=64)
+    limit: int = Field(default=100, ge=1, le=1000)
 
 
 class QuestionInput(Strict):
@@ -180,6 +202,25 @@ def mount(app, executor, identity, reviewer):
     def create(body: DatasetInput, p=Depends(reviewer)):
         return serial(catalog.create(p["tenant"], **body.model_dump()))
 
+    def csv_preview(body):
+        from .csv_import import preview_csv
+
+        return preview_csv(**body.model_dump(exclude={"fingerprint"}))
+
+    @app.post("/datasets/csv/preview", tags=["Generic datasets"])
+    def preview_import(body: CsvInput, p=Depends(reviewer)):
+        preview, _ = csv_preview(body)
+        return preview
+
+    @app.post("/datasets/csv", tags=["Generic datasets"])
+    def import_csv(body: CsvInput, p=Depends(reviewer)):
+        preview, rows = csv_preview(body)
+        if not preview["valid"] or body.fingerprint != preview["fingerprint"]:
+            raise ValueError("Preview the current CSV content and column types before importing")
+        return serial(
+            catalog.create(p["tenant"], name=body.name, rows=rows, columns=preview["columns"])
+        )
+
     @app.post("/datasets/relationships", tags=["Generic datasets"])
     def link(body: LinkInput, p=Depends(reviewer)):
         return catalog.link(p["tenant"], **body.model_dump())
@@ -195,6 +236,13 @@ def mount(app, executor, identity, reviewer):
             .limit(100)
         )
         return sql.execute(p["tenant"], query.sql(dialect="postgres"))
+
+    @app.post("/datasets/{dataset_id}/scan", tags=["Generic datasets"])
+    def scan(dataset_id: str, body: ScanInput, p=Depends(identity)):
+        """Read a bounded page in primary-key order; pass next_after for the next page."""
+        from .browse import TableBrowser
+
+        return TableBrowser(executor.db).scan(p["tenant"], dataset_id, **body.model_dump())
 
     def execute_plan(plan, principal, budget):
         try:

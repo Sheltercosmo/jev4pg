@@ -441,6 +441,7 @@ def execute_native(
         rows = [serial(dict(row)) for row in result.mappings()]
         manifest = {
             "execution_backend": "rust_postgresql",
+            "result_columns": list(result.keys()),
             "admission_id": admission.identity,
             "native_version": version,
             "native_scheduler": "shared_round_robin",

@@ -4,7 +4,17 @@
 
 Start the service, open [/ask/en](http://127.0.0.1:8000/ask/en), and connect with your database API token. The server's JEV and LLM credentials are separate; do not paste them into the workspace token field. Select the datasets relevant to your question.
 
-## Choose how to query
+## Browse and reuse work
+
+The development preview adds a searchable catalog, query tabs and a result grid. Expand a table to inspect columns, browse live rows or open a SQL draft. Live browsing filters in the database and advances by primary key. Select only the columns you need. See [large-table and application usage](APPLICATIONS.md).
+
+Name query tabs, reopen `.sql` files and save drafts with Ctrl/Cmd+S. Drafts remain in the current browser tab's session; completed executions remain in Recent queries. In SQL mode, Ctrl/Cmd+Enter runs the selected text when a selection exists, otherwise the full editor. Opening a draft never runs it automatically.
+
+Result-grid search, sorting and exports operate on returned rows, not the full source table. Open a cell to inspect or copy its complete value. JSON retains NULL values and exact decimal strings. CSV leaves NULL cells blank and prefixes formula-like text for spreadsheet safety; use JSON when those distinctions matter.
+
+For small files, choose Import CSV, review column types, then create the table. Changing the file or settings requires a fresh preview. Every row is checked before creation. Use PostgreSQL bulk loading and attachments for larger files.
+
+## Query modes
 
 | Mode | Use it for | How it works |
 | --- | --- | --- |

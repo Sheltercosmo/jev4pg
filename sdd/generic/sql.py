@@ -424,7 +424,17 @@ class SQLService:
         return sql, params
 
     def snapshots(self, tenant, datasets, conn=None):
-        return {d["id"]: self.catalog.rows(tenant, d, conn, limit=50001) for d in datasets}
+        snapshots, remaining = {}, 50000
+        for dataset in datasets:
+            rows = self.catalog.rows(tenant, dataset, conn, limit=remaining + 1)
+            remaining -= len(rows)
+            if remaining < 0:
+                raise ValueError(
+                    "Semantic queries and mutation previews support up to 50,000 source rows; "
+                    "use native semantic execution or a smaller registered dataset"
+                )
+            snapshots[dataset["id"]] = rows
+        return snapshots
 
     def eligible_rows(self, tenant, tree, bindings, dataset, rows):
         if len(bindings) != 1 or not isinstance(tree, (exp.Select, exp.Update, exp.Delete)):
@@ -692,10 +702,6 @@ class SQLService:
                 progress=progress,
             )
         initial = {} if native_read else self.snapshots(tenant, datasets)
-        if sum(len(v) for v in initial.values()) > 50000:
-            raise ValueError(
-                "Semantic queries and mutation previews support up to 50,000 source rows; use a smaller registered dataset"
-            )
         source_hash = None if native_read else digest(serial(initial))
         budget = [max_evaluations]
         # Lower in place to preserve SQLGlot source identities used in lexical bindings.
@@ -809,6 +815,7 @@ class SQLService:
                 result = connection.execute(text(bounded), params)
                 if len(result.keys()) != len(set(result.keys())):
                     raise ValueError("Duplicate output names require distinct SQL aliases")
+                manifest["result_columns"] = list(result.keys())
                 rows = [serial(dict(row)) for row in result.mappings()]
                 manifest["truncated"] = len(rows) > 1000
                 rows = rows[:1000]

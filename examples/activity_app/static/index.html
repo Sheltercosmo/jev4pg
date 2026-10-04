@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Activity monitor</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>APPLICATION EXAMPLE / JEVSD-PG</p>
+        <h1>Activity monitor</h1>
+        <p>Inspect live records without loading the full table.</p>
+      </header>
+      <form id="filters">
+        <label
+          >Category<select id="category">
+            <option value="">All categories</option>
+            <option>normal</option>
+            <option>warning</option>
+          </select></label
+        ><label
+          >Minimum amount<input id="minimum" inputmode="decimal" placeholder="No minimum" /></label
+        ><button>Apply filters</button>
+      </form>
+      <p id="status" role="status">Loading…</p>
+      <div class="grid">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Category</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <footer>
+        <button id="back" disabled>Previous</button><button id="next" disabled>Next</button
+        ><button id="refresh">Refresh from start</button><span>Live pages · primary-key order</span>
+      </footer>
+    </main>
+  </body>
+</html>

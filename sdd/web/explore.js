@@ -2,6 +2,10 @@ const $ = (id) => document.getElementById(id);
 let catalog = [],
   pending = null,
   busy = false;
+let connectionRevision = 0;
+$("token").addEventListener("input", () => {
+  connectionRevision++;
+});
 let draft = {};
 try {
   draft = JSON.parse(sessionStorage.getItem("sdd-workspace") || "{}");
@@ -24,6 +28,7 @@ function text(parent, tag, value) {
 }
 
 async function request(path, body) {
+  const revision = connectionRevision;
   const token = $("token").value.trim();
   if (!token) throw new Error(t("tokenRequired"));
   const response = await fetch(path, {
@@ -32,6 +37,7 @@ async function request(path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await response.json();
+  if (revision !== connectionRevision) throw new Error(t("connectionChanged"));
   if (!response.ok) {
     const error = new Error(apiErrorMessage(response.status, data));
     error.data = data;
@@ -62,6 +68,7 @@ function schema() {
   $("schema").textContent = datasets.map(describeDataset).join("\n\n") || t("catalogEmpty");
   $("scope").textContent = ids.length ? t("scopeSelected", { count: ids.length }) : t("scopeAll");
   $("catalog-count").textContent = t("catalogCount", { count: catalog.length });
+  document.dispatchEvent(new Event("sdd:catalog"));
   $("examples").replaceChildren();
   text($("examples"), "span", t("examples"));
   const dataset = datasets[0];
@@ -114,7 +121,8 @@ async function connect() {
   }
 }
 
-function renderTable(rows, isPlan = false) {
+function renderTable(rows, isPlan = false, columns = []) {
+  if (window.ResultGrid) return ResultGrid.render(rows, columns, isPlan);
   $("table").replaceChildren();
   if (!rows.length) {
     text($("table"), "p", t(isPlan ? "planRows" : "noRows")).className = "table-message";
@@ -154,6 +162,7 @@ function selectResultTab(name) {
 }
 
 function clearOutput() {
+  window.ResultGrid?.clear();
   $("metrics").replaceChildren();
   $("table").replaceChildren();
   $("answer").textContent = "";
@@ -172,9 +181,13 @@ function show(data) {
   $("sql").textContent = data.logical_sql || data.plan?.logical_sql || t("noSql");
   $("details").textContent = JSON.stringify(data, null, 2);
   const held = data.manifest?.result_output_state === "NOT_EVALUATED";
-  renderTable(data.result || data.before_sample || [], !data.manifest || held);
+  renderTable(
+    held ? [] : data.result || data.before_sample || [],
+    !data.manifest || held,
+    held ? [] : data.manifest?.result_columns || [],
+  );
   if (held) $("table").firstElementChild.textContent = t("heldResultHint");
-  $("review-sql").hidden = !(data.review_required && (data.logical_sql || data.plan?.logical_sql));
+  $("review-sql").hidden = !(data.logical_sql || data.plan?.logical_sql);
   renderPlanningReview(data);
   const manifest = data.manifest;
   selectResultTab(!manifest || data.review_required || held ? "sql" : "table");
@@ -201,6 +214,9 @@ function show(data) {
     if (!manifest.complete) $("answer").textContent += " · " + t("partialHint");
   }
   if (manifest) {
+    if (manifest.execution_ms != null)
+      text($("metrics"), "span", t("resultTime", { time: manifest.execution_ms })).className =
+        "execution-time";
     for (const [value, label] of [
       [manifest.source_rows, "sourceRows"],
       [manifest.semantic_coverage?.reused, "reused"],
@@ -231,16 +247,31 @@ function showError(error) {
 }
 
 function updateMode() {
+  updateRunLabel();
   $("question").placeholder = t(
     $("mode").value === "sql" ? "sqlPlaceholder" : "questionPlaceholder",
   );
   $("preview").disabled = busy || $("mode").value === "sql";
   $("planner-mode").disabled = busy || $("mode").value === "sql";
-  const helpKey = $("mode").value === "sql"
-    ? "plannerSqlHelp"
-    : $("planner-mode").value === "hybrid" ? "plannerHybridHelp" : "plannerJevHelp";
+  const helpKey =
+    $("mode").value === "sql"
+      ? "plannerSqlHelp"
+      : $("planner-mode").value === "hybrid"
+        ? "plannerHybridHelp"
+        : "plannerJevHelp";
   $("planner-help").textContent = t(helpKey);
 }
+
+function updateRunLabel() {
+  if (busy) return;
+  const editor = $("question");
+  const selection = editor.value.slice(editor.selectionStart, editor.selectionEnd).trim();
+  $("run").firstElementChild.textContent = t(
+    $("mode").value === "sql" && selection ? "runSelection" : "run",
+  );
+}
+document.addEventListener("selectionchange", updateRunLabel);
+$("question").addEventListener("input", updateRunLabel);
 
 async function run(execute) {
   if (busy) return;
@@ -253,7 +284,9 @@ async function run(execute) {
   $("status").textContent = t("planning");
   try {
     ensureHistoryScope();
-    const question = $("question").value;
+    const editor = $("question");
+    const selection = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+    const question = $("mode").value === "sql" && selection.trim() ? selection : editor.value;
     const budget = Number($("budget").value);
     if (!question.trim()) throw new Error(t("queryRequired"));
     if (!Number.isInteger(budget) || budget < 0 || budget > 1000)

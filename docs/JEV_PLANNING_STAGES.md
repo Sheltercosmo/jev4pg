@@ -2,6 +2,8 @@
 
 The existing [hybrid planning DAG](ARCHITECTURE.md#hybrid-stage-placement) remains in place. This document records the native execution stages and why they wait or run concurrently.
 
+Application table pages bypass semantic planning. Authentication, source pinning and typed filter validation precede the PostgreSQL read; unrelated requests use the connection pool concurrently. Paging adds no JEV calls and no dependency between existing semantic stages. The Python fallback's source-row budget is shared across tables and stops collection before another table exceeds it. CSV type checks and result-grid operations also remain deterministic. See [application reads](APPLICATIONS.md).
+
 Native container configuration and extension migration run before service readiness. They establish provider identity, registry privileges and persistence contracts without adding query-time JEV stages. The container deployment retains the same shared scheduler and independent branches. Registry backup registration preserves evidence and admission state across recovery; it does not authorize replay of unfinished provider work.
 
 Installation preflight runs before migration writes, under the migration lock. It checks object ownership and catalog contracts using local PostgreSQL metadata. It performs no inference and adds no dependency between query stages. See [installation ownership](adr/0006-installation-ownership.md).

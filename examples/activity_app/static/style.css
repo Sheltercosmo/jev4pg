@@ -1,0 +1,123 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #182334;
+  background: #f4f6f9;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 1250px;
+  margin: 60px auto;
+  padding: 0 24px;
+}
+header p {
+  color: #617080;
+  font-size: 14px;
+}
+header p:first-child {
+  font: 11px monospace;
+  letter-spacing: 0.12em;
+}
+h1 {
+  font-size: 36px;
+  margin: 12px 0;
+}
+form {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 32px 0 20px;
+}
+label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+input,
+select,
+button {
+  border: 1px solid #ccd4df;
+  border-radius: 6px;
+  padding: 11px 14px;
+  font: inherit;
+  background: #fff;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+form button {
+  background: #22344f;
+  color: #fff;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.grid {
+  max-height: 55vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #dbe1e8;
+  border-radius: 8px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+td,
+th {
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid #e8ecf1;
+  white-space: nowrap;
+}
+th {
+  position: sticky;
+  top: 0;
+  background: #eef2f6;
+}
+td:nth-child(4) {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+footer span {
+  margin-left: auto;
+  color: #617080;
+  font-size: 12px;
+}
+#status {
+  font-size: 12px;
+  color: #617080;
+}
+@media (max-width: 600px) {
+  main {
+    margin: 28px auto;
+    padding: 0 16px;
+  }
+  h1 {
+    font-size: 28px;
+  }
+  form label {
+    flex: 1;
+  }
+  footer span {
+    width: 100%;
+  }
+}

@@ -17,6 +17,7 @@ from .natural import ask
 from pathlib import Path
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from .json_response import ExactJSONResponse
 from .maintenance import create_policy, refresh
 
 
@@ -130,6 +131,7 @@ def create_app(executor=None, tokens=None):
                 await asyncio.to_thread(worker.join, 3)
 
     app = FastAPI(
+        default_response_class=ExactJSONResponse,
         title="jevsd-pg",
         version=__version__,
         lifespan=lifespan,

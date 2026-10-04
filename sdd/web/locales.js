@@ -860,6 +860,70 @@ Object.assign(messages.zh, {
   "hybridFactsNote": "以下内容描述拟议 SQL 的实际行为，不代表它一定符合你的本意。"
 });
 
+Object.assign(messages.en, {
+  findTables: "Find tables or columns…", catalogBrowseHint: "Check tables for language queries. Open a table to inspect its columns.",
+  browseRows: "Browse rows", writeQuery: "New SQL query", insertColumn: "Insert column", readOnlyTable: "Read only",
+  queryTabs: "Open queries", newQuery: "New query", queryName: "Query name", untitledQuery: "Query {number}",
+  closeQuery: "Close query", sessionSaved: "Draft saved in this browser tab", draftUnsaved: "Draft could not be saved locally",
+  openSql: "Open SQL", saveSql: "Save SQL", runSelection: "Run selection", queryFileLimit: "Choose a UTF-8 file up to 30,000 characters.",
+  filterResults: "Filter returned rows…", exportCsv: "Export CSV", exportJson: "Export JSON",
+  previousPage: "Previous", nextPage: "Next", resultRange: "{start}–{end} of {count} returned rows",
+  resultFiltered: "{count} of {total} returned rows match", closeCell: "Close", copyCell: "Copy value", copiedCell: "Copied",
+  nullCell: "NULL · no stored value", textCell: "Text", valueCell: "Value", copyFailed: "Copy unavailable. Select the value and copy it manually.",
+  resultTime: "{time} ms", browsingTable: "Browsing {name} · first 100 rows", csvTitle: "Import CSV",
+  csvHint: "UTF-8 CSV or TSV, up to 5 MB and 10,000 rows. Review detected types before creating a table. Leading-zero identifiers stay text.",
+  csvFile: "File", csvName: "Table name", csvDelimiter: "Delimiter", detectDelimiter: "Detect automatically", commaDelimiter: "Comma",
+  semicolonDelimiter: "Semicolon", tabDelimiter: "Tab", pipeDelimiter: "Pipe", csvNull: "Treat empty cells as NULL",
+  csvPreview: "Preview import", csvCreate: "Create table", csvPreviewRequired: "Preview again after changing the file or column settings.",
+  csvChoose: "Choose a file and table name first.", csvTooLarge: "Choose a UTF-8 file no larger than 5 MB.",
+  csvSummary: "{rows} rows · {columns} columns · showing the first 20 rows", csvErrors: "Import held. Check {count} reported conversion errors.",
+  csvRowError: "Row {row}, {column}: {reason}", csvTypeError: "The value does not match the selected type.",
+  csvImported: "Created {name}. Open it in the catalog to browse or query.", csvWorking: "Checking every row…", csvImporting: "Creating table…",
+  noCatalogMatches: "No matching tables or columns.", tabLimit: "Close a query before opening more (maximum 12).",
+  closeDraft: "Close this query draft? Its completed runs remain in Recent queries.",
+});
+Object.assign(messages.zh, {
+  findTables: "搜索表名或字段…", catalogBrowseHint: "勾选自然语言查询要使用的表。展开表名可查看字段。",
+  browseRows: "浏览数据", writeQuery: "新建 SQL 查询", insertColumn: "插入字段", readOnlyTable: "只读",
+  queryTabs: "已打开的查询", newQuery: "新建查询", queryName: "查询名称", untitledQuery: "查询 {number}",
+  closeQuery: "关闭查询", sessionSaved: "草稿已保存在当前浏览器标签页", draftUnsaved: "草稿未能保存到本地",
+  openSql: "打开 SQL", saveSql: "保存 SQL", runSelection: "运行选中内容", queryFileLimit: "请选择不超过 30,000 字符的 UTF-8 文件。",
+  filterResults: "在已返回的数据中筛选…", exportCsv: "导出 CSV", exportJson: "导出 JSON",
+  previousPage: "上一页", nextPage: "下一页", resultRange: "第 {start}–{end} 行，共返回 {count} 行",
+  resultFiltered: "已返回 {total} 行，其中 {count} 行符合筛选条件", closeCell: "关闭", copyCell: "复制内容", copiedCell: "已复制",
+  nullCell: "NULL · 无存储值", textCell: "文本", valueCell: "值", copyFailed: "无法自动复制，请选中内容后手动复制。",
+  resultTime: "{time} 毫秒", browsingTable: "正在浏览 {name}，最多显示前 100 行", csvTitle: "导入 CSV",
+  csvHint: "支持 UTF-8 编码的 CSV 或 TSV，最多 5 MB、10,000 行。检查字段类型后再建表。带前导零的编号默认保留为文本。",
+  csvFile: "文件", csvName: "表名", csvDelimiter: "分隔符", detectDelimiter: "自动识别", commaDelimiter: "逗号",
+  semicolonDelimiter: "分号", tabDelimiter: "制表符", pipeDelimiter: "竖线", csvNull: "将空单元格记为 NULL",
+  csvPreview: "预览导入", csvCreate: "创建数据表", csvPreviewRequired: "文件或字段设置已改变，请重新预览。",
+  csvChoose: "请先选择文件并填写表名。", csvTooLarge: "请选择不超过 5 MB 的 UTF-8 文件。",
+  csvSummary: "共 {rows} 行、{columns} 列，预览前 20 行", csvErrors: "导入暂未执行，请检查列出的 {count} 处类型转换错误。",
+  csvRowError: "第 {row} 条记录，字段 {column}：{reason}", csvTypeError: "该值不符合所选字段类型。",
+  csvImported: "已创建 {name}，可从左侧数据目录浏览或查询。", csvWorking: "正在逐行校验…", csvImporting: "正在创建数据表…",
+  noCatalogMatches: "没有匹配的表或字段。", tabLimit: "最多同时打开 12 个查询，请先关闭一个。",
+  closeDraft: "关闭此查询草稿？已运行的查询仍保留在“最近查询”中。",
+});
+
+Object.assign(messages.en, {
+  connectionChanged: "Connection changed. Run the request again.",
+  liveBrowseHint: "Live data, 100 rows per page in primary-key order. Filters run in the database. Changes between pages may affect what you see.",
+  filterColumn: "Filter column", filterOperator: "Condition", filterValue: "Value", prefixFilter: "Starts with",
+  applyFilter: "Apply", resetFilter: "Clear filter", chooseColumns: "Select columns, then Apply",
+  exportPage: "Export this page", loadingPage: "Loading page…", livePage: "Page {page} · {rows} rows · {time} ms",
+  lastPage: "End of results", chooseOneColumn: "Select at least one column.", noFilter: "All rows",
+  booleanFilterHint: "Enter true or false for this boolean column.",
+});
+Object.assign(messages.zh, {
+  connectionChanged: "连接已更换，请重新发起请求。",
+  liveBrowseHint: "每页读取 100 行，按主键排序，筛选直接在数据库内执行。翻页期间的数据变更可能影响结果。",
+  filterColumn: "筛选字段", filterOperator: "条件", filterValue: "值", prefixFilter: "开头是",
+  applyFilter: "应用", resetFilter: "清除筛选", chooseColumns: "选择显示字段，再点击“应用”",
+  exportPage: "导出当前页", loadingPage: "正在读取…", livePage: "第 {page} 页 · {rows} 行 · {time} 毫秒",
+  lastPage: "已到末页", chooseOneColumn: "请至少选择一个字段。", noFilter: "全部记录",
+  booleanFilterHint: "布尔字段请输入 true 或 false。",
+});
+
 document.querySelectorAll("[data-i18n]").forEach((element) => {
   element.textContent = t(element.dataset.i18n);
 });

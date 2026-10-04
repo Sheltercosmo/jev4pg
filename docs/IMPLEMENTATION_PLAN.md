@@ -23,6 +23,8 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 
 ## Remaining work
 
+The immediate priority is practical application use: efficient large-table reads, a usable analyst workspace and a runnable application path. The development preview adds cursor pagination, reviewed CSV import and an [activity monitor](../examples/activity_app/README.md). Validate these with real PostgreSQL populations and concurrent requests before expanding organization and remote-source features. See [application contracts](APPLICATIONS.md).
+
 | Area | Needed before a native production release |
 | --- | --- |
 | Relational coverage | Broader dependent query shapes and explicit provenance across joins and projections. |
