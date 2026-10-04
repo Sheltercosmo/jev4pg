@@ -307,7 +307,11 @@ class FeatureRegistry:
                 reason=reason,
                 created_at=now(),
             )
+            from .feature_publication import lock_definitions
+
+            lock_definitions(connection, tenant, dataset["id"])
             connection.execute(insert(schema.feature_reviews).values(**record))
+            self.enqueue(tenant, dataset["id"], connection)
         return record
 
     def preview(self, tenant, identity, decisions, max_evaluations=100):
@@ -352,6 +356,7 @@ class FeatureRegistry:
     ):
         from sqlglot import exp
         from .sql import SQLService, col, literal
+        from . import feature_publication
 
         dataset = self.catalog.get(tenant, dataset_id)
         features = self.list(tenant, dataset_id, active=True)
@@ -359,6 +364,7 @@ class FeatureRegistry:
             features = [feature for feature in features if feature["maintain"]]
         if not features:
             return {"manifest": {"complete": True}, "run_id": None}
+        contract = feature_publication.capture(self, tenant, dataset, features)
         columns = [col(key) for key in dataset["primary_key"]]
         columns += [
             exp.alias_(
@@ -380,23 +386,11 @@ class FeatureRegistry:
             max_evaluations=max_evaluations,
             progress=progress,
         )
-        if publish and result["manifest"]["complete"]:
-            with self.db.transaction(tenant) as connection:
-                connection.execute(
-                    update(schema.features)
-                    .where(
-                        schema.features.c.tenant == tenant,
-                        schema.features.c.id.in_([feature["id"] for feature in features]),
-                        schema.features.c.status == "active",
-                    )
-                    .values(
-                        materialization={
-                            "run_id": result["run_id"],
-                            "source_snapshot": result["manifest"]["source_snapshot"],
-                            "refreshed_at": now(),
-                        }
-                    )
-                )
+        result["refresh_contract"] = contract
+        if publish:
+            with feature_publication.publication_transaction(self, tenant, dataset) as connection:
+                outcome = feature_publication.publish(self, connection, tenant, dataset, result)
+                feature_publication.record(connection, tenant, result, outcome)
         return result
 
     def enqueue(self, tenant, dataset_id, connection):
@@ -435,6 +429,8 @@ class FeatureRegistry:
         return identity
 
     def work_one(self, tenant, decisions, stop_event=None):
+        from . import feature_publication
+
         with self.db.transaction(tenant) as connection:
             job = (
                 connection.execute(
@@ -500,6 +496,7 @@ class FeatureRegistry:
                         schema.maintenance_jobs.c.tenant == tenant,
                         schema.maintenance_jobs.c.lease_token == token,
                         schema.maintenance_jobs.c.state == "running",
+                        schema.maintenance_jobs.c.lease_until > time.time(),
                     )
                     .values(lease_until=time.time() + 120)
                 )
@@ -516,16 +513,49 @@ class FeatureRegistry:
             )
             if not result["manifest"]["complete"]:
                 error = "UnresolvedFeatureValues"
+            dataset = self.catalog.get(tenant, job["dataset_id"])
         except Exception as exc:
-            error = getattr(exc, "code", type(exc).__name__)
-        with self.db.transaction(tenant) as connection:
-            changed = connection.execute(
+            error = getattr(exc, "code", None) or type(exc).__name__
+        transaction = (
+            feature_publication.publication_transaction(self, tenant, dataset)
+            if not error and result.get("run_id")
+            else self.db.transaction(tenant)
+        )
+        with transaction as connection:
+            current = connection.execute(
+                select(schema.maintenance_jobs.c.id)
+                .where(
+                    schema.maintenance_jobs.c.id == job["id"],
+                    schema.maintenance_jobs.c.tenant == tenant,
+                    schema.maintenance_jobs.c.lease_token == token,
+                    schema.maintenance_jobs.c.state == "running",
+                    schema.maintenance_jobs.c.lease_until > time.time(),
+                )
+                .with_for_update()
+            ).scalar_one_or_none()
+            if current is None or (stop_event is not None and stop_event.is_set()):
+                if result and result.get("run_id"):
+                    feature_publication.record(
+                        connection, tenant, result, feature_publication.blocked("RefreshLeaseLost")
+                    )
+                return True
+            if not error and result.get("run_id"):
+                outcome = feature_publication.publish(self, connection, tenant, dataset, result)
+                feature_publication.record(connection, tenant, result, outcome)
+                if outcome["output_state"] != "VALUE":
+                    error = outcome["reason"]
+            elif result and result.get("run_id"):
+                feature_publication.record(
+                    connection, tenant, result, feature_publication.blocked(error)
+                )
+            finished = connection.execute(
                 update(schema.maintenance_jobs)
                 .where(
                     schema.maintenance_jobs.c.id == job["id"],
                     schema.maintenance_jobs.c.tenant == tenant,
                     schema.maintenance_jobs.c.lease_token == token,
                     schema.maintenance_jobs.c.state == "running",
+                    schema.maintenance_jobs.c.lease_until > time.time(),
                 )
                 .values(
                     state=("failed" if job["attempts"] >= 2 else "pending")
@@ -537,25 +567,6 @@ class FeatureRegistry:
                     run_id=result.get("run_id") if result else None,
                 )
             )
-            if changed.rowcount and not error and result.get("run_id"):
-                feature_ids = [
-                    item["feature_id"]
-                    for item in result["manifest"].get("evidence", [])
-                    if item.get("feature_id")
-                ]
-                connection.execute(
-                    update(schema.features)
-                    .where(
-                        schema.features.c.tenant == tenant,
-                        schema.features.c.id.in_(feature_ids),
-                        schema.features.c.status == "active",
-                    )
-                    .values(
-                        materialization={
-                            "run_id": result["run_id"],
-                            "source_snapshot": result["manifest"]["source_snapshot"],
-                            "refreshed_at": now(),
-                        }
-                    )
-                )
+            if finished.rowcount != 1:
+                raise ValueError("Refresh lease expired before publication commit")
         return True

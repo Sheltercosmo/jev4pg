@@ -151,8 +151,10 @@ $("refresh-features").addEventListener("click", (event) =>
       2,
     );
     $("feature-details").parentElement.open = true;
-    $("feature-status").textContent = result.manifest.complete
-      ? t("coverageComplete")
-      : t("coveragePartial");
+    $("feature-status").textContent = !result.manifest.complete
+      ? t("coveragePartial")
+      : result.publication && result.publication.output_state !== "VALUE"
+        ? t("featurePublicationHeld")
+        : t("coverageComplete");
   }),
 );

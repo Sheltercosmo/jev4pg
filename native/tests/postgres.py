@@ -356,6 +356,9 @@ def verify(connection, config):
         from application_upgrade import verify_application_upgrade
 
         checks.extend(verify_application_upgrade(connection, release_python))
+    from feature_publication import verify_feature_publication
+
+    checks.extend(verify_feature_publication(connection))
     return {
         "checks": checks,
         "passed": len(checks),

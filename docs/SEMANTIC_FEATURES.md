@@ -74,6 +74,10 @@ With `maintain: true`, activation and committed writes enqueue a dataset refresh
 
 Use `POST /features/refresh` with `{"dataset_id":"...","max_evaluations":1000}` for an explicit pass. Inspect `/feature-jobs`; cancel pending/running work through `POST /feature-jobs/{id}/cancel`. Complete runs publish a materialization reference. Partial or cancelled runs can retain evidence for reuse but cannot publish a complete generation.
 
+On the development application, inspect `publication` separately from `manifest.complete`. Evaluation can finish successfully while publication is blocked because source data, a correction or another refresh changed its context. A successful publication returns `VALUE / SUCCEEDED` and the run reference. A blocked publication returns `NOT_EVALUATED / BLOCKED_BY_DEPENDENCY` with a reason; refresh again after resolving it. Corrections to maintained features enqueue another pass.
+
+Publication briefly locks imported source data against writes, after model work has finished. Attached data retains its source permissions and receives a point-in-time check. The materialization records a checked run, not a stored SQL column or an ongoing freshness guarantee. Queries continue to check source dependencies before reusing observations. Native feature refresh remains on the [roadmap](IMPLEMENTATION_PLAN.md).
+
 Each maintenance attempt allows 1,000 new evaluations and at most three attempts per job. Larger or persistently ambiguous populations need further explicit refresh/review. External database writes do not enqueue jobs automatically. Extraction candidates are bounded original sentences and quoted spans, not arbitrary entity generation; features currently operate on one row and its declared columns.
 
 See [architecture](ARCHITECTURE.md) for evidence dependencies and [performance and cost](PERFORMANCE_AND_COST.md) for release measurements.
