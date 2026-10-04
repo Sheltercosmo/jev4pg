@@ -70,28 +70,32 @@ class Database:
             metadata.create_all(connection)
 
     @contextmanager
-    def transaction(self, tenant, isolation_level=None, *, before_snapshot=None):
+    def transaction(
+        self, tenant, isolation_level=None, *, before_snapshot=None, interruptible=False
+    ):
         engine = (
             self.engine.execution_options(isolation_level=isolation_level)
             if isolation_level
             else self.engine
         )
-        with self._transaction(engine, tenant, before_snapshot) as connection:
+        with self._transaction(engine, tenant, before_snapshot, interruptible) as connection:
             yield connection
 
     @contextmanager
     def source_guard(self, tenant):
         if self.engine.dialect.name != "postgresql":
             raise ValueError("Source guards require PostgreSQL")
-        with self._transaction(self._guard_engine, tenant) as connection:
+        with self._transaction(self._guard_engine, tenant, interruptible=True) as connection:
             yield connection
 
     @contextmanager
-    def _transaction(self, engine, tenant, before_snapshot=None):
+    def _transaction(self, engine, tenant, before_snapshot=None, interruptible=False):
         if not tenant or len(tenant) > 100:
             raise ValueError("A tenant identity is required")
         guard = self._transaction_lock if self.engine.dialect.name == "sqlite" else nullcontext()
-        with guard, engine.begin() as conn:
+        from .query_control import bind_source
+
+        with guard, engine.begin() as conn, bind_source(conn) if interruptible else nullcontext():
             if before_snapshot is not None:
                 before_snapshot(conn)
             if self.engine.dialect.name == "postgresql":

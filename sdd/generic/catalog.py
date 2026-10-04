@@ -335,7 +335,7 @@ class Catalog:
             if limit is not None:
                 query = query.limit(limit)
             return [dict(r) for r in conn.execute(query).mappings()]
-        with self.db.transaction(tenant) as cx:
+        with self.db.transaction(tenant, interruptible=True) as cx:
             return self.rows(tenant, dataset, cx, limit=limit)
 
     def link(self, tenant, source, target, source_column, target_column):

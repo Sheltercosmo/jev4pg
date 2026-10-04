@@ -3,6 +3,7 @@
 from sqlalchemy import and_, insert, or_, select, update
 
 from ..ledger import digest, now, uid
+from ..query_control import QueryInterrupted
 from . import schema
 from .catalog import Catalog
 from .planning_review import PlanReviewRequired, public_plan
@@ -207,6 +208,16 @@ class QueryHistory:
             result = operation()
         except PlanReviewRequired as exc:
             self.finish(tenant, actor, identity, {"plan": exc.plan}, "review")
+            exc.history_id = identity
+            raise
+        except QueryInterrupted as exc:
+            self.update(
+                tenant,
+                actor,
+                identity,
+                status="timed_out" if exc.operation_state == "TIMED_OUT" else "cancelled",
+                error=exc.operation_state,
+            )
             exc.history_id = identity
             raise
         except Exception as exc:

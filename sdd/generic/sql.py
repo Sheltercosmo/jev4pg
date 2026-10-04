@@ -17,6 +17,7 @@ from sqlglot.optimizer.scope import traverse_scope
 from sqlalchemy import text, insert, update, delete, select
 from ..evaluators import decision_identity
 from ..ledger import uid, now, digest
+from ..query_control import checkpoint, query_scope
 from .catalog import Catalog, serial
 from .semantics import Semantics
 from . import schema as schema
@@ -656,6 +657,7 @@ class SQLService:
             connection.execute(text("SET LOCAL statement_timeout = '10000ms'"))
             connection.execute(text("SET LOCAL lock_timeout = '3000ms'"))
 
+    @query_scope
     def execute(
         self,
         tenant,
@@ -672,7 +674,9 @@ class SQLService:
         mutation_token=None,
         expected_semantic_snapshot=None,
         progress=None,
+        control=None,
     ):
+        checkpoint()
         if not 0 <= max_evaluations <= 1000 or not 1 <= max_affected <= 1000:
             raise ValueError("Invalid execution budget")
         started = time.perf_counter()
@@ -730,6 +734,7 @@ class SQLService:
         lowered, coverage, evidence = self.lower_semantics(
             tenant, tree, bindings, initial, budget, accept, reject, progress=progress
         )
+        checkpoint()
         semantic_snapshot = digest(
             sorted(
                 [

@@ -15,6 +15,7 @@ from .sql import SQLService
 from . import schema as s
 from .planning_review import PlanReviews
 from .history import QueryHistory
+from ..query_control import QueryControl, QueryInterrupted
 
 
 class ColumnInput(Strict):
@@ -59,6 +60,7 @@ class QueryInput(Strict):
     reject: float = Field(default=0.2, ge=0, le=1)
     allow_all: bool = False
     max_affected: int = Field(default=1000, ge=1, le=1000)
+    timeout_seconds: float | None = Field(default=None, ge=0.1, le=3600, allow_inf_nan=False)
 
 
 class RowFilter(Strict):
@@ -177,6 +179,21 @@ def mount(app, executor, identity, reviewer):
             content={
                 "detail": "Database connection capacity is temporarily exhausted.",
                 "code": "database_capacity",
+            },
+        )
+
+    @app.exception_handler(QueryInterrupted)
+    async def query_interrupted(_, exc):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=408 if exc.operation_state == "TIMED_OUT" else 409,
+            content={
+                "detail": str(exc),
+                "output_state": exc.output_state,
+                "operation_state": exc.operation_state,
+                "result": None,
+                "history_id": getattr(exc, "history_id", None),
             },
         )
 
@@ -380,7 +397,12 @@ def mount(app, executor, identity, reviewer):
             if target and p.get("role") != "reviewer":
                 raise HTTPException(403, "Reviewer role required for mutation previews")
             return sql.execute(
-                p["tenant"], actor=p["name"], **body.model_dump(exclude={"parent_history_id"})
+                p["tenant"],
+                actor=p["name"],
+                control=QueryControl(body.timeout_seconds)
+                if body.timeout_seconds is not None
+                else None,
+                **body.model_dump(exclude={"parent_history_id", "timeout_seconds"}),
             )
 
         return history.capture(

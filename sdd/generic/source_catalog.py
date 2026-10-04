@@ -70,6 +70,7 @@ def source_transaction(db, tenant, datasets, isolation_level=None):
                 tenant,
                 isolation_level=isolation_level,
                 before_snapshot=lambda current: lock_sources(current, datasets),
+                interruptible=True,
             )
         )
         validate_sources(connection, datasets)

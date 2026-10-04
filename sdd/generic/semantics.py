@@ -508,6 +508,10 @@ class Semantics:
                 for group in groups.values():
                     if len(pending) >= self.concurrency:
                         drain()
+                    if (cancel_event is not None and cancel_event.is_set()) or (
+                        should_continue is not None and not should_continue()
+                    ):
+                        break
                     claims = self._claim(tenant, dataset, table, row, group, budget, values, stats)
                     if not claims:
                         continue

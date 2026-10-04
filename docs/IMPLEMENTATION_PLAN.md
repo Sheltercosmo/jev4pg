@@ -25,9 +25,11 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 
 The immediate priority is practical application use: efficient large-table reads, a usable analyst workspace and a runnable application path. The development preview adds cursor pagination, reviewed CSV import and an [activity monitor](../examples/activity_app/README.md). Validate these with real PostgreSQL populations and concurrent requests before expanding organization and remote-source features. See [application contracts](APPLICATIONS.md).
 
-Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES.md), typed assignment previews and row locks. This removes the whole-table Python snapshot for those writes. Bulk jobs, application cancellation, native semantic mutations and maintained-feature generations remain separate work; a successful bounded write does not establish their readiness.
+Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES.md), typed assignment previews and row locks. This removes the whole-table Python snapshot for those writes. Bulk jobs, native semantic mutations and maintained-feature generations remain separate work; a successful bounded write does not establish their readiness.
 
-Planning now uses [bounded shared value evidence](PLANNING_CONTEXT.md), concurrent table samples and index-checked literal probes. Sample completeness controls whether data can support a uniqueness hypothesis. These limits reduce preparation work; large-population semantic evaluation, query cancellation and durable bulk jobs remain unqualified.
+Planning now uses [bounded shared value evidence](PLANNING_CONTEXT.md), concurrent table samples and index-checked literal probes. Sample completeness controls whether data can support a uniqueness hypothesis. These limits reduce preparation work; large-population semantic evaluation and durable bulk jobs remain unqualified.
+
+The application now provides [execution controls](QUERY_CONTROL.md) for SQL reads and mutation previews: connection-scoped cancellation, API deadlines and retained history. This is the execution primitive for future query jobs. Durable submission, cross-process cancellation, worker recovery and resumable bulk work still need their own lifecycle and publication contracts.
 
 | Area | Needed before a native production release |
 | --- | --- |
