@@ -26,8 +26,10 @@ window.Workspace = (() => {
     try {
       sessionStorage.setItem(key, JSON.stringify({ documents, active }));
       $("draft-status").textContent = t("sessionSaved");
+      return true;
     } catch {
       $("draft-status").textContent = t("draftUnsaved");
+      return false;
     }
   }
   function tabs() {
@@ -50,7 +52,16 @@ window.Workspace = (() => {
       close.addEventListener("click", () => {
         if (busy) return;
         capture();
-        if (item.question.trim() && !confirm(t("closeDraft"))) return;
+        const running =
+          item.job &&
+          !["SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "REDACTED", "REJECTED"].includes(
+            item.job.state,
+          );
+        if (
+          (item.question.trim() || running) &&
+          !confirm(t(running ? "closeBackgroundDraft" : "closeDraft"))
+        )
+          return;
         documents = documents.filter((entry) => entry.id !== item.id);
         results.delete(item.id);
         if (!documents.length) add();
@@ -94,6 +105,7 @@ window.Workspace = (() => {
     tabs();
     save();
     $("question").focus();
+    document.dispatchEvent(new Event("sdd:document"));
   }
   function add(question = "", name = "", datasets = [], mode = "sql") {
     if (busy) return false;
@@ -323,5 +335,16 @@ window.Workspace = (() => {
     draft = {};
   });
   catalogBrowser();
-  return { add, save };
+  function current() {
+    capture();
+    return documents.find((item) => item.id === active);
+  }
+  function setJob(identity, job, expected = null) {
+    const item = documents.find((entry) => entry.id === identity);
+    if (!item || (expected && (item.job?.id !== expected.id || item.job?.key !== expected.key)))
+      return false;
+    item.job = job;
+    return save();
+  }
+  return { add, save, current, setJob, clearResult: (identity) => results.delete(identity) };
 })();

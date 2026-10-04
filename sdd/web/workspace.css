@@ -195,6 +195,42 @@ button {
 .output {
   margin-top: 24px;
 }
+.background-job {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #555;
+  background: var(--paper);
+}
+.job-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.job-heading h2 {
+  margin: 0;
+  font-size: 13px;
+}
+#job-state {
+  font: 11px var(--mono);
+}
+#job-state[data-state="FAILED"],
+#job-state[data-state="REJECTED"],
+#job-state[data-state="UNCONFIRMED"] {
+  color: #923737;
+}
+.job-query {
+  margin: 12px 0 8px;
+  font: 12px/1.6 var(--mono);
+  overflow-wrap: anywhere;
+}
+.background-job .button-group {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
 .metrics:empty {
   display: none;
 }
@@ -478,5 +514,12 @@ button {
   .query-toolbar,
   .query-actions {
     padding: 12px;
+  }
+  .query-actions {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .query-actions .button-group {
+    flex-wrap: wrap;
   }
 }

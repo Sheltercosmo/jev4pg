@@ -15,7 +15,7 @@ The native preview moves semantic row execution into PostgreSQL while keeping na
 | Probability embeddings | A fixed question basis produces matrices and vectors; projection and compatible distance comparisons run locally. |
 | Native container deployment | A Compose overlay builds the optimized extension, provisions the registry and enables native application reads. Extension 0.2.0 adds backup registration with a 0.1.0 upgrade path. |
 | Application upgrade | Catalog version 4 adds durable application query jobs. Upgrades retain version 3 catalog objects and relocate validated version 1 and 2 metadata into `sdd_catalog` transactionally. |
-| Application query jobs | Durable SQL submission, actor-scoped idempotency, separate workers, running cancellation and lease-fenced result publication. |
+| Application query jobs | Durable SQL submission, actor-scoped idempotency, separate workers, running cancellation and lease-fenced result publication. Workspace controls preserve edited drafts and recover saved jobs from history. |
 | Catalog isolation | Runtime metadata is schema-qualified; SQLite translates only that namespace. Fresh installations preserve public-schema objects and grants. |
 | Installation preflight | `migrate --check` inspects ownership and catalog contracts without writes. Migration refuses unmanaged collisions and fixes its schema resolution before installation. |
 | Feature publication checks | Python refresh rechecks source populations, definition and review revisions, prior publication and worker ownership before committing a run reference. |

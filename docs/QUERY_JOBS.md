@@ -4,6 +4,12 @@ Submit SQL once, keep its job ID, and retrieve the result after an HTTP disconne
 
 Natural-language planning still uses `/ask`. Submit its reviewed SQL when you need background execution. Jobs preserve the existing result, source and inference limits; they are not a bulk export or unrestricted population-scan interface.
 
+## Use the workspace
+
+Choose Run in background in SQL mode. The workspace keeps the submitted text separate from later edits, polls the active query's status and offers Cancel query and Open result. Closing a draft does not cancel an accepted job. Reopen it from Recent queries with the same identity. Opening a completed job recovers its saved rows or mutation preview without submitting SQL.
+
+The browser saves a request key before submission. If the reply is lost, Retry submission sends that same key and original request; it never substitutes newer draft text. An interrupted submission remains unconfirmed until the server answers. If the browser cannot save a new request, it does not dispatch it. See the [workspace guide](USER_GUIDE.md#run-sql-in-the-background) for recovery and editing behavior.
+
 ## Start a worker
 
 Upgrade the application catalog to version 4 with `sdd migrate` using the installation owner. Use the restricted runtime credentials for the API and workers. Stop older application processes before upgrading and keep a backup. The migration adds the job table and tenant policies while retaining existing catalog objects and data.
@@ -80,8 +86,17 @@ With `SDD_TEST_ADMIN_URL` set to an isolated PostgreSQL server:
 
 ```sh
 python -m pytest tests/test_query_jobs.py tests/test_query_jobs_postgres.py tests/test_query_jobs_final_postgres.py -q
+python -m pytest tests/test_workspace_jobs_postgres.py -q
 ```
 
 The tests cover simultaneous idempotent submissions, exclusive claims, process-level cancellation, worker death, publication fences, tenant and actor access, retained JEV evidence and migration from catalog version 3. Further cases exercise the worker CLI with Chinese catalogs, source rebinding, deadlines and managed deletion. Fixtures use generated data and deterministic providers. They measure execution contracts, not model accuracy or deployment capacity.
+
+Run workspace controller regressions with Node.js 22 or later:
+
+```sh
+node --test tests/web/query_jobs.test.cjs
+```
+
+These exercise the shipped JavaScript with an isolated event and transport harness: lost replies, storage failures, reload recovery, cancellation races, identity changes and edited drafts. They do not replace browser checks for rendering, accessibility or the live API connection.
 
 The queue follows PostgreSQL's documented [row locking and `SKIP LOCKED` behavior](https://www.postgresql.org/docs/17/sql-select.html#SQL-FOR-UPDATE-SHARE). Locks cover claim and publication transactions; model calls run outside them. See [stage placement](JEV_PLANNING_STAGES.md) for the parallel execution boundaries.

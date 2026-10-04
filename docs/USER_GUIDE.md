@@ -14,6 +14,18 @@ Result-grid search, sorting and exports operate on returned rows, not the full s
 
 For small files, choose Import CSV, review column types, then create the table. Changing the file or settings requires a fresh preview. Every row is checked before creation. Use PostgreSQL bulk loading and attachments for larger files.
 
+## Run SQL in the background
+
+In the development workspace, choose SQL mode and Run in background. A selection submits only the selected SQL; otherwise the whole editor is submitted. After the server accepts it, you can edit the draft, open another query tab or close the page. Your edits do not change the submitted request.
+
+The background card shows the submitted SQL and its status. Cancel query requests cancellation; already sent model requests may still finish and incur usage. Once a result is ready, choose Open result. If you have edited the draft, its saved result opens in another query tab. Results never replace newer edits automatically. Mutation results are previews and still require Commit changes.
+
+Refreshing the page restores the draft and job reference within that browser tab's session. After closing the tab or using another browser, connect with the same identity and open the job in Recent queries. Opening or refreshing a job retrieves its existing outcome without executing it again.
+
+If the submission response is lost, choose Retry submission to confirm the original request. It reuses the original SQL and request key, even if you have since edited the draft. A failed or cancelled job needs a new execution; Run in background creates a new request after you review it. Draft recovery requires browser session storage.
+
+An administrator must start a separate query worker for your tenant; accepted work stays queued until a worker claims it. See [worker setup and query limits](QUERY_JOBS.md). Natural-language planning remains interactive: review its SQL, choose Edit SQL, then submit that SQL in the background.
+
 ## Query modes
 
 | Mode | Use it for | How it works |

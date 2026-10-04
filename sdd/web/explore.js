@@ -40,6 +40,7 @@ async function request(path, body) {
   if (revision !== connectionRevision) throw new Error(t("connectionChanged"));
   if (!response.ok) {
     const error = new Error(apiErrorMessage(response.status, data));
+    error.status = response.status;
     error.data = data;
     throw error;
   }
@@ -260,6 +261,7 @@ function updateMode() {
         ? "plannerHybridHelp"
         : "plannerJevHelp";
   $("planner-help").textContent = t(helpKey);
+  window.BackgroundJobs?.render();
 }
 
 function updateRunLabel() {

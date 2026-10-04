@@ -173,3 +173,52 @@ def test_recent_pages_preserve_scope_and_completion_states(source):
         if not cursor:
             break
     assert seen == identities
+
+
+def test_history_identifies_pending_and_completed_jobs_without_dispatch(source):
+    db, _ = source
+    saved = submit(db)
+    history = QueryHistory(db)
+    pending = history.detail("team", "alice", saved["id"])
+    assert pending["query_job_id"] == saved["id"]
+    assert pending["status"] == "queued" and not pending["output"]["executed"]
+    assert "result" not in pending["output"]
+    assert QueryJobs(db).get("team", "alice", saved["id"])["job_state"] == "QUEUED"
+
+    QueryWorker(db).work_one("team")
+    completed = history.detail("team", "alice", saved["id"])
+    assert completed["query_job_id"] == saved["id"]
+    assert completed["status"] == "complete"
+    assert completed["output"]["result"] == [{"value": 12, "n": 2}, {"value": None, "n": 1}]
+    for tenant, actor in (("other", "alice"), ("team", "bob")):
+        with pytest.raises(ValueError, match="unavailable"):
+            history.detail(tenant, actor, saved["id"])
+
+
+def test_preview_history_links_to_authorized_job_without_reexecuting_mutation(source):
+    db, _ = source
+    saved = submit(
+        db, "preview-history", {"sql": "UPDATE records SET value=99 WHERE id=1"}, role="reviewer"
+    )
+    QueryWorker(db).work_one("team")
+    history = QueryHistory(db).detail("team", "alice", saved["id"])
+    assert history["status"] == "preview" and history["query_job_id"] == saved["id"]
+    assert "preview_token" not in str(history)
+    restored = QueryJobs(db).get("team", "alice", history["query_job_id"])
+    assert restored["operation_state"] == "AWAITING_REVIEW"
+    assert restored["result"]["preview_token"]
+    assert SQLService(db).execute("team", "SELECT value FROM records WHERE id=1")["result"] == [
+        {"value": 12}
+    ]
+
+
+def test_foreground_history_has_no_background_job_identity(source):
+    db, _ = source
+    history = QueryHistory(db)
+    result = history.capture(
+        "team",
+        "alice",
+        {"mode": "sql", "text": QUERY["sql"]},
+        lambda: SQLService(db).execute("team", QUERY["sql"]),
+    )
+    assert history.detail("team", "alice", result["history_id"])["query_job_id"] is None

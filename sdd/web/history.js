@@ -101,6 +101,10 @@ async function openHistory(identity) {
   try {
     const entry = await request(`/query-history/${encodeURIComponent(identity)}`);
     if (token !== $("token").value) return;
+    if (entry.query_job_id && window.BackgroundJobs) {
+      await BackgroundJobs.open(entry);
+      return;
+    }
     showHistoryContext(entry);
     restoreHistoryInput(entry);
     show(entry.output);

@@ -86,6 +86,60 @@ const messages = {
     expression_loss: "Decrease",
     expression_percent: "Percentage change",
     expression_weighted_gain: "Change in weighted mean",
+    runBackground: "Run in background",
+    backgroundQuery: "Background query",
+    openJobResult: "Open result",
+    cancelJob: "Cancel query",
+    retrySubmission: "Retry submission",
+    closeBackgroundDraft:
+      "Close this draft? Submitted work continues on the server. You can reopen it from Recent queries.",
+    jobStatusSUBMITTING: "Submitting",
+    jobStatusUNCONFIRMED: "Submission unconfirmed",
+    jobStatusQUEUED: "Queued",
+    jobStatusRUNNING: "Running",
+    jobStatusCANCELLING: "Cancelling",
+    jobStatusSUCCEEDED: "Result ready",
+    jobStatusCANCELLED: "Cancelled",
+    jobStatusTIMED_OUT: "Timed out",
+    jobStatusFAILED: "Execution interrupted",
+    jobStatusREDACTED: "Source deleted",
+    jobStatusREJECTED: "Not submitted",
+    jobHintSUBMITTING: "Saving your request. You can keep working once it is accepted.",
+    jobHintUNCONFIRMED:
+      "The response was lost. Retry submission to recover the same request without running it twice.",
+    jobHintQUEUED: "Waiting for a query worker. You can keep editing or close this page.",
+    jobHintRUNNING:
+      "The server is running this query. Your current edits are separate from the submitted request.",
+    jobHintCANCELLING:
+      "Stopping execution. Model requests already sent may still finish and incur usage.",
+    jobHintSUCCEEDED:
+      "Open the saved result when you are ready. Newer edits will be kept in their own tab.",
+    jobHintCANCELLED:
+      "This job published no result. Earlier model work may still have produced reusable evidence.",
+    jobHintTIMED_OUT:
+      "The execution deadline was reached. Edit the query before submitting a new run.",
+    jobHintFAILED:
+      "The query did not publish a result. Check its SQL and available data before submitting a new run.",
+    jobHintREDACTED: "Source deletion removed this job's saved request and result.",
+    jobHintREJECTED:
+      "The server could not accept this request. Check the SQL, access token and selected data.",
+    jobLeaseLost:
+      "The worker stopped before confirming a result. Some model work may have completed. Inspect the query before submitting a new run.",
+    jobResultTooLarge: "The saved result exceeded its size limit. Select fewer columns or rows.",
+    jobPreviewHint:
+      "A change preview is ready. Open it and review the affected rows before committing.",
+    jobTruncated:
+      "The saved result reached the row limit. Open it to inspect or export the returned rows.",
+    jobStatusUnavailable:
+      "Status could not be refreshed. This does not cancel the server query. Reconnect or try Refresh.",
+    jobCancelUnconfirmed:
+      "Cancellation could not be confirmed. Refresh the status or retry cancellation.",
+    jobNotAuthorized:
+      "This identity cannot submit that query. Check the access token and required permissions.",
+    jobSaveFailed:
+      "The browser could not save the request, so it was not submitted. Save your draft to a file before retrying.",
+    jobRetrySaveFailed:
+      "The browser could not save recovery details. The earlier request may still be running. Check Recent queries or retry confirmation after browser storage is available.",
     historyTitle: "Recent queries",
     historyRefresh: "Refresh",
     historyHint: "Open a query to edit it or review its decisions.",
@@ -469,6 +523,45 @@ const messages = {
     expression_loss: "减少量",
     expression_percent: "百分比变化",
     expression_weighted_gain: "加权平均值的变化",
+    runBackground: "后台运行",
+    backgroundQuery: "后台查询",
+    openJobResult: "打开结果",
+    cancelJob: "取消查询",
+    retrySubmission: "重新确认提交",
+    closeBackgroundDraft: "关闭此草稿？已提交的查询会继续执行，之后可从“最近查询”重新打开。",
+    jobStatusSUBMITTING: "正在提交",
+    jobStatusUNCONFIRMED: "提交结果待确认",
+    jobStatusQUEUED: "等待执行",
+    jobStatusRUNNING: "正在运行",
+    jobStatusCANCELLING: "正在取消",
+    jobStatusSUCCEEDED: "结果已就绪",
+    jobStatusCANCELLED: "已取消",
+    jobStatusTIMED_OUT: "执行超时",
+    jobStatusFAILED: "执行中断",
+    jobStatusREDACTED: "源数据已删除",
+    jobStatusREJECTED: "未提交",
+    jobHintSUBMITTING: "正在保存查询请求，提交成功后即可继续处理其他工作。",
+    jobHintUNCONFIRMED: "未收到服务器的确认。点击“重新确认提交”可找回同一次请求，不会重复执行。",
+    jobHintQUEUED: "正在等待后台工作进程处理，您可以继续编辑或关闭页面。",
+    jobHintRUNNING: "服务器正在执行已提交的查询。您现在修改草稿，不会改变本次执行。",
+    jobHintCANCELLING: "正在停止查询。已经发出的模型请求可能仍会完成并产生用量。",
+    jobHintSUCCEEDED: "结果已保存，可随时打开查看。若草稿已有修改，结果会在另一个标签页中打开。",
+    jobHintCANCELLED: "本次查询未发布结果。此前完成的模型判断仍可能作为证据供后续查询复用。",
+    jobHintTIMED_OUT: "查询已达到执行时限。请调整查询后再发起新的执行。",
+    jobHintFAILED: "查询未能发布结果。请检查 SQL 和可用数据，再决定是否重新执行。",
+    jobHintREDACTED: "源数据删除后，本次查询保存的请求和结果也已清除。",
+    jobHintREJECTED: "服务器未能接受请求。请检查 SQL、访问令牌和所选数据。",
+    jobLeaseLost:
+      "工作进程中断，未能确认最终结果；部分模型请求可能已经完成。请检查查询后再决定是否重新执行。",
+    jobResultTooLarge: "结果超过了保存大小限制，请减少返回的列或行。",
+    jobPreviewHint: "修改预览已生成。打开后核对受影响的记录，再决定是否提交修改。",
+    jobTruncated: "返回行数已达到上限。打开结果可查看或导出本次返回的记录。",
+    jobStatusUnavailable: "暂时无法刷新状态，服务器上的查询不会因此取消。请重新连接或点击刷新。",
+    jobCancelUnconfirmed: "暂时无法确认是否已取消。请刷新状态，或再次点击取消查询。",
+    jobNotAuthorized: "当前身份无权提交此查询，请检查访问令牌及所需权限。",
+    jobSaveFailed: "浏览器无法保存请求，因此尚未提交。请先将草稿保存为文件，再重试。",
+    jobRetrySaveFailed:
+      "浏览器无法保存恢复信息，先前的请求可能仍在运行。请查看最近查询，或在浏览器恢复存储后重新确认提交。",
     historyTitle: "最近查询",
     historyRefresh: "刷新",
     historyHint: "打开查询后可编辑内容或修正规划判断。",

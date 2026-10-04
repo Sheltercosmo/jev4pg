@@ -15,6 +15,7 @@
     <script src="/ask-assets/text-import.js" defer></script>
     <script src="/ask-assets/result-grid.js" defer></script>
     <script src="/ask-assets/workspace.js" defer></script>
+    <script src="/ask-assets/query-jobs.js" defer></script>
     <script src="/ask-assets/csv-import.js" defer></script>
     <script src="/ask-assets/table-view.js" defer></script>
   </head>
@@ -242,6 +243,15 @@
               ><span data-i18n="planShortcut">plan</span></span
             >
             <div class="button-group">
+              <button
+                type="button"
+                id="run-background"
+                class="secondary"
+                data-i18n="runBackground"
+                hidden
+              >
+                Run in background
+              </button>
               <button type="button" id="preview" class="secondary" data-i18n="plan">
                 Preview plan</button
               ><button type="submit" id="run">
@@ -250,6 +260,34 @@
             </div>
           </div>
         </form>
+        <section id="background-job" class="background-job" aria-labelledby="job-heading" hidden>
+          <div class="job-heading">
+            <h2 id="job-heading" data-i18n="backgroundQuery">Background query</h2>
+            <span id="job-state" role="status"></span>
+          </div>
+          <p id="job-query" class="job-query"></p>
+          <p id="job-message" class="hint" role="status"></p>
+          <div class="button-group">
+            <button type="button" id="job-open" data-i18n="openJobResult" hidden>
+              Open result
+            </button>
+            <button type="button" id="job-cancel" class="secondary" data-i18n="cancelJob" hidden>
+              Cancel query
+            </button>
+            <button
+              type="button"
+              id="job-retry"
+              class="secondary"
+              data-i18n="retrySubmission"
+              hidden
+            >
+              Retry submission
+            </button>
+            <button type="button" id="job-refresh" class="text-button" data-i18n="historyRefresh">
+              Refresh
+            </button>
+          </div>
+        </section>
         <div class="examples" id="examples"><span data-i18n="examples">QUICK START</span></div>
         <section id="output" class="output" aria-live="polite">
           <div class="output-heading">

@@ -97,7 +97,16 @@ class QueryHistory:
         with self.db.transaction(tenant) as connection:
             record = (
                 connection.execute(
-                    select(schema.query_history).where(
+                    select(schema.query_history, schema.query_jobs.c.state.label("job_state"))
+                    .outerjoin(
+                        schema.query_jobs,
+                        and_(
+                            schema.query_jobs.c.id == schema.query_history.c.id,
+                            schema.query_jobs.c.tenant == schema.query_history.c.tenant,
+                            schema.query_jobs.c.actor == schema.query_history.c.actor,
+                        ),
+                    )
+                    .where(
                         schema.query_history.c.tenant == tenant,
                         schema.query_history.c.actor == actor,
                         schema.query_history.c.id == identity,
@@ -154,6 +163,7 @@ class QueryHistory:
             )
         return {
             "id": identity,
+            "query_job_id": identity if record["job_state"] is not None else None,
             "input": record["input"],
             "dataset_ids": record["dataset_ids"],
             "status": record["status"],
