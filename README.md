@@ -31,6 +31,10 @@ JEV answers constrained questions about your data and retains typed decisions an
 
 Explore the interactive demos at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
+<p align="center">
+  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+</p>
+
 ## Why choose jev4pg
 
 ### Define once, reuse across queries
@@ -76,10 +80,6 @@ With concept generation and repair disabled, a request uses one LLM generation; 
 `VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay separate from execution failures. A skipped judgment cannot silently become false or produce a misleading zero total. Applications can route uncertainty to review, retain held SQL for correction and preview proposed writes before an explicit commit. [Decision states](docs/JEV_OPERATORS.md).
 
 Native stage plans, cross-connection evidence reuse and probability embeddings are development-preview features on `main`. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
-
-<p align="center">
-  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
-</p>
 
 ## What you can build
 
