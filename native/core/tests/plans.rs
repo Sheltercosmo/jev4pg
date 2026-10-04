@@ -69,3 +69,46 @@ fn validates_typed_decision_requirements_and_guards() {
     plan["stages"][1]["inputs"][0]["require_values"] = json!(["missing"]);
     assert!(Plan::parse(plan).is_err());
 }
+
+#[test]
+fn validates_row_conditions_and_selected_decision_dependencies() {
+    let mut source = stage("route", json!([]));
+    source["columns"]["decision"] = json!({"kind":"json","label":"route"});
+    source["operator"] = json!("semantic");
+    source["questions"] = json!({"done":{"type":"noul","instructions":"Review"}});
+    source["row_guard"] = json!({"column":"decision","equals":true});
+    let mut merge = stage(
+        "merge",
+        json!([{"stage":"route","alias":"route","require_values":[]}]),
+    );
+    merge["operator"] = json!("merge");
+    merge["columns"]["selector"] = json!({"kind":"json","label":"routing"});
+    merge["columns"]["answer"] = json!({"kind":"json","label":"answer"});
+    merge["selections"] =
+        json!({"result":{"selector":"selector","cases":[{"equals":true,"column":"answer"}]}});
+    let child = stage(
+        "end",
+        json!([{"stage":"merge","alias":"m","require_values":["result"]}]),
+    );
+    let plan = json!({"version":1,"target":"end","stages":[source,merge,child]});
+    assert!(Plan::parse(plan.clone()).is_ok());
+    for (field, invalid) in [
+        ("column", json!("missing")),
+        ("equals", json!(null)),
+        ("equals", json!([])),
+    ] {
+        let mut wrong = plan.clone();
+        wrong["stages"][0]["row_guard"][field] = invalid;
+        assert!(Plan::parse(wrong).is_err());
+    }
+    for cases in [
+        json!([]),
+        json!([{"equals":true,"column":"missing"}]),
+        json!([{"equals":1,"column":"answer"},{"equals":1.0,"column":"answer"}]),
+        json!([{"equals":true,"column":"answer"},{"equals":1,"column":"answer"}]),
+    ] {
+        let mut wrong = plan.clone();
+        wrong["stages"][1]["selections"]["result"]["cases"] = cases;
+        assert!(Plan::parse(wrong).is_err());
+    }
+}

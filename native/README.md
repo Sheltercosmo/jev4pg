@@ -218,6 +218,6 @@ Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still requi
 
 ## Remaining integration
 
-The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Reuse across differently packed question batches, row guards and selected-branch composition, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
+The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Explicit plans support row conditions and local selected-branch merges; see [conditional plans](../docs/NATIVE_PLANS.md#route-individual-rows). Automatic conditional SQL lowering, reuse across differently packed question batches, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
 
 Model calls are external effects: transaction rollback cannot undo provider usage. Synchronous scans hold a PostgreSQL backend while inference runs. Restrict execution grants during development and use the released queue interface where its asynchronous behavior is required.

@@ -1,3 +1,4 @@
+use crate::conditional::{RowGuard, Selection, scalar};
 use crate::{Questions, validate_questions};
 use serde::Deserialize;
 use serde_json::Value;
@@ -24,6 +25,10 @@ pub struct Stage {
     pub questions: Questions,
     #[serde(default)]
     pub guard: Option<Guard>,
+    #[serde(default)]
+    pub row_guard: Option<RowGuard>,
+    #[serde(default)]
+    pub selections: BTreeMap<String, Selection>,
     #[serde(default)]
     pub grain: Option<Vec<String>>,
     #[serde(default)]
@@ -64,6 +69,12 @@ pub struct Guard {
     pub input: String,
     pub question: String,
     pub equals: Value,
+}
+
+impl Stage {
+    pub fn decision_ids(&self) -> impl Iterator<Item = &String> {
+        self.questions.keys().chain(self.selections.keys())
+    }
 }
 
 pub fn identifier(value: &str) -> bool {
@@ -115,6 +126,7 @@ impl Plan {
                     "window",
                     "join",
                     "semantic",
+                    "merge",
                     "row_identity",
                     "latest",
                     "order_limit",
@@ -138,6 +150,60 @@ impl Plan {
             } else if !stage.questions.is_empty() {
                 return Err("Only semantic stages declare questions");
             }
+            let decision_column = |name: &String| {
+                stage
+                    .columns
+                    .get(name)
+                    .is_some_and(|column| column.kind == "json")
+            };
+            if let Some(guard) = &stage.row_guard
+                && (stage.operator != "semantic"
+                    || !decision_column(&guard.column)
+                    || !scalar(&guard.equals)
+                    || stage
+                        .questions
+                        .values()
+                        .any(|question| question.subject_column.as_ref() == Some(&guard.column)))
+            {
+                return Err(
+                    "A row guard requires a semantic stage, a JSON decision column and a scalar comparison",
+                );
+            }
+            if stage.operator == "merge" {
+                if !(1..=32).contains(&stage.selections.len()) {
+                    return Err("A merge stage requires 1 to 32 decision selections");
+                }
+                for (id, selection) in &stage.selections {
+                    if id.is_empty()
+                        || id.len() > 200
+                        || !decision_column(&selection.selector)
+                        || !(1..=32).contains(&selection.cases.len())
+                        || selection
+                            .otherwise
+                            .as_ref()
+                            .is_some_and(|column| !decision_column(column))
+                    {
+                        return Err("Invalid decision selection");
+                    }
+                    for (index, case) in selection.cases.iter().enumerate() {
+                        if !scalar(&case.equals)
+                            || !decision_column(&case.column)
+                            || selection.cases[..index].iter().any(|previous| {
+                                same_scalar(&previous.equals, &case.equals).unwrap_or(false)
+                            })
+                            || case.equals.is_boolean() != selection.cases[0].equals.is_boolean()
+                            || case.equals.is_string() != selection.cases[0].equals.is_string()
+                            || case.equals.is_number() != selection.cases[0].equals.is_number()
+                        {
+                            return Err(
+                                "Selection cases require distinct scalars of one type and JSON decision columns",
+                            );
+                        }
+                    }
+                }
+            } else if !stage.selections.is_empty() {
+                return Err("Only merge stages declare decision selections");
+            }
             if stage
                 .keys
                 .iter()
@@ -157,11 +223,10 @@ impl Plan {
                 if !identifier(&input.alias) || !aliases.insert(&input.alias) {
                     return Err("Input aliases must be valid and unique");
                 }
-                if input
-                    .require_values
-                    .as_ref()
-                    .is_some_and(|ids| ids.iter().any(|id| !parent.questions.contains_key(id)))
-                {
+                if input.require_values.as_ref().is_some_and(|ids| {
+                    ids.iter()
+                        .any(|id| !parent.decision_ids().any(|declared| declared == id))
+                }) {
                     return Err("A completeness requirement names an undeclared decision");
                 }
             }
@@ -172,8 +237,8 @@ impl Plan {
                     .find(|i| i.alias == guard.input)
                     .ok_or("Guard input is absent")?;
                 if !stages[input.stage.as_str()]
-                    .questions
-                    .contains_key(&guard.question)
+                    .decision_ids()
+                    .any(|id| id == &guard.question)
                     || !matches!(
                         guard.equals,
                         Value::Bool(_) | Value::String(_) | Value::Number(_)

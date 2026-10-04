@@ -1,5 +1,6 @@
 //! Typed semantic evaluation. PostgreSQL owns source selection and arithmetic.
 
+pub mod conditional;
 pub mod evidence;
 pub mod plan;
 pub mod registry;

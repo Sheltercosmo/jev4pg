@@ -12,7 +12,7 @@ The plan contains `version: 1`, a `target` stage ID and up to 32 `stages`. Each 
 
 The result contains target `rows`, separate `stages` receipts, shared `usage`, the applied `policy` and `completion_order`. A sealed empty target has `VALUE`, zero rows and `population_closed: true`. A held target has `NOT_EVALUATED` and a reason. Decision counts within each stage preserve VALUE, UNKNOWN and NOT_EVALUATED independently of relation availability.
 
-Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
+Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=..., row_guards=..., selections=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
 
 ## Use generated or handwritten SQL
 
@@ -61,9 +61,43 @@ Every stage has a separate receipt recording whether its population closed, its 
 
 ## Conditions
 
-A stage can declare `guard: {"input":"items","question":"eligible","equals":true}`. This requires exactly one selected value. Empty inputs are unresolved; multiple rows produce a FAILED stage receipt. Neither implies ANY, ALL or false. Row guards and combining selected alternatives are not implemented yet.
+A stage can declare `guard: {"input":"items","question":"eligible","equals":true}`. This requires exactly one selected value. Empty inputs are unresolved; multiple rows produce a FAILED stage receipt. Neither implies ANY, ALL or false.
 
 Matching values enable work. A known nonmatching guard leaves the branch `NOT_EVALUATED / SKIPPED`. An unresolved guard produces `NOT_EVALUATED / BLOCKED_BY_DEPENDENCY`; incompatible types produce `BLOCKED_BY_POLICY`. Boolean true and integer 1 are different values. Declared Choice uncertainty options and Score confidence policies must be resolved before checking a guard.
+
+### Route individual rows
+
+A semantic stage can add `row_guard: {"column":"route","equals":true}`. Its SQL projects a single typed decision into a declared JSON column, for example `__jev_decisions->'urgent' AS route`. The guard runs before evidence lookup or provider admission. Only matching rows enter semantic evaluation. The SQL projection itself runs before the guard; use SQL conditions for calculations that must also be conditional.
+
+Every input row remains in the branch result. A known nonmatch produces `NOT_EVALUATED / SKIPPED` for that branch's questions. An unknown or unexecuted selector produces `BLOCKED_BY_DEPENDENCY`. Malformed or missing decisions produce `FAILED`; incompatible scalar types produce `BLOCKED_BY_POLICY`. None supplies a false answer. An empty input remains a sealed empty relation.
+
+The routing column stays in the result but is removed from the provider context. Other projected columns form the context. This permits identical selected contexts to reuse evidence despite different routing observations, without removing duplicate rows. To replay an observation manually, supply that same context without the routing column. Skipped rows have no observation or provider receipt.
+
+Use `require_values: []` on the guarded input when the branch is meant to receive unresolved selectors and report their state per row. The default remains whole-input completeness. Independent branches share the existing scheduler, limits and evidence registry.
+
+### Merge selected decisions
+
+A `merge` stage performs local decision selection without a model call. Its SQL combines branch outputs at an explicit row identity and projects the selector and branch decisions into JSON columns. It declares `selections` instead of `questions`:
+
+```json
+{
+  "answer": {
+    "selector": "route",
+    "cases": [
+      {"equals": true, "column": "urgent_result"},
+      {"equals": false, "column": "routine_result"}
+    ]
+  }
+}
+```
+
+Each case names a projected decision column. Cases must be distinct Boolean, text or exact numeric values of one type. An optional `otherwise` names a fallback column for a known selector without a matching case. An unresolved selector never activates that fallback. Without a matching case or fallback, the result is `NOT_EVALUATED / BLOCKED_BY_POLICY`.
+
+The selected decision retains its value, uncertainty or operational failure. Unchosen branch states do not affect it. Results appear under `__jev_decisions` just like evaluated questions; a later consumer requires the merged decisions by default. This lets an exact aggregate proceed when every selected answer is resolved, even though each alternative branch contains intentionally skipped work.
+
+Declare merge inputs with `require_values: []` to accept those skipped alternatives. Keep a stable key in each branch and preserve its multiplicity when joining. Key contracts can detect accidental fanout; the executor does not infer the intended identity from arbitrary SQL. Merge stages do not create model observations. Preserve upstream receipt columns in the projection when their row-level provenance is needed.
+
+See the [conditional SQL example](../examples/planning/conditional_plan.sql). These contracts are available through explicit native plans and the Python adapter. Automatic lowering of SQL `CASE` into guarded branches remains separate work; ordinary generated semantic SQL does not yet acquire this routing automatically.
 
 ## Snapshot and resource contract
 

@@ -1,10 +1,14 @@
+use jev_executor::conditional::{RowGuard, Selection};
 use jev_executor::registry::RegistryConfig;
 use jev_executor::source::{MAX_CONTEXT_BYTES, parse_source};
-use jev_executor::{EvaluationInput, Executor, Limits, Provider, Questions, validate_questions};
+use jev_executor::{
+    Decision, Evaluation, EvaluationInput, Executor, Limits, Provider, Questions,
+    validate_questions,
+};
 use pgrx::JsonB;
 use pgrx::prelude::*;
 use serde_json::Value;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ffi::CString;
 
 pub type ResultRow = (
@@ -23,6 +27,8 @@ pub struct SourceSpec {
     sql: String,
     questions: Questions,
     nested_context: bool,
+    row_guard: Option<RowGuard>,
+    selections: BTreeMap<String, Selection>,
 }
 
 impl SourceSpec {
@@ -38,13 +44,76 @@ impl SourceSpec {
             sql,
             questions,
             nested_context: false,
+            row_guard: None,
+            selections: BTreeMap::new(),
         }
     }
 
-    pub fn for_plan(id: String, sql: String, questions: Value) -> Self {
-        let mut source = Self::new(id, sql, questions);
-        source.nested_context = true;
-        source
+    pub fn for_plan(
+        id: String,
+        sql: String,
+        questions: Questions,
+        row_guard: Option<RowGuard>,
+        selections: BTreeMap<String, Selection>,
+    ) -> Self {
+        if id.is_empty() || id.len() > 200 || sql.is_empty() || sql.len() > 30_000 {
+            error!("Supply a source identity and one bounded source SELECT");
+        }
+        Self {
+            id,
+            sql,
+            questions,
+            nested_context: true,
+            row_guard,
+            selections,
+        }
+    }
+
+    fn prepare(&self, source: &Value) -> (Option<Value>, Option<Evaluation>) {
+        if !self.selections.is_empty() {
+            return (
+                None,
+                Some(Evaluation {
+                    decisions: self
+                        .selections
+                        .iter()
+                        .map(|(id, selection)| (id.clone(), selection.evaluate(source)))
+                        .collect(),
+                    observation: None,
+                    receipt: None,
+                }),
+            );
+        }
+        let Some(guard) = &self.row_guard else {
+            return (None, None);
+        };
+        let blocked = match guard.evaluate(source) {
+            Ok(true) => {
+                let mut context = source.clone();
+                context
+                    .as_object_mut()
+                    .expect("Source is a row")
+                    .remove(&guard.column);
+                return (Some(context), None);
+            }
+            Ok(false) => Decision::blocked(
+                "SKIPPED",
+                "The resolved row condition does not select this branch",
+            ),
+            Err(blocked) => blocked,
+        };
+        (
+            None,
+            Some(Evaluation {
+                decisions: self
+                    .questions
+                    .keys()
+                    .map(|id| (id.clone(), blocked.clone()))
+                    .collect(),
+                observation: None,
+                receipt: None,
+            }),
+        )
     }
 }
 
@@ -395,20 +464,44 @@ impl Iterator for SemanticScan {
         if rows.is_empty() {
             return None;
         }
+        let prepared: Vec<_> = rows
+            .iter()
+            .map(|row| self.sources[row.index].spec.prepare(&row.source))
+            .collect();
+        let local_bytes: usize = prepared
+            .iter()
+            .filter_map(|(_, result)| result.as_ref())
+            .map(|result| {
+                serde_json::to_vec(result)
+                    .expect("Typed decisions serialize")
+                    .len()
+            })
+            .sum();
+        if local_bytes > 8_000_000 {
+            error!("Conditional result batch exceeds 8 MB; reduce batch_rows");
+        }
         let inputs: Vec<_> = rows
             .iter()
-            .map(|row| EvaluationInput {
-                source: &row.source,
+            .zip(&prepared)
+            .filter(|(_, (_, result))| result.is_none())
+            .map(|(row, (context, _))| EvaluationInput {
+                source: context.as_ref().unwrap_or(&row.source),
                 questions: &self.sources[row.index].spec.questions,
             })
             .collect();
-        let results = self
-            .executor
-            .evaluate_many(&inputs, || {
-                pgrx::check_for_interrupts!();
-            })
-            .unwrap_or_else(|message| error!("{}", message));
-        for (row, evaluation) in rows.into_iter().zip(results) {
+        let mut results = if inputs.is_empty() {
+            Vec::new()
+        } else {
+            self.executor
+                .evaluate_many(&inputs, || {
+                    pgrx::check_for_interrupts!();
+                })
+                .unwrap_or_else(|message| error!("{}", message))
+        }
+        .into_iter();
+        for (row, (_, ready)) in rows.into_iter().zip(prepared) {
+            let evaluation =
+                ready.unwrap_or_else(|| results.next().expect("Every admitted row has a result"));
             self.pending.push_back((
                 self.sources[row.index].spec.id.clone(),
                 row.ordinal,

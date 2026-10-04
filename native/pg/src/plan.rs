@@ -49,7 +49,7 @@ fn relation(stage: &Stage, table: &str, ordered: bool) -> String {
         "SELECT string_agg('s.' || quote_ident(attname),',' ORDER BY attnum) FROM pg_attribute \
          WHERE attrelid='pg_temp.{table}'::regclass AND attnum>0 AND NOT attisdropped AND attname<>'__jev_ordinal'"
     )).expect("Catalog column order is available").expect("Stage has columns");
-    let sql = if stage.questions.is_empty() {
+    let sql = if stage.decision_ids().next().is_none() {
         format!("SELECT {columns} FROM pg_temp.{table} s")
     } else {
         format!(
@@ -300,7 +300,7 @@ pub fn execute(value: Value, options: Value) -> JsonB {
             verify_schema(stage, table);
             progress[index].started = true;
             progress[index].rows = count;
-            if stage.questions.is_empty() {
+            if stage.decision_ids().next().is_none() {
                 progress[index].terminal = true;
                 progress[index].sealed = true;
                 progress[index].state = "SUCCEEDED";
@@ -324,9 +324,11 @@ pub fn execute(value: Value, options: Value) -> JsonB {
                 scan.add_source(SourceSpec::for_plan(
                     stage.id.clone(),
                     source,
-                    serde_json::to_value(&stage.questions).unwrap(),
+                    stage.questions.clone(),
+                    stage.row_guard.clone(),
+                    stage.selections.clone(),
                 ));
-                for question in stage.questions.keys() {
+                for question in stage.decision_ids() {
                     progress[index].decisions.insert(question.clone(), [0; 3]);
                 }
             }
