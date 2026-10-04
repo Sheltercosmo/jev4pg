@@ -74,7 +74,9 @@ class QueryHistory:
                         input={
                             "mode": "natural",
                             "text": source["request"],
-                            "planner_mode": "hybrid" if plan.get("_planner_strategy") == "hybrid" else "jev",
+                            "planner_mode": "hybrid"
+                            if plan.get("_planner_strategy") == "hybrid"
+                            else "jev",
                             "dataset_ids": dataset_ids,
                             "max_evaluations": 100,
                         },
@@ -276,6 +278,29 @@ class QueryHistory:
 
     @staticmethod
     def redact_dataset(connection, tenant, dataset_id):
+        redaction = (
+            update(schema.query_history)
+            .where(schema.query_history.c.tenant == tenant)
+            .values(
+                input={},
+                logical_sql="",
+                run_id=None,
+                review_id=None,
+                preview_id=None,
+                status="redacted",
+                error=None,
+                updated_at=now(),
+            )
+        )
+        if connection.dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import JSONB
+
+            connection.execute(
+                redaction.where(
+                    schema.query_history.c.dataset_ids.cast(JSONB).contains([dataset_id])
+                )
+            )
+            return
         records = connection.execute(
             select(schema.query_history.c.id, schema.query_history.c.dataset_ids).where(
                 schema.query_history.c.tenant == tenant
@@ -283,20 +308,4 @@ class QueryHistory:
         ).mappings()
         for record in records:
             if dataset_id in record["dataset_ids"]:
-                connection.execute(
-                    update(schema.query_history)
-                    .where(
-                        schema.query_history.c.id == record["id"],
-                        schema.query_history.c.tenant == tenant,
-                    )
-                    .values(
-                        input={},
-                        logical_sql="",
-                        run_id=None,
-                        review_id=None,
-                        preview_id=None,
-                        status="redacted",
-                        error=None,
-                        updated_at=now(),
-                    )
-                )
+                connection.execute(redaction.where(schema.query_history.c.id == record["id"]))

@@ -25,6 +25,8 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 
 The immediate priority is practical application use: efficient large-table reads, a usable analyst workspace and a runnable application path. The development preview adds cursor pagination, reviewed CSV import and an [activity monitor](../examples/activity_app/README.md). Validate these with real PostgreSQL populations and concurrent requests before expanding organization and remote-source features. See [application contracts](APPLICATIONS.md).
 
+Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES.md), typed assignment previews and row locks. This removes the whole-table Python snapshot for those writes. Bulk jobs, application cancellation, native semantic mutations and maintained-feature generations remain separate work; a successful bounded write does not establish their readiness.
+
 | Area | Needed before a native production release |
 | --- | --- |
 | Relational coverage | Broader dependent query shapes and explicit provenance across joins and projections. |

@@ -56,7 +56,7 @@ Keep credentials on the application backend. Use a reader identity, expose only 
 
 Relational filtering and semantic evaluation have different costs. Filter and project in PostgreSQL before JEV calls where doing so preserves the requested population. Use reviewed semantic features or compatible evidence reuse for repeated work. Independent JEV stages remain parallel; dependent stages wait for their inputs.
 
-The Python semantic and mutation-preview path has a shared 50,000-source-row limit. It stops reading additional tables as soon as that budget is exceeded. The opt-in native executor supports bounded semantic scans and stage DAGs; consult [native deployment](NATIVE_DEPLOYMENT.md) and [plan coverage](NATIVE_PLANS.md). A fast table-page benchmark does not demonstrate million-row inference performance.
+The Python semantic path has a shared 50,000-source-row limit, including semantic mutation previews. It stops reading additional tables as soon as that budget is exceeded. Ordinary PostgreSQL writes use [bounded target previews and row locks](APPLICATION_WRITES.md), without copying the source table. The opt-in native executor supports bounded semantic scans and stage DAGs; consult [native deployment](NATIVE_DEPLOYMENT.md) and [plan coverage](NATIVE_PLANS.md). A fast table-page benchmark does not demonstrate million-row inference performance.
 
 ## Reproduce application validation
 

@@ -186,6 +186,14 @@ def mount(app, executor, identity, reviewer):
 
         # DBAPI exceptions can contain SQL parameters. Return only a stable class/code.
         code = getattr(exc.orig, "sqlstate", None)
+        if code in {"40001", "40P01", "55P03"}:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "Concurrent database activity prevented this operation. No changes were committed. For a mutation, inspect a fresh preview before retrying.",
+                    "code": code,
+                },
+            )
         return JSONResponse(
             status_code=400,
             content={

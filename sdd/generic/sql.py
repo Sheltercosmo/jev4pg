@@ -681,6 +681,28 @@ class SQLService:
             node.name.upper() in ("SEMANTIC", "SEMANTIC_FEATURE")
             for node in tree.find_all(exp.Anonymous)
         )
+        if (
+            target is not None
+            and not semantic_query
+            and self.db.engine.dialect.name == "postgresql"
+        ):
+            from .mutation import execute_mutation
+
+            return execute_mutation(
+                self,
+                tenant,
+                sql,
+                tree,
+                bindings,
+                target,
+                request=request,
+                plan=plan,
+                allow_all=allow_all,
+                max_affected=max_affected,
+                actor=actor,
+                mutation_token=mutation_token,
+                started=started,
+            )
         native_read = target is None and not semantic_query
         if self.semantic_engine == "native" and semantic_query:
             from .native_sql import execute_native
@@ -938,50 +960,7 @@ class SQLService:
                 .where(schema.previews.c.id == mutation_token, schema.previews.c.tenant == tenant)
                 .values(state="committed")
             )
-            if isinstance(tree, exp.Delete):
-                row_keys = [digest(serial([r[p] for p in target["primary_key"]])) for r in before]
-                connection.execute(
-                    delete(schema.evidence).where(
-                        schema.evidence.c.tenant == tenant,
-                        schema.evidence.c.dataset_id == target["id"],
-                        schema.evidence.c.row_key.in_(row_keys),
-                    )
-                )
-                connection.execute(
-                    delete(schema.row_versions).where(
-                        schema.row_versions.c.tenant == tenant,
-                        schema.row_versions.c.dataset_id == target["id"],
-                        schema.row_versions.c.row_key.in_(row_keys),
-                    )
-                )
-                connection.execute(
-                    delete(schema.inference_calls).where(
-                        schema.inference_calls.c.tenant == tenant,
-                        schema.inference_calls.c.dataset_id == target["id"],
-                        schema.inference_calls.c.row_key.in_(row_keys),
-                    )
-                )
-                from .history import QueryHistory
-
-                QueryHistory.redact_dataset(connection, tenant, target["id"])
-                # Results may contain source text: redact retained runs over this deleted dataset.
-                for old in connection.execute(
-                    select(schema.runs).where(schema.runs.c.tenant == tenant)
-                ).mappings():
-                    if target["id"] in old["manifest"].get("dataset_ids", []):
-                        connection.execute(
-                            update(schema.runs)
-                            .where(schema.runs.c.id == old["id"], schema.runs.c.tenant == tenant)
-                            .values(
-                                plan={},
-                                parameters={},
-                                result=[],
-                                manifest={"status": "redacted_source_deleted"},
-                            )
-                        )
-            from .features import FeatureRegistry
-
-            FeatureRegistry(self.db).enqueue(tenant, target["id"], connection)
+            self.after_mutation(connection, tenant, target, tree, before)
             manifest.update(
                 committed=True,
                 affected_rows=changed,
@@ -998,6 +977,64 @@ class SQLService:
                 manifest,
                 [{"affected_rows": changed}],
             )
+
+    def after_mutation(self, connection, tenant, target, tree, before):
+        if isinstance(tree, exp.Delete):
+            row_keys = [digest(serial([r[p] for p in target["primary_key"]])) for r in before]
+            connection.execute(
+                delete(schema.evidence).where(
+                    schema.evidence.c.tenant == tenant,
+                    schema.evidence.c.dataset_id == target["id"],
+                    schema.evidence.c.row_key.in_(row_keys),
+                )
+            )
+            connection.execute(
+                delete(schema.row_versions).where(
+                    schema.row_versions.c.tenant == tenant,
+                    schema.row_versions.c.dataset_id == target["id"],
+                    schema.row_versions.c.row_key.in_(row_keys),
+                )
+            )
+            connection.execute(
+                delete(schema.inference_calls).where(
+                    schema.inference_calls.c.tenant == tenant,
+                    schema.inference_calls.c.dataset_id == target["id"],
+                    schema.inference_calls.c.row_key.in_(row_keys),
+                )
+            )
+            from .history import QueryHistory
+
+            QueryHistory.redact_dataset(connection, tenant, target["id"])
+            # Results may contain source text: redact retained runs over this deleted dataset.
+            redaction = (
+                update(schema.runs)
+                .where(schema.runs.c.tenant == tenant)
+                .values(
+                    plan={},
+                    parameters={},
+                    result=[],
+                    manifest={"status": "redacted_source_deleted"},
+                )
+            )
+            if self.db.engine.dialect.name == "postgresql":
+                from sqlalchemy.dialects.postgresql import JSONB
+
+                connection.execute(
+                    redaction.where(
+                        schema.runs.c.manifest.cast(JSONB)["dataset_ids"].contains([target["id"]])
+                    )
+                )
+            else:
+                for old in connection.execute(
+                    select(schema.runs.c.id, schema.runs.c.manifest).where(
+                        schema.runs.c.tenant == tenant
+                    )
+                ).mappings():
+                    if target["id"] in old["manifest"].get("dataset_ids", []):
+                        connection.execute(redaction.where(schema.runs.c.id == old["id"]))
+        from .features import FeatureRegistry
+
+        FeatureRegistry(self.db).enqueue(tenant, target["id"], connection)
 
     def save(self, connection, tenant, request, sql, compiled, params, plan, manifest, rows):
         identity = uid()
