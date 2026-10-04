@@ -6,7 +6,7 @@ The development Rust executor can reuse committed observations and coordinate JE
 
 The [native Compose stack](NATIVE_DEPLOYMENT.md) provisions a dedicated registry login and mounts its password automatically. The steps below configure an existing PostgreSQL server.
 
-For an application deployment, set `SDD_NATIVE_REGISTRY_PASSWORD_FILE` to a protected file containing a password of at least 24 characters. Run `jevsd-pg migrate --native-interface --native-registry` with the usual administrator and runtime credentials. This creates the restricted login and grants below; existing passwords are preserved. Configure the server's provider file afterward as described below.
+For an application deployment, set `SDD_NATIVE_REGISTRY_PASSWORD_FILE` to a protected file containing a password of at least 24 characters. Run `jev4pg migrate --native-interface --native-registry` with the usual administrator and runtime credentials. This creates the restricted login and grants below; existing passwords are preserved. Configure the server's provider file afterward as described below.
 
 For standalone SQL use, install the current native extension, then create a dedicated login as an administrator:
 

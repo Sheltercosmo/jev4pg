@@ -8,8 +8,8 @@ from . import __version__
 
 
 def main():
-    parser = argparse.ArgumentParser(description="jevsd-pg database workspace")
-    parser.add_argument("--version", action="version", version=f"jevsd-pg {__version__}")
+    parser = argparse.ArgumentParser(description="jev4pg database workspace")
+    parser.add_argument("--version", action="version", version=f"jev4pg {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init")
     sub.add_parser("demo")

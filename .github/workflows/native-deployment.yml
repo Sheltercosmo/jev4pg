@@ -36,7 +36,7 @@ jobs:
         with:
           context: .
           load: true
-          tags: jevsd-pg:local
+          tags: jev4pg:local
           cache-from: type=gha,scope=native-app
           cache-to: type=gha,scope=native-app,mode=max
       - name: Build optimized native image
@@ -45,7 +45,7 @@ jobs:
           context: .
           file: deploy/native.Dockerfile
           load: true
-          tags: jevsd-pg-native-postgres:local
+          tags: jev4pg-native-postgres:local
           cache-from: type=gha,scope=native-postgres
           cache-to: type=gha,scope=native-postgres,mode=max
       - name: Start native deployment

@@ -130,7 +130,7 @@ def create_app(executor=None, tokens=None):
                 await asyncio.to_thread(worker.join, 3)
 
     app = FastAPI(
-        title="jevsd-pg",
+        title="jev4pg",
         version=__version__,
         lifespan=lifespan,
         description="Query, inspect evidence, review decisions, and govern reusable concepts. Tenant is bound to the bearer token.",

@@ -1,6 +1,6 @@
 # Architecture
 
-jevsd-pg has three main responsibilities: interpret the request, establish the evidence needed by that interpretation, and execute authorized data operations. Keeping these responsibilities separate makes plans inspectable and allows independent semantic work to run in parallel.
+jev4pg has three main responsibilities: interpret the request, establish the evidence needed by that interpretation, and execute authorized data operations. Keeping these responsibilities separate makes plans inspectable and allows independent semantic work to run in parallel.
 
 ## Components
 

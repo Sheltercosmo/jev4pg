@@ -53,7 +53,7 @@ services:
 
   migrate:
     build: .
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["migrate", "--sql-interface"]
     environment:
       <<: *database
@@ -66,7 +66,7 @@ services:
     tmpfs: [/tmp]
 
   app:
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["serve", "--host", "0.0.0.0"]
     environment:
       <<: *runtime
@@ -89,14 +89,14 @@ services:
     stop_grace_period: 120s
 
   sql-worker:
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["sql-worker", "--concurrency", "${SDD_SQL_WORKERS:-2}"]
     environment: *runtime
     secrets: [app_password, typesafe_api_key, jev_api_key, llm_api_key]
     depends_on:
       migrate: {condition: service_completed_successfully}
     healthcheck:
-      test: ["CMD", "jevsd-pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
+      test: ["CMD", "jev4pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
       interval: 15s
       timeout: 12s
       retries: 4

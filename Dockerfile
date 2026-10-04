@@ -16,5 +16,5 @@ COPY --from=build /wheels /wheels
 RUN pip install --no-cache-dir --no-deps /wheels/*.whl && rm -r /wheels
 USER 10001:10001
 EXPOSE 8000
-ENTRYPOINT ["jevsd-pg"]
+ENTRYPOINT ["jev4pg"]
 CMD ["serve", "--host", "0.0.0.0"]

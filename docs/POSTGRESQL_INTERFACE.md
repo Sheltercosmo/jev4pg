@@ -28,7 +28,7 @@ Map that login to an application identity:
 docker compose run --rm migrate sql-grant analyst --tenant demo --actor analyst --role reader
 ```
 
-On an installation without Docker, use `jevsd-pg sql-grant` with administrator connection settings. Use `--role reviewer` only for clients allowed to approve or promote definitions. Do not share the runtime login `sdd_app` with SQL clients. The grant command rejects administrative logins and logins with runtime table access.
+On an installation without Docker, use `jev4pg sql-grant` with administrator connection settings. Use `--role reviewer` only for clients allowed to approve or promote definitions. Do not share the runtime login `sdd_app` with SQL clients. The grant command rejects administrative logins and logins with runtime table access.
 
 Connect as the client:
 

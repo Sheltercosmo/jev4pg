@@ -1,6 +1,6 @@
 # Capabilities and operator selection
 
-jevsd-pg separates language interpretation from data execution. JEV supplies bounded semantic decisions, while SQL and application code handle arithmetic, authorization, storage and workflow state. Use the table below to find the relevant API before consulting its full signature.
+jev4pg separates language interpretation from data execution. JEV supplies bounded semantic decisions, while SQL and application code handle arithmetic, authorization, storage and workflow state. Use the table below to find the relevant API before consulting its full signature.
 
 ## Query and data workflows
 

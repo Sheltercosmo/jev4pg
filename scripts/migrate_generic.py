@@ -1,4 +1,4 @@
-"""Compatibility entry point; new deployments should use jevsd-pg migrate."""
+"""Compatibility entry point; new deployments should use jev4pg migrate."""
 
 import os
 from sdd.bootstrap import migrate

@@ -2,7 +2,7 @@ name: jevsd-pg-native
 
 services:
   postgres:
-    image: jevsd-pg-native-postgres:local
+    image: jev4pg-native-postgres:local
     build:
       dockerfile: deploy/native.Dockerfile
     environment:

@@ -2,7 +2,7 @@
 
 ## 0.7.0.dev0 — development preview
 
-These changes are available from `main`. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0).
+These changes are available from `main`. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.6.0).
 
 | Feature | What it adds |
 | --- | --- |

@@ -1,5 +1,7 @@
 # Installation
 
+The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available in development builds; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
+
 Choose the application deployment or the native execution preview:
 
 | Path | Requirements | Execution |
@@ -51,22 +53,22 @@ Copy `.env.example` to `.env` and configure the runtime database URL, provider a
 For the SQL interface, export the packaged extension files:
 
 ```bash
-jevsd-pg extension-files ./extension-files
+jev4pg extension-files ./extension-files
 ```
 
 On the PostgreSQL server, copy the resulting `.control` and `.sql` files into the directory printed by `pg_config --sharedir`, under `extension/`. Then run:
 
 ```bash
-jevsd-pg migrate --sql-interface
+jev4pg migrate --sql-interface
 ```
 
-This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jevsd-pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
+This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jev4pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
 
 Remove administrator credentials from the service environment. Set `SDD_ENV=production`, `SDD_SQL_INTERFACE=1`, and start the services under your process supervisor:
 
 ```bash
-jevsd-pg serve --host 127.0.0.1 --port 8000
-jevsd-pg sql-worker --concurrency 2 --heartbeat-file /tmp/jev-sql-worker.heartbeat
+jev4pg serve --host 127.0.0.1 --port 8000
+jev4pg sql-worker --concurrency 2 --heartbeat-file /tmp/jev-sql-worker.heartbeat
 ```
 
 Run these as separate processes. On Windows choose a writable heartbeat path, such as `.runtime/sql-worker.heartbeat`. Production startup rejects SQLite, administrative runtime roles, missing migration state and invalid API token mappings. Use a separate PostgreSQL login for each SQL client; follow [SQL access setup](POSTGRESQL_INTERFACE.md#grant-access).
@@ -78,7 +80,7 @@ Use a checkout of `main`. The [native Compose guide](NATIVE_DEPLOYMENT.md) build
 For application integration, install Python from that same checkout and run:
 
 ```bash
-jevsd-pg migrate --native-interface
+jev4pg migrate --native-interface
 ```
 
 Set `SDD_SEMANTIC_ENGINE=native` in the application environment and start the service. This enables supported semantic reads through `/ask` and `/data/sql`. It does not switch all operators to Rust. Maintained semantic features and semantic mutation review require the default Python engine. The [roadmap](IMPLEMENTATION_PLAN.md) lists remaining release work; use a separate database for preview evaluation.
@@ -121,7 +123,7 @@ docker compose up -d --wait
 
 The current migration is additive and preserves source data and evidence. It does not rotate passwords. Never run two migration versions against the same database at once. Before adopting this deployment on an existing installation, test migration and restore on a database copy. Do not repoint Compose at an unrelated database volume.
 
-On a development build, check the installed application version with `jevsd-pg --version`, or `docker compose exec app jevsd-pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
+On a development build, check the installed application version with `jev4pg --version`, or `docker compose exec app jev4pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
 
 ```sql
 SELECT version FROM sdd_schema_version;

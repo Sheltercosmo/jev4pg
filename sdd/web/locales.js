@@ -219,7 +219,7 @@ const messages = {
     outer_max: "Largest group value",
     outer_sum: "Sum of group values",
 
-    title: "jevsd-pg · Database workspace",
+    title: "jev4pg · Database workspace",
     brand: "DATABASE",
     workspace: "Workspace",
     api: "API reference",
@@ -580,7 +580,7 @@ const messages = {
     outer_max: "各组结果的最大值",
     outer_sum: "各组结果之和",
 
-    title: "jevsd-pg · 数据库工作区",
+    title: "jev4pg · 数据库工作区",
     brand: "数据库",
     workspace: "工作区",
     api: "接口文档",

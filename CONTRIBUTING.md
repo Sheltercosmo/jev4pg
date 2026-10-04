@@ -1,4 +1,4 @@
-# Contributing to jevsd-pg
+# Contributing to jev4pg
 
 Contributions are welcome in query planning, semantic operators, execution correctness, usability and evaluation. Open an issue describing the problem and the behavior you expect, or submit a focused pull request with a reproducible example.
 

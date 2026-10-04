@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="docs/assets/readme-banner.png" width="1000" alt="jevsd-pg: Natural language. Semantic SQL. Pangolin mascot with three parallel data paths." />
+  <img src="docs/assets/readme-banner.png?v=jev4pg" width="1000" alt="jev4pg: Natural language. Semantic SQL. Pangolin mascot with three parallel data paths." />
 </p>
 
-<h1 align="center">jevsd-pg</h1>
+<h1 align="center">jev4pg</h1>
 
 <p align="center">
   <strong>Natural language to SQL and semantic operators for PostgreSQL</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/release-0.6.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.6.0" /></a>
+  <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/release-0.6.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.6.0" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
 
 <p align="center">
-  <a href="https://jevsdpg.com">Website</a> ·
+  <a href="https://jev4pg.com">Website</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/zh/USER_GUIDE.md">简体中文</a> ·
@@ -22,14 +22,14 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural language to SQL (text-to-SQL) in English and Simplified Chinese with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
+jev4pg is an open-source semantic database built on PostgreSQL. It combines natural language to SQL (text-to-SQL) in English and Simplified Chinese with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
 
 The execution model makes each model call count: independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused. Choose JEV planning or combine LLM plan generation with JEV context selection and review. Inspect generated SQL and refine previous queries through the web workspace, HTTP API or SQL clients. A shared provider interface supports compatible hosted services and local adapters.
 
-Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-language queries, parallel execution and probability embeddings.
+Visit [jev4pg.com](https://jev4pg.com) for interactive examples of natural-language queries, parallel execution and probability embeddings.
 
 <p align="center">
-  <img src="docs/assets/product-tour.gif?v=94ace4f0" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
 
 ## What you can build
@@ -46,7 +46,7 @@ Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-lan
 
 The self-developing layer stores definitions, evidence and corrections as reusable database features. New definitions require review before promotion. The [provider interface](docs/PROVIDERS.md) supports TypeSafe, compatible hosted endpoints and local adapters.
 
-Previously published as **JevSDSQL**; the current repository and package are named **jevsd-pg**.
+Previously published as **JevSDSQL** and **jevsd-pg**; the current project and development package are named **jev4pg**.
 
 ## Choose an installation
 
@@ -62,8 +62,8 @@ Use a release tag for a fixed deployment and `main` to evaluate ongoing developm
 To start the released application with Python 3.11+ and Docker Compose v2:
 
 ```bash
-git clone --branch v0.6.0 https://github.com/Sheltercosmo/jevsd-pg.git
-cd jevsd-pg
+git clone --branch v0.6.0 https://github.com/Sheltercosmo/jev4pg.git
+cd jev4pg
 python deploy/configure.py
 docker compose build
 docker compose up -d --wait
