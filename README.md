@@ -15,6 +15,7 @@
 
 <p align="center">
   <a href="https://jev4pg.com">Website</a> ·
+  <a href="https://jev4pg.com/guide/">Project guide</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/zh/USER_GUIDE.md">简体中文</a> ·
