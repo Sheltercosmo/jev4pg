@@ -13,6 +13,7 @@ jevsd-pg has three main responsibilities: interpret the request, establish the e
 | SQL execution | `sdd/generic/sql.py` | SQL validation, semantic predicates, result coverage and mutation previews. |
 | Native query compilation | `sdd/generic/native_sql.py`, `native_relational.py`, `native_conditionals.py` | Authorized source relations, shared stages and conditional SQL routing. |
 | Native semantic execution | `native/core/`, `native/pg/` | Bounded Rust evaluation, concurrent provider I/O, typed decisions and observation replay. |
+| Native probability embeddings | `native/core/src/embedding.rs` | Fixed question bases, complete answer distributions and compatible local distance comparisons. |
 | Semantic features | `sdd/generic/features.py` | Definition revisions, evidence reuse, human corrections and materialization. |
 | Operator API | `sdd/operators/service.py` | Operator contracts, authorization and dispatch. |
 | Operator runtime | `sdd/operators/runtime.py`, `budget.py`, `types.py` | Batching, concurrency, reservations and explicit output states. |

@@ -11,7 +11,7 @@ from sdd.operators.usage import examples
 DESTINATION = Path(__file__).resolve().parents[1] / "docs" / "JEV_FUNCTION_REFERENCE.md"
 INTRODUCTION = """# JEV function reference
 
-Each section gives the `arguments` object for `POST /jev/call`. Set `operator` to the section name:
+The JEV.* sections give the `arguments` object for `POST /jev/call`. Set `operator` to the section name:
 
 ```json
 {
@@ -30,6 +30,18 @@ Inspect `output_state` before reading `value`. Incomplete results use `partial_v
 Optional execution controls belong beside `operator` and `arguments`, for example `"limits": {"max_judgments": 100, "concurrency": 4}`. Do not pass the outer budget as an operator argument. Most population parameters also accept `{"dataset_id":"...","where":{"team":"North"}}`; registered datasets require a primary key. Direct states for NOUL, CHOICE, SCORE and COMPARE are literal input values.
 
 The same complete request examples are available from `GET /jev/operators/examples` and each catalog entry's `usage` field. The source is [examples.json](../sdd/operators/examples.json); rebuild this reference with `python -m scripts.build_operator_docs`.
+
+## Native PostgreSQL embedding functions
+
+These development functions run in the Rust extension through SQL. See [native embeddings](NATIVE_EMBEDDINGS.md) for setup, basis definitions and a runnable example.
+
+| Function | Purpose |
+| --- | --- |
+| `jev_native.embed(source_sql, basis, options)` | Evaluate a shared question basis and return a probability matrix and vector for each source row. |
+| `jev_native.answer_matrix(basis, decisions, evaluator)` | Project existing typed decisions into the same representation without model calls. |
+| `jev_native.embedding_distance(left, right)` | Compare complete matrices with matching basis and evaluator identities locally. |
+
+## HTTP operators
 
 """
 

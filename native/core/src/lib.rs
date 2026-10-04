@@ -1,6 +1,7 @@
 //! Typed semantic evaluation. PostgreSQL owns source selection and arithmetic.
 
 pub mod conditional;
+pub mod embedding;
 pub mod evidence;
 pub mod plan;
 pub mod registry;
@@ -235,6 +236,10 @@ pub struct Executor {
 }
 
 impl Executor {
+    pub fn evaluator(&self) -> evidence::EvaluatorIdentity {
+        (&self.provider).into()
+    }
+
     pub fn new(provider: Provider, limits: Limits) -> Result<Self, &'static str> {
         limits.validate()?;
         let endpoint =

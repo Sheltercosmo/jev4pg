@@ -296,6 +296,9 @@ def verify_registry_runtime(connection, observations, gates, config_path):
         checks.append(
             "application semantic reads reuse durable evidence under zero new-call allowance"
         )
+        from embeddings import verify_embedding_registry
+
+        checks.extend(verify_embedding_registry(connection, observations))
         return checks
     finally:
         config_path.write_text(original)

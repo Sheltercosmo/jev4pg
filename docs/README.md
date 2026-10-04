@@ -21,6 +21,7 @@ Start with installation, then use the workspace guide or API examples for your t
 | [Performance and cost](PERFORMANCE_AND_COST.md) | Release measurements and their limits. |
 | [Architecture](ARCHITECTURE.md) | Components, stage dependencies and parallel work. |
 | [Native plans](NATIVE_PLANS.md) | Development Rust/PostgreSQL stage execution, typed inputs and SQL usage. |
+| [Native embeddings](NATIVE_EMBEDDINGS.md) | Multi-question probability matrices, reusable vectors and SQL similarity queries. |
 | [Dependencies](DEPENDENCIES.md) | Libraries and external services. |
 
 The running service exposes OpenAPI documentation at `/docs`. Runnable operator clients are in [examples/operators](../examples/operators/README.md). See [contribution guidance](../CONTRIBUTING.md) to change the code or documentation.

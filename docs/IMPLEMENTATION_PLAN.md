@@ -43,4 +43,6 @@ Explicit native plans now support row conditions and deterministic selected-bran
 
 The query service also lowers SQL CASE to guarded branches with stable row identities. SQL NULL conditions fall through, while unresolved semantic selectors hold the result. Selected decision requirements allow exact consumers to proceed without requiring skipped alternatives. Internal routing fields remain outside provider context, preserving duplicate-context reuse.
 
+Native multi-question embeddings now expose complete answer probability distributions and vectors through SQL. They share scan scheduling and evidence reuse. Matrix projection and compatible distance comparisons run locally, while missing distributions retain their operational states. Retrieval-quality measurements remain distinct from deterministic execution verification.
+
 Broader dependency shapes and provenance, reuse across differently packed questions, live source revisions, maintained features and aggregate resource accounting remain open gates. Versioned installation packages, upgrade and restore checks, comparative measurements and a frozen final evaluation are also required before release.

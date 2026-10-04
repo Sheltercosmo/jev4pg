@@ -339,6 +339,9 @@ def verify(connection, config):
     multi_checks, multi_metrics = verify_multi_source(connection, observations, gates, must_fail)
     checks.extend(multi_checks)
     checks.extend(verify_application(connection, observations))
+    from embeddings import verify_embeddings
+
+    checks.extend(verify_embeddings(connection, observations, gates, must_fail))
     from registry import verify_registry
 
     checks.extend(verify_registry(connection))

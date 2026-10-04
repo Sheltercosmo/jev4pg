@@ -128,6 +128,9 @@ def migrate(
                 connection.exec_driver_sql(
                     f"GRANT EXECUTE ON FUNCTION jev_native.execute_plan(jsonb,jsonb) TO {role}"
                 )
+                connection.exec_driver_sql(
+                    f"GRANT EXECUTE ON FUNCTION jev_native.embed(text,jsonb,jsonb) TO {role}"
+                )
             connection.execute(
                 text(
                     "INSERT INTO public.sdd_schema_version(singleton, version) VALUES(true, :version) "

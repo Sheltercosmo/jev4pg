@@ -6,6 +6,8 @@ PostgreSQL filters, projects and joins source data. A cursor supplies bounded ba
 
 For dependent work, `jev_native.execute_plan` runs a typed stage DAG with PostgreSQL intermediates and one shared semantic executor. See [native plans](../docs/NATIVE_PLANS.md) and the [runnable SQL example](../examples/planning/native_plan.sql).
 
+For reusable probability features, `jev_native.embed` batches a fixed basis of questions and returns an answer probability matrix and vector per row. [Native embeddings](../docs/NATIVE_EMBEDDINGS.md) covers projection, states, evidence reuse and local similarity queries.
+
 ## Build
 
 The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed:
@@ -44,6 +46,7 @@ GRANT USAGE ON SCHEMA jev_native TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.scan_many(jsonb,jsonb) TO analyst;
 GRANT EXECUTE ON FUNCTION jev_native.execute_plan(jsonb,jsonb) TO analyst;
+GRANT EXECUTE ON FUNCTION jev_native.embed(text,jsonb,jsonb) TO analyst;
 ```
 
 The caller also needs access to its source tables and columns. Source reads run with the caller's PostgreSQL privileges and row security. The scan function is not executable by PUBLIC by default.

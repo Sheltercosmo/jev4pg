@@ -33,6 +33,11 @@ pub struct SourceSpec {
 }
 
 impl SourceSpec {
+    pub fn with_context(mut self, columns: Vec<String>) -> Self {
+        self.context_columns = Some(columns);
+        self
+    }
+
     pub fn new(id: String, sql: String, questions: Value) -> Self {
         if id.is_empty() || id.len() > 200 || sql.is_empty() || sql.len() > 30_000 {
             error!("Supply a source identity and one bounded source SELECT");
@@ -97,7 +102,12 @@ impl SourceSpec {
                 if let Some(columns) = &self.context_columns {
                     let context = columns
                         .iter()
-                        .map(|name| (name.clone(), source[name].clone()))
+                        .map(|name| {
+                            let value = source.get(name).unwrap_or_else(|| {
+                                error!("Projected context column is absent from source: {}", name)
+                            });
+                            (name.clone(), value.clone())
+                        })
                         .collect();
                     return (Some(Value::Object(context)), None);
                 }
