@@ -23,6 +23,9 @@ def main():
         action="store_true",
         help="Enable the installed Rust semantic extension",
     )
+    migration.add_argument(
+        "--native-registry", action="store_true", help="Create the restricted native evidence login"
+    )
     grant = sub.add_parser("sql-grant", help="Map an existing SQL login to a JEV identity")
     grant.add_argument("login")
     grant.add_argument("--tenant", required=True)
@@ -96,6 +99,8 @@ def main():
                     secret("SDD_DB_PASSWORD"),
                     args.sql_interface,
                     native_interface=args.native_interface,
+                    native_registry=args.native_registry,
+                    native_registry_password=secret("SDD_NATIVE_REGISTRY_PASSWORD"),
                 )
             elif args.command == "sql-grant":
                 grant_client(

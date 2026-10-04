@@ -252,3 +252,8 @@ COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS
 );
 
 extension_sql_file!("../sql/registry.sql", name = "native_registry");
+extension_sql_file!(
+    "../sql/jev_native--0.1.0--0.2.0.sql",
+    name = "native_registry_backup",
+    requires = ["native_registry"]
+);

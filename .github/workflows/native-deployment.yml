@@ -1,0 +1,62 @@
+name: Native deployment
+on:
+  push:
+    paths: ['native/**', 'sdd/**', 'deploy/**', 'compose*.yaml', '.dockerignore', 'Dockerfile', 'requirements.lock.txt', 'pyproject.toml', '.github/workflows/native-deployment.yml']
+  pull_request:
+    paths: ['native/**', 'sdd/**', 'deploy/**', 'compose*.yaml', '.dockerignore', 'Dockerfile', 'requirements.lock.txt', 'pyproject.toml', '.github/workflows/native-deployment.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SDD_TEST_NATIVE: '1'
+      SDD_HTTP_PORT: '18000'
+      SDD_POSTGRES_PORT: '15432'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements.lock.txt
+          python -m pip install --no-deps .
+          python -m pytest tests/test_deployment_config.py -q
+      - name: Create disposable credentials
+        run: |
+          python deploy/configure.py --native --no-prompt
+          python -c "from pathlib import Path; Path('.secrets/typesafe_api_key').write_text('fixture-key-must-not-reach-custom-endpoint\\n')"
+      - uses: docker/setup-buildx-action@v3
+      - name: Build application image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: jevsd-pg:local
+          cache-from: type=gha,scope=native-app
+          cache-to: type=gha,scope=native-app,mode=max
+      - name: Build optimized native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/native.Dockerfile
+          load: true
+          tags: jevsd-pg-native-postgres:local
+          cache-from: type=gha,scope=native-postgres
+          cache-to: type=gha,scope=native-postgres,mode=max
+      - name: Start native deployment
+        run: docker compose -f compose.yaml -f compose.native.yaml -f deploy/compose.test.yaml up -d --no-build --wait --wait-timeout 180
+      - name: Verify deployment and persistence
+        run: |
+          python deploy/smoke.py
+          python deploy/native_smoke.py
+      - name: Service diagnostics
+        if: failure()
+        run: docker compose -f compose.yaml -f compose.native.yaml -f deploy/compose.test.yaml logs --tail=100
+      - name: Stop disposable deployment
+        if: always()
+        run: docker compose -f compose.yaml -f compose.native.yaml -f deploy/compose.test.yaml down -v

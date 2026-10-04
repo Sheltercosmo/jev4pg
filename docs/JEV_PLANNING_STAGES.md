@@ -2,6 +2,8 @@
 
 The existing [hybrid planning DAG](ARCHITECTURE.md#hybrid-stage-placement) remains in place. This document records the native execution stages and why they wait or run concurrently.
 
+Native container configuration and extension migration run before service readiness. They establish provider identity, registry privileges and persistence contracts without adding query-time JEV stages. The container deployment retains the same shared scheduler and independent branches. Registry backup registration preserves evidence and admission state across recovery; it does not authorize replay of unfinished provider work.
+
 Attached sources add a catalog boundary before source selection. Authorization determines the logical dataset; source pinning and contract validation then establish the relation this query may read. Table locks precede the data snapshot. Indirect views hold a guard transaction while the main query runs. Schema failures stop before inference, without adding a serial JEV stage. Foreign-key metadata retains every composite operand during parallel field retrieval. See [existing sources](EXISTING_DATA.md).
 
 | Stage | Required input | Independent work | Placement reason |

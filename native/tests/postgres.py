@@ -348,6 +348,10 @@ def verify(connection, config):
     from registry_runtime import verify_registry_runtime
 
     checks.extend(verify_registry_runtime(connection, observations, gates, config))
+    if os.getenv("SDD_TEST_NATIVE_UPGRADE") == "1":
+        from upgrade import verify_upgrade
+
+        checks.extend(verify_upgrade(connection))
     return {
         "checks": checks,
         "passed": len(checks),

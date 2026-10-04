@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/release-0.6.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.6.0" /></a>
-  <a href="native/README.md"><img src="https://img.shields.io/badge/Rust_native-preview-18181b?style=flat-square&amp;labelColor=52525b" alt="Rust native preview" /></a>
+  <a href="docs/NATIVE_DEPLOYMENT.md"><img src="https://img.shields.io/badge/native-0.2.0_preview-18181b?style=flat-square&amp;labelColor=52525b" alt="Native 0.2.0 preview" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
 
@@ -43,9 +43,9 @@ The self-developing layer stores definitions, evidence and corrections as reusab
 | Path | Includes | Setup |
 | --- | --- | --- |
 | Release v0.6.0 | Workspace, HTTP API, Python semantic runtime and asynchronous `jev.*` SQL jobs | [Compose or existing PostgreSQL](docs/INSTALLATION.md) |
-| Development source on `main` | The application plus Rust `jev_native.*`, source attachments and native SQL compilation | [Native build and configuration](native/README.md) |
+| Development source on `main` | The application plus Rust `jev_native.*`, source attachments and native SQL compilation | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
 
-The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. The default Compose stack uses the Python runtime and does not install the Rust extension. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).
+The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. Use the native Compose overlay to build and enable it; the default Compose stack uses Python. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).
 
 To start the released application with Python 3.11+ and Docker Compose v2:
 

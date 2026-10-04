@@ -10,6 +10,8 @@ For reusable probability features, `jev_native.embed` batches a fixed basis of q
 
 ## Build
 
+For a complete container installation, use the [native Compose stack](../docs/NATIVE_DEPLOYMENT.md). The following commands install the extension on an existing server.
+
 Build from the repository's `main` branch. The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed. The default Compose image does not include this extension. From the repository root:
 
 ```sh

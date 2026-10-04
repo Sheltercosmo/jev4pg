@@ -14,18 +14,18 @@ from sqlalchemy import URL, create_engine, text
 from sdd.bootstrap import ensure_login, grant_client
 
 COMPOSE = ["docker", "compose", "-f", "compose.yaml", "-f", "deploy/compose.test.yaml"]
+if os.getenv("SDD_TEST_NATIVE") == "1":
+    COMPOSE[4:4] = ["-f", "compose.native.yaml"]
 
 
 def command(*args, input=None, env=None):
-    return subprocess.run(
-        [*COMPOSE, *args],
-        input=input,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=True,
-        env=env,
-    ).stdout.strip()
+    result = subprocess.run(
+        [*COMPOSE, *args], input=input, capture_output=True, text=True, encoding="utf-8", env=env
+    )
+    if result.returncode:
+        print(result.stderr[-4000:])
+        result.check_returncode()
+    return result.stdout.strip()
 
 
 def main():

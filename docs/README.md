@@ -1,6 +1,6 @@
 # Documentation
 
-Start with [installation](INSTALLATION.md) for the application or [native setup](../native/README.md) for direct Rust execution in PostgreSQL. The native interface is a development preview; the default Compose stack uses the Python runtime.
+Start with [installation](INSTALLATION.md) for the released application or [native Compose](NATIVE_DEPLOYMENT.md) for the Rust preview. For direct SQL use on an existing server, follow the [native build guide](../native/README.md). The default Compose stack uses the Python runtime.
 
 ## Use the database
 
@@ -33,6 +33,7 @@ Start with [installation](INSTALLATION.md) for the application or [native setup]
 | Guide | Contents |
 | --- | --- |
 | [Installation](INSTALLATION.md) | Release deployment, native preview, credentials and backups. |
+| [Native Compose](NATIVE_DEPLOYMENT.md) | Optimized Rust image, registry setup, upgrades and recovery. |
 | [Providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
 | [Performance and cost](PERFORMANCE_AND_COST.md) | Usage accounting, tuning and measurement scope. |

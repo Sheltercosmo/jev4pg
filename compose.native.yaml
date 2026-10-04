@@ -1,0 +1,28 @@
+name: jevsd-pg-native
+
+services:
+  postgres:
+    image: jevsd-pg-native-postgres:local
+    build:
+      dockerfile: deploy/native.Dockerfile
+    environment:
+      SDD_JEV_ENDPOINT: ${SDD_JEV_ENDPOINT:-}
+      SDD_JEV_MODEL: ${SDD_JEV_MODEL:-jev-1.13.0}
+      SDD_JEV_REVISION: ${SDD_JEV_REVISION:-}
+      SDD_JEV_API_KEY_FILE: /run/secrets/jev_api_key
+      TYPESAFE_API_KEY_FILE: /run/secrets/typesafe_api_key
+      SDD_NATIVE_REGISTRY_PASSWORD_FILE: /run/secrets/native_registry_password
+    secrets: [typesafe_api_key, jev_api_key, native_registry_password]
+  migrate:
+    command: ["migrate", "--sql-interface", "--native-interface", "--native-registry"]
+    environment:
+      SDD_NATIVE_REGISTRY_PASSWORD_FILE: /run/secrets/native_registry_password
+    secrets: [native_registry_password]
+  app:
+    environment:
+      SDD_SEMANTIC_ENGINE: native
+      SDD_FEATURE_MAINTENANCE: "0"
+
+secrets:
+  native_registry_password:
+    file: ${SDD_SECRETS_DIR:-.secrets}/native_registry_password

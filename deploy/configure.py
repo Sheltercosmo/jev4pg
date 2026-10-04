@@ -8,7 +8,7 @@ import secrets
 from pathlib import Path
 
 
-def configure(directory, *, prompt=True):
+def configure(directory, *, prompt=True, native=False):
     directory = Path(directory)
     if directory.is_symlink():
         raise ValueError("The secrets directory must not be a symbolic link")
@@ -33,6 +33,8 @@ def configure(directory, *, prompt=True):
         "jev_api_key": lambda: os.getenv("SDD_JEV_API_KEY", ""),
         "llm_api_key": lambda: os.getenv("OPENAI_API_KEY", ""),
     }
+    if native:
+        values["native_registry_password"] = lambda: secrets.token_urlsafe(36)
     for name, create in values.items():
         path = directory / name
         if path.is_symlink():
@@ -51,10 +53,11 @@ if __name__ == "__main__":
     parser.add_argument("--directory", default=".secrets")
     parser.add_argument("--no-prompt", action="store_true")
     parser.add_argument("--show-token", action="store_true")
+    parser.add_argument("--native", action="store_true", help="Create native registry credentials")
     args = parser.parse_args()
     if args.show_token:
         tokens = json.loads((Path(args.directory) / "api_tokens.json").read_text())
         print(next(iter(tokens)))
     else:
-        directory = configure(args.directory, prompt=not args.no_prompt)
+        directory = configure(args.directory, prompt=not args.no_prompt, native=args.native)
         print(f"Deployment secrets ready in {directory}. Existing files were preserved.")

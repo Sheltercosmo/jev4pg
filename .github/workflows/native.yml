@@ -49,10 +49,25 @@ jobs:
           fi
           cargo pgrx init --pg17 /usr/lib/postgresql/17/bin/pg_config
           cargo pgrx install --sudo --pg-config /usr/lib/postgresql/17/bin/pg_config
+      - uses: actions/checkout@v4
+        with:
+          repository: Sheltercosmo/jevsd-pg
+          ref: 984dab8b551f6901b02661f5af7ffc93a4d43df7
+          path: .native-baseline
+      - name: Build published upgrade baseline
+        working-directory: .native-baseline/native/pg
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/native/target
+          PGRX_BUILD_FLAGS: --locked
+        run: |
+          cargo pgrx schema --pg-config /usr/lib/postgresql/17/bin/pg_config --out /tmp/jev_native--0.1.0.sql
+          sudo install -m 644 /tmp/jev_native--0.1.0.sql /usr/share/postgresql/17/extension/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Verify direct PostgreSQL execution
+        env:
+          SDD_TEST_NATIVE_UPGRADE: '1'
         run: |
           python -m pip install -e '.[test]' 'psycopg[binary]==3.2.9'
           python native/tests/postgres.py

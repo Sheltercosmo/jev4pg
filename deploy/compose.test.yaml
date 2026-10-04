@@ -1,5 +1,10 @@
 # Synthetic provider for deployment tests only; never part of the default stack.
 services:
+  postgres:
+    environment:
+      SDD_JEV_ENDPOINT: http://fixture:9100/v1/systemone
+      SDD_JEV_MODEL: deployment-fixture-v1
+      SDD_JEV_REVISION: fixture-v1
   fixture:
     image: python:3.13-slim-bookworm
     command: ["python", "/fixture.py"]
