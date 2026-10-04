@@ -28,7 +28,7 @@ Independent semantic tasks run in parallel, questions sharing context are batche
 Explore the interactive product tour at [jevsdpg.com](https://jevsdpg.com).
 
 <p align="center">
-  <img src="docs/assets/product-tour.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+  <img src="docs/assets/product-tour-94ace4f0.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
 
 ## What you can build
