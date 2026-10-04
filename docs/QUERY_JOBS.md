@@ -1,6 +1,6 @@
 # Durable application queries
 
-Submit SQL once, keep its job ID, and retrieve the result after an HTTP disconnect or API restart. The development application provides durable jobs for reads and mutation previews. PostgreSQL stores the request, ownership lease and outcome; a separate worker executes the query through the existing SQL and semantic runtime.
+Submit SQL once, keep its job ID, and retrieve the result after an HTTP disconnect or API restart. The application provides durable jobs for reads and mutation previews. PostgreSQL stores the request, ownership lease and outcome; a separate worker executes the query through the existing SQL and semantic runtime.
 
 Natural-language planning still uses `/ask`. Submit its reviewed SQL when you need background execution. Jobs preserve the existing result, source and inference limits; they are not a bulk export or unrestricted population-scan interface.
 
@@ -11,6 +11,14 @@ Choose Run in background in SQL mode. The workspace keeps the submitted text sep
 The browser saves a request key before submission. If the reply is lost, Retry submission sends that same key and original request; it never substitutes newer draft text. An interrupted submission remains unconfirmed until the server answers. If the browser cannot save a new request, it does not dispatch it. See the [workspace guide](USER_GUIDE.md#run-sql-in-the-background) for recovery and editing behavior.
 
 ## Start a worker
+
+The default v0.7.0 Compose stack starts `query-worker` for the generated token's `demo` tenant. Set `SDD_QUERY_TENANT` to match your API token mapping and `SDD_QUERY_WORKERS` to choose 1–8 concurrent queries. Restart the worker after changing these settings. For several tenants, override its command with repeated `--tenant` arguments or run a separate worker service for each scope.
+
+With an external server, enable the optional worker after migration:
+
+```sh
+docker compose --env-file deployment.env -f compose.external.yaml --profile queries up -d --wait
+```
 
 Upgrade the application catalog to version 4 with `sdd migrate` using the installation owner. Use the restricted runtime credentials for the API and workers. Stop older application processes before upgrading and keep a backup. The migration adds the job table and tenant policies while retaining existing catalog objects and data.
 

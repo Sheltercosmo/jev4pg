@@ -49,6 +49,12 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
 
+  query-worker:
+    extends: {file: compose.services.yaml, service: query-worker}
+    environment: *bundled-database
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
 volumes:
   sdd_pg:
 

@@ -130,11 +130,36 @@ def main():
         },
     )
     assert batch["output_state"] == "VALUE" and len(batch["observations"]) == 4
+    job_request = {
+        "sql": "SELECT id, text FROM deployment_notes ORDER BY id",
+        "idempotency_key": "deployment-background-query",
+        "timeout_seconds": 30,
+    }
+    command("stop", "query-worker")
+    query_job = request("/data/query-jobs", job_request)
+    assert query_job["job_state"] == "QUEUED"
+    assert query_job["output_state"] == "NOT_EVALUATED"
+    assert request("/data/query-jobs", job_request)["id"] == query_job["id"]
+    command("up", "-d", "--wait", "query-worker")
+    deadline = time.monotonic() + 60
+    while True:
+        completed = request("/data/query-jobs/" + query_job["id"])
+        if completed["job_state"] not in {"QUEUED", "RUNNING"}:
+            break
+        assert time.monotonic() < deadline, "Application query did not complete"
+        time.sleep(0.5)
+    assert completed["job_state"] == "SUCCEEDED"
+    assert completed["output_state"] == "VALUE"
+    assert completed["result"]["rows"] == [
+        {"id": 1, "text": "问题仍未解决。"},
+        {"id": 2, "text": "Please follow up."},
+    ]
     command("run", "--rm", "migrate")
-    command("restart", "postgres", "app", "sql-worker")
+    command("restart", "postgres", "app", "sql-worker", "query-worker")
     command("up", "-d", "--wait")
     assert json.loads(sql(f"SELECT jev.result('{jobs[0]}');"))["job_state"] == "COMPLETED"
     assert request("/datasets")["datasets"][0]["id"] == dataset["id"]
+    assert request("/data/query-jobs/" + query_job["id"])["result"] == completed["result"]
 
     # A fresh restore exercises extension config tables, role grants and ordinary source data.
     with tempfile.TemporaryDirectory() as temporary:
@@ -183,7 +208,10 @@ def main():
                 == 3
             )
             assert (
-                connection.execute(text("SELECT count(*) FROM sdd_catalog.dataset_catalog")).scalar_one() == 1
+                connection.execute(
+                    text("SELECT count(*) FROM sdd_catalog.dataset_catalog")
+                ).scalar_one()
+                == 1
             )
         restored.dispose()
     engine.dispose()

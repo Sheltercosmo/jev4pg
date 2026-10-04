@@ -1,0 +1,11 @@
+include README.md CHANGELOG.md CONTRIBUTING.md CONTEXT.md AGENTS.md
+include requirements.lock.txt Dockerfile .dockerignore .env.example
+include compose*.yaml
+recursive-include docs *.md *.png *.gif *.svg
+recursive-include deploy *.py *.yaml *.example *.sql *.sh *.Dockerfile
+recursive-include examples *.py *.md *.sql *.json *.html *.css *.js *.csv
+recursive-include scripts *.py
+recursive-include tests *.py *.cjs
+recursive-include native *.toml *.lock *.rs *.sql *.control *.md *.py
+prune native/target
+global-exclude __pycache__ *.py[cod]

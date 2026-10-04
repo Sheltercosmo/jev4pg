@@ -23,6 +23,10 @@ services:
       SDD_SEMANTIC_ENGINE: native
       SDD_FEATURE_MAINTENANCE: "0"
 
+  query-worker:
+    environment:
+      SDD_SEMANTIC_ENGINE: native
+
 secrets:
   native_registry_password:
     file: ${SDD_SECRETS_DIR:-.secrets}/native_registry_password

@@ -1,20 +1,19 @@
 # Installation
 
-The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available in development builds; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
+The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available from v0.7.0; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
 
 Choose the application deployment or the native execution preview:
 
 | Path | Requirements | Execution |
 | --- | --- | --- |
-| Released application, v0.6.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Python service and worker; asynchronous `jev.*` SQL jobs. |
-| Development application, 0.7.0.dev0 | Same application requirements; optional native build below | Current catalog and query service, including source attachments. |
+| Application, v0.7.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs. |
 | Native extension, 0.2.0 preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
 
 The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
 ## Docker Compose
 
-Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.6.0` tag for the released deployment, or `main` to develop the application. From that checkout:
+Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.7.0` tag for the released deployment, or `main` to develop the application. From that checkout:
 
 ```bash
 python deploy/configure.py
@@ -30,7 +29,9 @@ Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:
 python deploy/configure.py --show-token
 ```
 
-The stack starts PostgreSQL, runs an idempotent migration, then starts the API and SQL worker. Source data, evidence and queued jobs live in the `sdd_pg` volume. The API and worker run as an unprivileged user with a read-only container filesystem. Administrator credentials are available only to PostgreSQL and migration.
+The stack starts PostgreSQL, runs an idempotent migration, then starts the API, SQL worker and application query worker. Source data, evidence and queued jobs live in the `sdd_pg` volume. The API and worker run as an unprivileged user with a read-only container filesystem. Administrator credentials are available only to PostgreSQL and migration.
+
+The query worker serves the generated `demo` tenant. If you change the API token mapping, set `SDD_QUERY_TENANT` to the matching tenant in `.env`. See [background query deployment](QUERY_JOBS.md#start-a-worker) for concurrency and multiple tenants.
 
 HTTP and PostgreSQL bind to localhost. Set `SDD_HTTP_PORT` or `SDD_POSTGRES_PORT` in `.env` to change their host ports. For remote access, place the API behind a TLS reverse proxy and configure firewall and PostgreSQL TLS rules for your environment. Keep `.secrets/` private; on Windows restrict its inherited file permissions to the deployment account.
 
@@ -66,7 +67,7 @@ jev4pg migrate --sql-interface
 
 This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jev4pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
 
-Development installations can inspect the target before applying changes:
+Inspect the target before applying changes:
 
 ```bash
 jev4pg migrate --check
@@ -74,7 +75,7 @@ jev4pg migrate --check
 
 This read-only command checks installation ownership, supported catalog versions, table contracts, tenant policies and runtime-role memberships. It returns JSON and exits nonzero on a conflict. It neither calls a model nor creates roles. It does not test extension availability, provider connectivity or backup recovery; use the matching installation procedure and readiness checks for those.
 
-The same check runs inside migration before any installation changes. Development catalog version 4 keeps metadata, evidence, history and application query jobs in `sdd_catalog`, separate from imported rows in `sdd_data`. Runtime statements name the catalog explicitly; custom search paths and temporary tables cannot redirect them. Installation leaves business tables, functions and the `public` schema's grants unchanged. Source access still requires explicit PostgreSQL grants and attachment registration.
+The same check runs inside migration before any installation changes. Catalog version 4 keeps metadata, evidence, history and application query jobs in `sdd_catalog`, separate from imported rows in `sdd_data`. Runtime statements name the catalog explicitly; custom search paths and temporary tables cannot redirect them. Installation leaves business tables, functions and the `public` schema's grants unchanged. Source access still requires explicit PostgreSQL grants and attachment registration.
 
 An unmanaged `sdd_catalog` or `sdd_data` schema stops installation. A legacy `public.sdd_schema_version` marker must describe a supported version 1 or 2 installation before migration can move its objects. Conflicting markers, owners or tenant policies stop the upgrade. Inspect the reported objects; do not delete them to make the check pass. Catalog isolation is a deployment foundation, not a claim of tested shared-database capacity or availability.
 
@@ -89,7 +90,7 @@ Run these as separate processes. On Windows choose a writable heartbeat path, su
 
 ## Native preview
 
-Use a checkout of `main`. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
+Use the `v0.7.0` checkout. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
 
 For application integration, install Python from that same checkout and run:
 
@@ -103,7 +104,7 @@ The application and native extension configure providers separately. The Rust ex
 
 ## Existing source data
 
-The development application can register authorized PostgreSQL tables and views without importing their rows. Follow [source attachments](EXISTING_DATA.md) after the matching migration. Attachments are read-only through the workspace and preserve source ownership and PostgreSQL permissions.
+The application can register authorized PostgreSQL tables and views without importing their rows. Follow [source attachments](EXISTING_DATA.md) after the matching migration. Attachments are read-only through the workspace and preserve source ownership and PostgreSQL permissions.
 
 ## Credentials and providers
 
@@ -111,7 +112,7 @@ A runtime connection can use `DATABASE_URL`, or `SDD_DB_HOST`, `SDD_DB_PORT`, `S
 
 `SDD_API_TOKENS_FILE` contains a JSON map from random tokens to tenant, name and role. Roles are `reader` and `reviewer`; production tokens need at least 32 characters. Provider secrets support `TYPESAFE_API_KEY_FILE`, `SDD_JEV_API_KEY_FILE` and `OPENAI_API_KEY_FILE`. A file setting takes precedence over its corresponding value.
 
-Compose reads provider settings from `.env` and mounts key files from `.secrets/`. It does not pass the entire `.env` to services. Edit `typesafe_api_key`, `jev_api_key` or `llm_api_key` for the selected provider. Restart the API and SQL worker after changing credentials. Configure `SDD_JEV_ENDPOINT`, model and revision for a compatible HTTP endpoint. An in-process Python adapter requires a derived app image containing that adapter; see [providers](PROVIDERS.md).
+Compose reads provider settings from `.env` and mounts key files from `.secrets/`. It does not pass the entire `.env` to services. Edit `typesafe_api_key`, `jev_api_key` or `llm_api_key` for the selected provider. Restart the API and both workers after changing credentials. Configure `SDD_JEV_ENDPOINT`, model and revision for a compatible HTTP endpoint. An in-process Python adapter requires a derived app image containing that adapter; see [providers](PROVIDERS.md).
 
 Hybrid queries require `SDD_LLM_TRANSPORT`, `SDD_LLM_MODEL` and the corresponding LLM credential. See [hybrid setup](HYBRID_QUERY.md).
 
@@ -124,12 +125,14 @@ Application, catalog and extension compatibility:
 | Source | Application | Catalog schema | Optional native extension |
 | --- | --- | --- | --- |
 | Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
-| Development `main` | 0.7.0.dev0 | 3 | 0.2.0 preview |
+| Released `v0.7.0` tag | 0.7.0 | 4 | 0.2.0 preview |
+
+The Python distribution was renamed from `jevsd-pg` to `jev4pg`. For installations outside Compose, create a fresh virtual environment and install the new wheel or source checkout there; do not install both distributions over one another. They share the `sdd` import namespace. Point the existing service supervisor at the new environment after migration. The `jevsd-pg` and `sdd` command aliases remain available.
 
 Back up the database and retain its role credentials first. Check out the desired release, then run:
 
 ```bash
-docker compose stop app sql-worker
+docker compose stop app sql-worker query-worker
 docker compose build
 docker compose run --rm migrate
 docker compose up -d --wait
@@ -137,9 +140,9 @@ docker compose up -d --wait
 
 Stop the API, workers and administrative writes before upgrading. Catalog version 4 adds the tenant-scoped application query job table to a version 3 installation. Upgrades from version 1 or 2 also move validated catalog tables and guard functions from `public` into `sdd_catalog` in one transaction. PostgreSQL retains existing identities, rows, indexes, constraints and grants. Imported source tables, existing attachments and the `jev` operator queue remain in their original schemas. Passwords are preserved. A failure rolls back the migration; an already committed upgrade has no automatic downgrade. Restore the pre-upgrade backup with the old application if rollback is required.
 
-Run the API and workers from the same application version after upgrading. Processes that expect the public catalog or version 3 cannot serve the version 4 lifecycle. Update any administrator scripts that directly query internal tables to use `sdd_catalog`. Do not add compatibility views in `public`. Never run two migration versions against the same database at once. Test migration and restore on a database copy before deployment, and do not repoint Compose at an unrelated database volume. A legacy upgrade does not undo public-schema grants changed by earlier releases; the administrator remains responsible for those grants. Start the optional application query workers using the [query job guide](QUERY_JOBS.md).
+Run the API and workers from the same application version after upgrading. Processes that expect the public catalog or version 3 cannot serve the version 4 lifecycle. Update any administrator scripts that directly query internal tables to use `sdd_catalog`. Do not add compatibility views in `public`. Never run two migration versions against the same database at once. Test migration and restore on a database copy before deployment, and do not repoint Compose at an unrelated database volume. A legacy upgrade does not undo public-schema grants changed by earlier releases; the administrator remains responsible for those grants. Configure application query workers using the [query job guide](QUERY_JOBS.md).
 
-On a development build, check the installed application version with `jev4pg --version`, or `docker compose exec app jev4pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
+Check the installed application version with `jev4pg --version`, or `docker compose exec app jev4pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
 
 ```sql
 SELECT version FROM sdd_catalog.sdd_schema_version;

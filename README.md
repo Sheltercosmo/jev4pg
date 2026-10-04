@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/release-0.6.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.6.0" /></a>
+  <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.7.0"><img src="https://img.shields.io/badge/release-0.7.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.7.0" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
 
@@ -79,7 +79,7 @@ With concept generation and repair disabled, a request uses one LLM generation; 
 
 `VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay separate from execution failures. A skipped judgment cannot silently become false or produce a misleading zero total. Applications can route uncertainty to review, retain held SQL for correction and preview proposed writes before an explicit commit. [Decision states](docs/JEV_OPERATORS.md).
 
-Native stage plans, cross-connection evidence reuse and probability embeddings are development-preview features on `main`. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
+Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.7.0. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
 
 ## What you can build
 
@@ -89,7 +89,7 @@ Native stage plans, cross-connection evidence reuse and probability embeddings a
 | Document intake                                 | Extract typed fields from incoming text, inspect source passages and approve an import. | Field descriptions drive extraction, reducing manual entry while preserving a transactional review step. [Guide](docs/TEXT_IMPORT.md).                                                           |
 | An analyst workspace in your product            | Ask in English or Simplified Chinese, inspect SQL and revise a saved interpretation.    | The HTTP API exposes context selection, generation and review as a reusable workflow. [Tutorial](examples/nl2sql/README.md).                                                                     |
 | Search by business criteria                     | Find records similar in urgency, intent or resolution status.                           | Named probability dimensions make the comparison inspectable; stored compatible vectors can be compared without model calls. Native preview. [Example](examples/operators/native_embedding.sql). |
-| Semantic analysis over existing PostgreSQL data | Add meaning-based queries to authorized tables and views in place.                      | Read-only attachments preserve source types and access controls without requiring a full data copy. Development preview. [Setup](docs/EXISTING_DATA.md).                                         |
+| Semantic analysis over existing PostgreSQL data | Add meaning-based queries to authorized tables and views in place.                      | Read-only attachments preserve source types and access controls without requiring a full data copy. [Setup](docs/EXISTING_DATA.md).                                         |
 
 ## Fit into your existing stack
 
@@ -106,8 +106,8 @@ Previously published as JevSDSQL and jevsd-pg; the current project and developme
 
 | Path                     | Includes                                                                                | Setup                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Stable release: `v0.6.0` | Workspace, HTTP API, Python semantic runtime and asynchronous `jev.*` SQL jobs          | [Compose or existing PostgreSQL](docs/INSTALLATION.md)                                |
-| Development: `main`      | The application plus Rust `jev_native.*`, source attachments and native SQL compilation | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
+| Application: `v0.7.0` | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs          | [Compose or existing PostgreSQL](docs/INSTALLATION.md)                                |
+| Optional native preview | Rust `jev_native.*`, parallel stage plans, evidence reuse and probability embeddings | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
 
 The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. Use the native Compose overlay to build and enable it; the default Compose stack uses Python. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).
 
@@ -116,7 +116,7 @@ Use a release tag for a fixed deployment and `main` to evaluate ongoing developm
 To start the released application with Python 3.11+ and Docker Compose v2:
 
 ```bash
-git clone --branch v0.6.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py
 docker compose build

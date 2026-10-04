@@ -1,6 +1,6 @@
 # Query cancellation and deadlines
 
-The development application supports cancellation handles for SQL reads and mutation previews, plus an optional execution deadline on `POST /data/sql`. This is an in-process execution control. [Durable query jobs](QUERY_JOBS.md) use it for cancellation across service processes. The existing `jev.cancel` operator SQL queue function still cancels queued jobs only.
+The application supports cancellation handles for SQL reads and mutation previews, plus an optional execution deadline on `POST /data/sql`. This is an in-process execution control. [Durable query jobs](QUERY_JOBS.md) use it for cancellation across service processes. The existing `jev.cancel` operator SQL queue function still cancels queued jobs only.
 
 ## API execution deadline
 

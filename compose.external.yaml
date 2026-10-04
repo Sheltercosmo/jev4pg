@@ -21,6 +21,12 @@ services:
       SDD_SQL_INTERFACE: "1"
     secrets: [database_ca]
 
+  query-worker:
+    extends: {file: compose.services.yaml, service: query-worker}
+    profiles: [queries]
+    environment: *external-database
+    secrets: [database_ca]
+
   migrate:
     extends: {file: compose.services.yaml, service: migrate}
     profiles: [tools]

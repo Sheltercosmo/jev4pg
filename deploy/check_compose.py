@@ -29,8 +29,8 @@ def check(compose):
         return json.loads(result.stdout)
 
     bundled = resolve("-f", "compose.yaml")
-    assert set(bundled["services"]) == {"postgres", "migrate", "app", "sql-worker"}
-    for name in ("app", "migrate", "sql-worker"):
+    assert set(bundled["services"]) == {"postgres", "migrate", "app", "sql-worker", "query-worker"}
+    for name in ("app", "migrate", "sql-worker", "query-worker"):
         service = bundled["services"][name]
         assert service["environment"]["SDD_DB_HOST"] == "postgres"
         assert service["environment"]["SDD_DB_USER"] == "sdd_app"
@@ -42,14 +42,35 @@ def check(compose):
         "-f", "compose.yaml", "-f", "compose.native.yaml", "-f", "deploy/compose.test.yaml"
     )
     assert native["services"]["app"]["environment"]["SDD_SEMANTIC_ENGINE"] == "native"
+    assert native["services"]["query-worker"]["environment"]["SDD_SEMANTIC_ENGINE"] == "native"
+    worker = bundled["services"]["query-worker"]
+    assert worker["command"] == [
+        "query-worker",
+        "--tenant",
+        "demo",
+        "--concurrency",
+        "2",
+        "--heartbeat-file",
+        "/tmp/jev-query-worker.heartbeat",
+    ]
+    assert worker["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
     assert "--native-registry" in native["services"]["migrate"]["command"]
     assert native["services"]["postgres"]["build"]["dockerfile"] == "deploy/native.Dockerfile"
 
     external = resolve("-f", "compose.external.yaml")
     assert set(external["services"]) == {"app"}
     assert "postgres_password" not in external.get("secrets", {})
-    enabled = resolve("-f", "compose.external.yaml", "--profile", "sql", "--profile", "tools")
-    assert set(enabled["services"]) == {"app", "sql-worker", "migrate"}
+    enabled = resolve(
+        "-f",
+        "compose.external.yaml",
+        "--profile",
+        "sql",
+        "--profile",
+        "tools",
+        "--profile",
+        "queries",
+    )
+    assert set(enabled["services"]) == {"app", "sql-worker", "migrate", "query-worker"}
     assert not enabled.get("volumes")
     for name, service in enabled["services"].items():
         assert not service.get("depends_on")

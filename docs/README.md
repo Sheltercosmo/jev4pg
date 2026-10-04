@@ -7,7 +7,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | Guide | Contents |
 | --- | --- |
 | [Workspace](USER_GUIDE.md) | Queries, corrections, history and data changes. |
-| [Large tables and applications](APPLICATIONS.md) | Cursor pagination, bulk loading, limits and a runnable application example in the development preview. |
+| [Large tables and applications](APPLICATIONS.md) | Cursor pagination, bulk loading, limits and a runnable application example in v0.7.0. |
 | [简体中文指南](zh/USER_GUIDE.md) | 简体中文工作区使用说明。 |
 | [Query examples](NL2SQL_EXAMPLES.md) | SQL, expected results and a runnable tutorial. |
 | [Query API](NATURAL_LANGUAGE.md) | Planning, review, confirmation and saved queries. |
@@ -47,7 +47,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Architecture](ARCHITECTURE.md) | Components, languages and data boundaries. |
 | [Stage placement](JEV_PLANNING_STAGES.md) | Dependencies and reasons for parallel placement. |
 | [Roadmap](IMPLEMENTATION_PLAN.md) | Implemented native capabilities and remaining release work. |
-| [Changelog](../CHANGELOG.md) | Changes since the packaged release and current version identifiers. |
+| [Changelog](../CHANGELOG.md) | Release changes and component compatibility. |
 | [Dependencies](DEPENDENCIES.md) | Libraries and external services. |
 | [Contributing](../CONTRIBUTING.md) | Development checks and contribution requirements. |
 

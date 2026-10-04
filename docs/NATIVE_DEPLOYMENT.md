@@ -2,7 +2,7 @@
 
 The native stack builds an optimized Rust extension into PostgreSQL 17 and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
 
-This deployment uses application 0.7.0.dev0, catalog schema 2 and native extension 0.2.0. It is a development preview and does not enable native maintained-feature refresh or semantic write review.
+This deployment uses application 0.7.0, catalog schema 4 and native extension 0.2.0. It is a development preview and does not enable native maintained-feature refresh or semantic write review.
 
 ## Start
 

@@ -1,6 +1,6 @@
 # Reviewed application writes
 
-The development preview executes ordinary `INSERT`, `UPDATE` and `DELETE` in PostgreSQL without copying the source table into Python. A small update can target a large table through its indexes. This interface is for reviewed application changes; PostgreSQL clients remain the appropriate interface for bulk migrations.
+Version 0.7.0 executes ordinary `INSERT`, `UPDATE` and `DELETE` in PostgreSQL without copying the source table into Python. A small update can target a large table through its indexes. This interface is for reviewed application changes; PostgreSQL clients remain the appropriate interface for bulk migrations.
 
 ## Preview and commit
 

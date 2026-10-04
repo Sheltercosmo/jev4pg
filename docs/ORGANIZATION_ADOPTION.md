@@ -4,7 +4,7 @@ The target is gradual adoption: preserve existing SQL applications and source ow
 
 ## Current support
 
-The development application supports a dedicated PostgreSQL 17 database, restricted runtime roles, tenant policies, mounted secrets, transactional catalog upgrades and read-only source attachments within that database. Its version 4 catalog uses an explicit `sdd_catalog` schema and can coexist with same-named business tables without changing their ownership or grants. [Durable query jobs](QUERY_JOBS.md) add idempotent submission, process-level cancellation and ownership-fenced publication. The native preview adds direct SQL execution and a durable evidence registry. Installation preflight refuses conflicting objects before migration changes anything.
+The application supports a dedicated PostgreSQL 17 database, restricted runtime roles, tenant policies, mounted secrets, transactional catalog upgrades and read-only source attachments within that database. Its version 4 catalog uses an explicit `sdd_catalog` schema and can coexist with same-named business tables without changing their ownership or grants. [Durable query jobs](QUERY_JOBS.md) add idempotent submission, process-level cancellation and ownership-fenced publication. The native preview adds direct SQL execution and a durable evidence registry. Installation preflight refuses conflicting objects before migration changes anything.
 
 This is not yet a supported high-availability or cross-database migration product. The Compose stack is a reference deployment. Existing source registration does not provision network access, replicate remote rows or copy remote authorization policies.
 

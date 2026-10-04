@@ -29,6 +29,8 @@ Native CI checks both extension and application upgrades against pinned publishe
 
 The application version comes from `sdd/_version.py`. Native extension versions and catalog schema versions describe their own upgrade contracts, not alternative editions of the product. Their compatibility belongs in the [installation guide](docs/INSTALLATION.md#upgrade). Record the commit SHA when testing an unreleased build.
 
+Before tagging a release, reconcile the version, changelog and installation matrix; run the package, deployment, native and remote-protocol workflows on that exact commit. `python -m build` creates the source distribution and builds its wheel. Install the wheel in a fresh environment and run `python -I scripts/check_installed.py` to check packaged workspace assets, operator data and SQL extension files. Publish only the verified artifacts with SHA-256 checksums. Native preview status must remain explicit until its production requirements are met.
+
 ## Planner and operator changes
 
 A change should address a reusable mechanism, such as entity identity, join multiplicity, time boundaries, output units or missing evidence. Production code must not recognize a benchmark question, database name or expected answer.

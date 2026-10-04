@@ -90,3 +90,20 @@ services:
     restart: unless-stopped
     stop_grace_period: 120s
 
+  query-worker:
+    image: jev4pg:local
+    command: ["query-worker", "--tenant", "${SDD_QUERY_TENANT:-demo}", "--concurrency", "${SDD_QUERY_WORKERS:-2}", "--heartbeat-file", "/tmp/jev-query-worker.heartbeat"]
+    environment: *runtime
+    secrets: [app_password, typesafe_api_key, jev_api_key, llm_api_key]
+    healthcheck:
+      test: ["CMD", "jev4pg", "ready", "--worker-heartbeat", "/tmp/jev-query-worker.heartbeat"]
+      interval: 15s
+      timeout: 12s
+      retries: 4
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 120s
+

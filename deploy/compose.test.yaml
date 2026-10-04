@@ -22,3 +22,8 @@ services:
       SDD_JEV_ENDPOINT: http://fixture:9100/v1/systemone
       SDD_JEV_MODEL: deployment-fixture-v1
       SDD_JEV_REVISION: fixture-v1
+  query-worker:
+    environment:
+      SDD_JEV_ENDPOINT: http://fixture:9100/v1/systemone
+      SDD_JEV_MODEL: deployment-fixture-v1
+      SDD_JEV_REVISION: fixture-v1

@@ -6,7 +6,7 @@ Start the service, open [/ask/en](http://127.0.0.1:8000/ask/en), and connect wit
 
 ## Browse and reuse work
 
-The development preview adds a searchable catalog, query tabs and a result grid. Expand a table to inspect columns, browse live rows or open a SQL draft. Live browsing filters in the database and advances by primary key. Select only the columns you need. See [large-table and application usage](APPLICATIONS.md).
+Version 0.7.0 adds a searchable catalog, query tabs and a result grid. Expand a table to inspect columns, browse live rows or open a SQL draft. Live browsing filters in the database and advances by primary key. Select only the columns you need. See [large-table and application usage](APPLICATIONS.md).
 
 Name query tabs, reopen `.sql` files and save drafts with Ctrl/Cmd+S. Drafts remain in the current browser tab's session; completed executions remain in Recent queries. In SQL mode, Ctrl/Cmd+Enter runs the selected text when a selection exists, otherwise the full editor. Opening a draft never runs it automatically.
 

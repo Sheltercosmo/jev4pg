@@ -1,6 +1,6 @@
 # Deploy with an existing PostgreSQL server
 
-The development application can run separately from PostgreSQL 17. This path starts no database container and creates no database volume. Your PostgreSQL administrator retains responsibility for backups, server upgrades, availability and source permissions. Use a dedicated database for the initial deployment.
+The application can run separately from PostgreSQL 17. This path starts no database container and creates no database volume. Your PostgreSQL administrator retains responsibility for backups, server upgrades, availability and source permissions. Use a dedicated database for the initial deployment.
 
 The HTTP workspace requires the Python application and application catalog. The asynchronous SQL interface additionally needs the `jevsd_pg` extension files on the server. Managed services that cannot install custom extension files can use the HTTP path. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
 
@@ -32,6 +32,8 @@ Migration is an explicit operation. Normal startup launches only the application
 The HTTP port binds to localhost. Put a TLS reverse proxy and your organization's access controls in front of remote users. `/health` reports process liveness; `/ready` checks PostgreSQL readiness without model calls. Inspect container health and logs with the same environment and Compose arguments.
 
 ## Optional SQL clients
+
+For workspace background queries, set `SDD_QUERY_TENANT` to the tenant in your API token map and start with `--profile queries`. This worker does not require the SQL extension. See [query workers](QUERY_JOBS.md#start-a-worker).
 
 Have the PostgreSQL administrator install the packaged extension files using [SQL access setup](POSTGRESQL_INTERFACE.md). Then stop the application, set `SDD_SQL_INTERFACE=1` in `deployment.env`, and run:
 

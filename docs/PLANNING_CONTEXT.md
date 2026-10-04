@@ -1,6 +1,6 @@
 # Planning context on large tables
 
-The development preview collects bounded value evidence before interpreting a request. It reads several columns together and reuses that batch within the request. Planning no longer builds a full distinct-value dictionary or counts an entire column to infer a key.
+Version 0.7.0 collects bounded value evidence before interpreting a request. It reads several columns together and reuses that batch within the request. Planning no longer builds a full distinct-value dictionary or counts an entire column to infer a key.
 
 Independent PostgreSQL table batches use up to four concurrent connections. Each batch receives a share of the remaining payload budget, so a large table cannot consume the whole allowance before smaller tables are inspected. This collection performs no JEV or LLM calls. Model decisions retain their existing parallel stages.
 

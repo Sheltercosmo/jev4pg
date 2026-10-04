@@ -1,6 +1,6 @@
 # Native execution roadmap
 
-The native preview moves semantic row execution into PostgreSQL while keeping natural-language planning and the workspace in Python. It is available in the source tree; v0.6.0 remains the packaged application release.
+The native preview moves semantic row execution into PostgreSQL while keeping natural-language planning and the workspace in Python. It is included as an optional preview in v0.7.0. The application release uses Python by default.
 
 ## Available in the preview
 
@@ -25,7 +25,7 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 
 ## Remaining work
 
-The immediate priority is practical application use: efficient large-table reads, a usable analyst workspace and a runnable application path. The development preview adds cursor pagination, reviewed CSV import and an [activity monitor](../examples/activity_app/README.md). Validate these with real PostgreSQL populations and concurrent requests before expanding organization and remote-source features. See [application contracts](APPLICATIONS.md).
+The immediate priority is practical application use: efficient large-table reads, a usable analyst workspace and a runnable application path. The v0.7.0 application includes cursor pagination, reviewed CSV import and an [activity monitor](../examples/activity_app/README.md). Validate these with real PostgreSQL populations and concurrent requests before expanding organization and remote-source features. See [application contracts](APPLICATIONS.md).
 
 Ordinary PostgreSQL writes now use [bounded reviewed targets](APPLICATION_WRITES.md), typed assignment previews and row locks. This removes the whole-table Python snapshot for those writes. Bulk jobs, native semantic mutations and maintained-feature generations remain separate work; a successful bounded write does not establish their readiness.
 
