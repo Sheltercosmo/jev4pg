@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://jevsdpg.com">Website</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/zh/USER_GUIDE.md">简体中文</a> ·
@@ -20,9 +21,15 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jevsd-pg adds 41 semantic operators, natural-language queries and reusable evidence to PostgreSQL. Its Rust extension evaluates independent questions in parallel and represents text as named answer probabilities. PostgreSQL performs the joins, calculations and transactions; JEV supplies typed semantic decisions.
+jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural-language queries with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
 
-Use the web workspace, HTTP API or PostgreSQL clients. Choose JEV planning or hybrid planning, where JEV selects context, an LLM proposes SQL, and JEV reviews it. Inspect the proposal, correct its interpretation and rerun it from history.
+The execution model makes each model call count: independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused. Choose JEV planning or combine LLM plan generation with JEV context selection and review. Inspect generated SQL and refine previous queries through the web workspace, HTTP API or SQL clients. A shared provider interface supports compatible hosted services and local adapters.
+
+Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-language queries, parallel execution and probability embeddings.
+
+<p align="center">
+  <img src="docs/assets/product-tour-94ace4f0.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+</p>
 
 ## What you can build
 
