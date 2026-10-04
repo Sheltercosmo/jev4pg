@@ -53,6 +53,34 @@ def database_url(admin=False):
     prefix = "SDD_ADMIN_DB_" if admin else "SDD_DB_"
     user, password = os.getenv(prefix + "USER"), secret(prefix + "PASSWORD")
     if user and password:
+        options = {
+            key: os.environ["SDD_DB_" + setting]
+            for key, setting in (
+                ("sslmode", "SSLMODE"),
+                ("sslrootcert", "SSLROOTCERT"),
+                ("sslcert", "SSLCERT"),
+                ("sslkey", "SSLKEY"),
+                ("connect_timeout", "CONNECT_TIMEOUT"),
+                ("application_name", "APPLICATION_NAME"),
+            )
+            if os.getenv("SDD_DB_" + setting)
+        }
+        if options.get("sslmode", "prefer") not in {
+            "disable",
+            "allow",
+            "prefer",
+            "require",
+            "verify-ca",
+            "verify-full",
+        }:
+            raise ValueError("SDD_DB_SSLMODE must be a PostgreSQL TLS mode")
+        if "connect_timeout" in options:
+            try:
+                timeout = int(options["connect_timeout"])
+            except ValueError:
+                raise ValueError("SDD_DB_CONNECT_TIMEOUT must be a positive integer") from None
+            if timeout < 1:
+                raise ValueError("SDD_DB_CONNECT_TIMEOUT must be a positive integer")
         return URL.create(
             "postgresql+psycopg",
             username=user,
@@ -60,6 +88,7 @@ def database_url(admin=False):
             host=os.getenv("SDD_DB_HOST", "127.0.0.1"),
             port=int(os.getenv("SDD_DB_PORT", "5432")),
             database=os.getenv("SDD_DB_NAME", "sdd"),
+            query=options,
         )
     if admin or os.getenv("SDD_ENV") == "production":
         raise ValueError("Configure the database URL or database user and password file")

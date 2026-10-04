@@ -59,11 +59,7 @@ def source_transaction(db, tenant, datasets, isolation_level=None):
     ]
     with ExitStack() as stack:
         if indirect:
-            from ..db import Database
-
-            guard_db = Database(db.engine.url)
-            stack.callback(guard_db.engine.dispose)
-            guard = stack.enter_context(guard_db.transaction(tenant))
+            guard = stack.enter_context(db.source_guard(tenant))
             guard.exec_driver_sql("SET LOCAL lock_timeout = '3000ms'")
             guard.exec_driver_sql("SET LOCAL statement_timeout = '10000ms'")
             validate_sources(

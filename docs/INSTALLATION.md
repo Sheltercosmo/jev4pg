@@ -36,6 +36,8 @@ Use `docker compose ps` to inspect health. `/health` is process liveness; `/read
 
 ## Existing PostgreSQL server
 
+For an application-only deployment with verified TLS and explicit migration control, follow [external PostgreSQL deployment](EXTERNAL_POSTGRESQL.md). It includes connection sizing and an optional SQL worker. The process-supervisor installation below remains available.
+
 Use PostgreSQL 17 and a dedicated database. Install the Python package:
 
 ```bash

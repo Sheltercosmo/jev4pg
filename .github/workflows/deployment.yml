@@ -27,6 +27,8 @@ jobs:
           python -m pytest -q --tb=short
       - name: Create disposable credentials
         run: python deploy/configure.py --no-prompt
+      - name: Validate deployment configurations
+        run: python deploy/check_compose.py
       - name: Build and start deployment
         run: |
           docker compose -f compose.yaml -f deploy/compose.test.yaml build

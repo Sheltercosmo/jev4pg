@@ -12,6 +12,8 @@ Maintained-feature publication has a separate local boundary. Capture definition
 
 Attached sources add a catalog boundary before source selection. Authorization determines the logical dataset; source pinning and contract validation then establish the relation this query may read. Table locks precede the data snapshot. Indirect views hold a guard transaction while the main query runs. Schema failures stop before inference, without adding a serial JEV stage. Foreign-key metadata retains every composite operand during parallel field retrieval. See [existing sources](EXISTING_DATA.md).
 
+View guards share one bounded auxiliary connection pool per database instance. A guard is acquired before the main snapshot and released on success, validation failure or main-pool timeout. It cannot consume a main execution slot while waiting for another main slot. The guard pool limits concurrent view queries; independent semantic work inside each admitted query retains its existing DAG and provider concurrency. No provider work is added to connection setup.
+
 | Stage | Required input | Independent work | Placement reason |
 | --- | --- | --- | --- |
 | Source selection | Caller privileges and explicit source SELECT | PostgreSQL's ordinary relational plan | Exact filters and projection reduce model context before dispatch. |

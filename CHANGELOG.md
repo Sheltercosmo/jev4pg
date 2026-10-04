@@ -2,7 +2,7 @@
 
 ## 0.7.0.dev0 — development preview
 
-These changes are available from `main`. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0).
+The development line targets the next release. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0).
 
 | Feature | What it adds |
 | --- | --- |
@@ -12,8 +12,9 @@ These changes are available from `main`. The packaged application release remain
 | [Persistent evidence](docs/NATIVE_EVIDENCE.md) | Reuse compatible observations across connections and coordinate provider admission. Decision thresholds remain separate from observations. |
 | [Source attachments](docs/EXISTING_DATA.md) | Query authorized PostgreSQL tables and views without importing their rows. Attachments remain read-only through the application. |
 | [Native deployment](docs/NATIVE_DEPLOYMENT.md) | Build the extension with Docker Compose and provision restricted registry access. Native 0.2.0 adds registry backup support and an upgrade from 0.1.0. |
+| [External PostgreSQL](docs/EXTERNAL_POSTGRESQL.md) | Deploy the application against an existing server with verified TLS, explicit migration control and bounded connection pools. Catalog version 3 isolates metadata in `sdd_catalog`. |
 
-The application reports `0.7.0.dev0` through the package, CLI, health endpoint and OpenAPI document. Its catalog schema is version 2; the native extension is version 0.2.0. See [upgrade instructions](docs/INSTALLATION.md#upgrade).
+The application reports `0.7.0.dev0` through the package, CLI, health endpoint and OpenAPI document. Its catalog schema is version 3; the native extension is version 0.2.0. See [upgrade instructions](docs/INSTALLATION.md#upgrade).
 
 Python remains the default semantic engine. Native execution is a PostgreSQL 17 preview; maintained features and semantic write review still use Python. Current native tests establish execution behavior, not a measured language-accuracy or performance advantage. See the [roadmap](docs/IMPLEMENTATION_PLAN.md).
 

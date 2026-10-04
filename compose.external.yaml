@@ -1,0 +1,45 @@
+name: jevsd-pg-external
+
+x-external-database: &external-database
+  SDD_DB_HOST: ${SDD_DB_HOST:?Set the existing PostgreSQL hostname}
+  SDD_DB_NAME: ${SDD_DB_NAME:?Set the existing database name}
+  SDD_DB_USER: ${SDD_DB_USER:?Set the restricted runtime login}
+  SDD_DB_SSLMODE: verify-full
+  SDD_DB_SSLROOTCERT: /run/secrets/database_ca
+
+services:
+  app:
+    extends: {file: compose.services.yaml, service: app}
+    environment: *external-database
+    secrets: [database_ca]
+
+  sql-worker:
+    extends: {file: compose.services.yaml, service: sql-worker}
+    profiles: [sql]
+    environment:
+      <<: *external-database
+      SDD_SQL_INTERFACE: "1"
+    secrets: [database_ca]
+
+  migrate:
+    extends: {file: compose.services.yaml, service: migrate}
+    profiles: [tools]
+    command: [migrate]
+    environment: *external-database
+    secrets: [database_ca]
+
+secrets:
+  database_ca:
+    file: ${SDD_DATABASE_CA_FILE:-.secrets/database-ca.crt}
+  postgres_password:
+    file: ${SDD_ADMIN_PASSWORD_FILE:-.secrets/postgres_password}
+  app_password:
+    file: ${SDD_SECRETS_DIR:-.secrets}/app_password
+  api_tokens:
+    file: ${SDD_SECRETS_DIR:-.secrets}/api_tokens.json
+  typesafe_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/typesafe_api_key
+  jev_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/jev_api_key
+  llm_api_key:
+    file: ${SDD_SECRETS_DIR:-.secrets}/llm_api_key

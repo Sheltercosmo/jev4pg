@@ -1,0 +1,92 @@
+x-database: &database
+  SDD_DB_HOST: ${SDD_DB_HOST:-postgres}
+  SDD_DB_PORT: ${SDD_DB_PORT:-5432}
+  SDD_DB_NAME: ${SDD_DB_NAME:-sdd}
+  SDD_DB_USER: ${SDD_DB_USER:-sdd_app}
+  SDD_DB_PASSWORD_FILE: /run/secrets/app_password
+  SDD_DB_SSLMODE: ${SDD_DB_SSLMODE:-prefer}
+  SDD_DB_SSLROOTCERT: ${SDD_DB_SSLROOTCERT:-}
+  SDD_DB_CONNECT_TIMEOUT: ${SDD_DB_CONNECT_TIMEOUT:-10}
+  SDD_DB_APPLICATION_NAME: ${SDD_DB_APPLICATION_NAME:-jevsd-pg}
+  SDD_DB_POOL_SIZE: ${SDD_DB_POOL_SIZE:-5}
+  SDD_DB_MAX_OVERFLOW: ${SDD_DB_MAX_OVERFLOW:-10}
+  SDD_DB_POOL_TIMEOUT: ${SDD_DB_POOL_TIMEOUT:-30}
+  SDD_DB_POOL_RECYCLE: ${SDD_DB_POOL_RECYCLE:-1800}
+  SDD_DB_GUARD_POOL_SIZE: ${SDD_DB_GUARD_POOL_SIZE:-2}
+  SDD_SQL_INTERFACE: ${SDD_SQL_INTERFACE:-0}
+
+x-runtime: &runtime
+  <<: *database
+  SDD_ENV: production
+  SDD_JEV_TRANSPORT: ${SDD_JEV_TRANSPORT:-systemone}
+  SDD_JEV_MODEL: ${SDD_JEV_MODEL:-jev-1.13.0}
+  SDD_JEV_ENDPOINT: ${SDD_JEV_ENDPOINT:-}
+  SDD_JEV_REVISION: ${SDD_JEV_REVISION:-}
+  SDD_JEV_ADAPTER: ${SDD_JEV_ADAPTER:-}
+  SDD_JEV_CONCURRENCY: ${SDD_JEV_CONCURRENCY:-4}
+  SDD_PLANNING_WORKERS: ${SDD_PLANNING_WORKERS:-4}
+  SDD_JEV_INPUT_USD_PER_MILLION: ${SDD_JEV_INPUT_USD_PER_MILLION:-0.042}
+  SDD_OPERATOR_HARD_JUDGMENTS: ${SDD_OPERATOR_HARD_JUDGMENTS:-1000000}
+  SDD_OPERATOR_HARD_REQUESTS: ${SDD_OPERATOR_HARD_REQUESTS:-100000}
+  SDD_OPERATOR_HARD_USD: ${SDD_OPERATOR_HARD_USD:-20}
+  SDD_DAILY_EVALUATIONS: ${SDD_DAILY_EVALUATIONS:-1000}
+  TYPESAFE_API_KEY_FILE: /run/secrets/typesafe_api_key
+  SDD_JEV_API_KEY_FILE: /run/secrets/jev_api_key
+  OPENAI_API_KEY_FILE: /run/secrets/llm_api_key
+  SDD_LLM_TRANSPORT: ${SDD_LLM_TRANSPORT:-openai}
+  SDD_LLM_MODEL: ${SDD_LLM_MODEL:-}
+  SDD_HYBRID_CONCEPTS: ${SDD_HYBRID_CONCEPTS:-off}
+  SDD_HYBRID_REPAIR: ${SDD_HYBRID_REPAIR:-on}
+
+services:
+  migrate:
+    build: .
+    image: jevsd-pg:local
+    command: ["migrate", "--sql-interface"]
+    environment:
+      <<: *database
+      SDD_ADMIN_DB_USER: ${SDD_ADMIN_DB_USER:-sdd_admin}
+      SDD_ADMIN_DB_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, app_password]
+    read_only: true
+    tmpfs: [/tmp]
+
+  app:
+    build: .
+    image: jevsd-pg:local
+    command: ["serve", "--host", "0.0.0.0"]
+    environment:
+      <<: *runtime
+      SDD_API_TOKENS_FILE: /run/secrets/api_tokens
+      SDD_FEATURE_MAINTENANCE: ${SDD_FEATURE_MAINTENANCE:-1}
+    secrets: [app_password, api_tokens, typesafe_api_key, jev_api_key, llm_api_key]
+    ports: ["127.0.0.1:${SDD_HTTP_PORT:-8000}:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 120s
+
+  sql-worker:
+    image: jevsd-pg:local
+    command: ["sql-worker", "--concurrency", "${SDD_SQL_WORKERS:-2}"]
+    environment: *runtime
+    secrets: [app_password, typesafe_api_key, jev_api_key, llm_api_key]
+    healthcheck:
+      test: ["CMD", "jevsd-pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
+      interval: 15s
+      timeout: 12s
+      retries: 4
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 120s
+

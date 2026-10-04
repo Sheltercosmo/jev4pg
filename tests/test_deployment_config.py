@@ -59,6 +59,68 @@ def test_secret_generation_is_repeatable_without_rotation(tmp_path):
     assert before["postgres_password"] != before["app_password"]
 
 
+def test_structured_tls_settings_and_explicit_url_precedence(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
+    monkeypatch.delenv("SDD_ADMIN_DATABASE_URL", raising=False)
+    monkeypatch.delenv("SDD_ADMIN_DATABASE_URL_FILE", raising=False)
+    for prefix in ("SDD_DB_", "SDD_ADMIN_DB_"):
+        monkeypatch.setenv(prefix + "USER", "restricted")
+        monkeypatch.setenv(prefix + "PASSWORD", "a password with @ and / and spaces")
+        monkeypatch.delenv(prefix + "PASSWORD_FILE", raising=False)
+    monkeypatch.setenv("SDD_DB_SSLMODE", "verify-full")
+    monkeypatch.setenv("SDD_DB_SSLROOTCERT", str(tmp_path / "company root.crt"))
+    monkeypatch.setenv("SDD_DB_CONNECT_TIMEOUT", "7")
+    monkeypatch.setenv("SDD_DB_APPLICATION_NAME", "analysis-workspace")
+    for admin in (False, True):
+        url = database_url(admin=admin)
+        assert url.query["sslmode"] == "verify-full"
+        assert url.query["sslrootcert"].endswith("company root.crt")
+        assert url.query["connect_timeout"] == "7"
+        assert url.query["application_name"] == "analysis-workspace"
+    explicit = "postgresql+psycopg://runtime@db/warehouse?sslmode=require"
+    monkeypatch.setenv("DATABASE_URL", explicit)
+    assert database_url() == explicit
+
+
+@pytest.mark.parametrize(
+    "setting,value",
+    [
+        ("SDD_DB_SSLMODE", "verify-everything"),
+        ("SDD_DB_CONNECT_TIMEOUT", "0"),
+        ("SDD_DB_CONNECT_TIMEOUT", "nan"),
+    ],
+)
+def test_invalid_structured_connection_options_fail_early(monkeypatch, setting, value):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL_FILE", raising=False)
+    monkeypatch.delenv("SDD_DB_PASSWORD_FILE", raising=False)
+    monkeypatch.setenv("SDD_DB_USER", "runtime")
+    monkeypatch.setenv("SDD_DB_PASSWORD", "example")
+    monkeypatch.setenv(setting, value)
+    with pytest.raises(ValueError, match=setting):
+        database_url()
+
+
+@pytest.mark.parametrize(
+    "setting,value",
+    [
+        ("SDD_DB_POOL_SIZE", "0"),
+        ("SDD_DB_POOL_SIZE", "1.5"),
+        ("SDD_DB_MAX_OVERFLOW", "-1"),
+        ("SDD_DB_GUARD_POOL_SIZE", "0"),
+        ("SDD_DB_POOL_TIMEOUT", "nan"),
+        ("SDD_DB_POOL_TIMEOUT", "inf"),
+        ("SDD_DB_POOL_TIMEOUT", "0"),
+        ("SDD_DB_POOL_RECYCLE", "-1"),
+    ],
+)
+def test_unbounded_or_invalid_pool_settings_are_rejected(monkeypatch, setting, value):
+    monkeypatch.setenv(setting, value)
+    with pytest.raises(ValueError, match=setting):
+        Database("postgresql+psycopg://runtime@localhost/unused")
+
+
 def test_native_configuration_adds_a_separate_persistent_secret(tmp_path):
     directory = configure(tmp_path / "secrets", prompt=False)
     original = {path.name: path.read_bytes() for path in directory.iterdir()}

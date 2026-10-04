@@ -5,7 +5,7 @@ from typing import Literal
 from sqlglot.errors import SqlglotError
 from fastapi import Depends, HTTPException, Query
 from pydantic import Field, StrictBool, StrictStr
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, TimeoutError as PoolTimeout
 from ..ir import Strict
 from ..evaluators import ProviderError
 from .catalog import Catalog, serial
@@ -143,6 +143,18 @@ def mount(app, executor, identity, reviewer):
             content={
                 "detail": "Planning provider request failed: " + exc.code,
                 "retryable": exc.retryable,
+            },
+        )
+
+    @app.exception_handler(PoolTimeout)
+    async def database_capacity(_, exc):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Database connection capacity is temporarily exhausted.",
+                "code": "database_capacity",
             },
         )
 

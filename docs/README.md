@@ -33,6 +33,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | Guide | Contents |
 | --- | --- |
 | [Installation](INSTALLATION.md) | Release deployment, native preview, credentials and backups. |
+| [External PostgreSQL](EXTERNAL_POSTGRESQL.md) | Application-only deployment, verified TLS, connection capacity and recovery. |
 | [Native Compose](NATIVE_DEPLOYMENT.md) | Optimized Rust image, registry setup, upgrades and recovery. |
 | [Providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
