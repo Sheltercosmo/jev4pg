@@ -249,13 +249,20 @@ def test_composite_foreign_keys_reach_planning_without_partial_join_rules(source
     assert packet["catalog"][1]["source_relationships"] == [relation]
 
 
-def test_upgrade_requires_migration_and_preserves_existing_catalog(source):
+def test_inconsistent_version_does_not_rewrite_existing_catalog(source):
     dataset = attach(source)
     with source["owner"].engine.begin() as connection:
         connection.exec_driver_sql("UPDATE sdd_schema_version SET version=1")
     with pytest.raises(ValueError, match="migration"):
         check_database(source["app"])
-    migrate(source["url"], source["roles"][0], sql_interface=True)
+    with pytest.raises(ValueError, match="predates"):
+        migrate(source["url"], source["roles"][0], sql_interface=True)
+    with source["owner"].engine.begin() as connection:
+        assert (
+            connection.exec_driver_sql("SELECT version FROM public.sdd_schema_version").scalar_one()
+            == 1
+        )
+        connection.exec_driver_sql("UPDATE public.sdd_schema_version SET version=2")
     assert check_database(source["app"])["schema_version"] == SCHEMA_VERSION
     assert (
         source["catalog"].get("tenant-a", dataset["id"])["source_binding"]

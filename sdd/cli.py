@@ -21,6 +21,11 @@ def main():
     )
     migration.add_argument("--sql-interface", action="store_true")
     migration.add_argument(
+        "--check",
+        action="store_true",
+        help="Check installation ownership without changing the database",
+    )
+    migration.add_argument(
         "--native-interface",
         action="store_true",
         help="Enable the installed Rust semantic extension",
@@ -90,11 +95,16 @@ def main():
         return
     if args.command in {"migrate", "sql-grant", "extension-files", "ready", "attach", "detach"}:
         from .config import load_env, database_url, secret
-        from .bootstrap import migrate, grant_client, extension_files
+        from .bootstrap import migrate, check_migration, grant_client, extension_files
+        from .migration_preflight import InstallationConflict
 
         load_env()
         try:
-            if args.command == "migrate":
+            if args.command == "migrate" and args.check:
+                result = check_migration(
+                    database_url(admin=True), os.getenv("SDD_DB_USER", "sdd_app")
+                )
+            elif args.command == "migrate":
                 result = migrate(
                     database_url(admin=True),
                     os.getenv("SDD_DB_USER", "sdd_app"),
@@ -148,6 +158,13 @@ def main():
                 finally:
                     db.engine.dispose()
         except Exception as exc:
+            if isinstance(exc, InstallationConflict):
+                print(
+                    json.dumps(
+                        {"status": "blocked", "conflicts": exc.conflicts}, ensure_ascii=False
+                    )
+                )
+                parser.exit(1)
             if args.command in {"attach", "detach"} and isinstance(exc, ValueError):
                 parser.exit(1, f"{args.command} failed: {exc}\n")
             parser.exit(

@@ -78,13 +78,17 @@ def migrate(
         raise ValueError("PostgreSQL is required for deployment")
     try:
         with db.engine.begin() as connection:
+            connection.exec_driver_sql("SET LOCAL search_path=pg_catalog,public,pg_temp")
             connection.execute(text("SELECT pg_advisory_xact_lock(1747654244, 1)"))
+            from .migration_preflight import inspect_installation
+
+            inspect_installation(connection, runtime_role, SCHEMA_VERSION)
             ensure_login(connection, runtime_role, runtime_password)
             role = identifier(connection, runtime_role)
             from .generic import schema as generic_schema  # noqa: F401
             from .operators import schema as operator_schema  # noqa: F401
 
-            metadata.create_all(connection)
+            metadata.create_all(connection.execution_options(schema_translate_map={None: "public"}))
             connection.execute(
                 text(
                     "CREATE TABLE IF NOT EXISTS public.sdd_schema_version "
@@ -165,6 +169,21 @@ def migrate(
         if native_registry:
             result["native_registry"] = True
         return result
+    finally:
+        db.engine.dispose()
+
+
+def check_migration(admin_url, runtime_role="sdd_app"):
+    from .migration_preflight import inspect_installation
+
+    db = Database(admin_url)
+    try:
+        if db.engine.dialect.name != "postgresql":
+            raise ValueError("PostgreSQL is required for deployment")
+        with db.engine.begin() as connection:
+            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+            connection.exec_driver_sql("SET LOCAL search_path=pg_catalog,public,pg_temp")
+            return inspect_installation(connection, runtime_role, SCHEMA_VERSION)
     finally:
         db.engine.dispose()
 

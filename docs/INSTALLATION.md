@@ -62,6 +62,16 @@ jevsd-pg migrate --sql-interface
 
 This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jevsd-pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
 
+Development installations can inspect the target before applying changes:
+
+```bash
+jevsd-pg migrate --check
+```
+
+This read-only command checks installation ownership, supported catalog versions, table contracts, tenant policies and runtime-role memberships. It returns JSON and exits nonzero on a conflict. It neither calls a model nor creates roles. It does not test extension availability, provider connectivity or backup recovery; use the matching installation procedure and readiness checks for those.
+
+The same check runs inside migration before any installation changes. An unrelated same-named table, function or `sdd_data` schema stops installation. Existing versioned installations must match their table, owner and tenant-policy contracts; changing the version row alone does not authorize adoption. Inspect the reported objects and use a dedicated database when they belong to another application. Do not delete them to make the check pass. Migration uses explicit `public` objects regardless of the administrator's search path.
+
 Remove administrator credentials from the service environment. Set `SDD_ENV=production`, `SDD_SQL_INTERFACE=1`, and start the services under your process supervisor:
 
 ```bash

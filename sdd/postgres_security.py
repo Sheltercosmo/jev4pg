@@ -13,16 +13,16 @@ def secure(db, connection=None):
     with nullcontext(connection) if connection is not None else db.engine.begin() as cx:
         for table in metadata.sorted_tables:
             name = table.name
-            cx.execute(text(f'ALTER TABLE "{name}" ENABLE ROW LEVEL SECURITY'))
-            cx.execute(text(f'ALTER TABLE "{name}" FORCE ROW LEVEL SECURITY'))
-            cx.execute(text(f'DROP POLICY IF EXISTS tenant_isolation ON "{name}"'))
+            cx.execute(text(f'ALTER TABLE public."{name}" ENABLE ROW LEVEL SECURITY'))
+            cx.execute(text(f'ALTER TABLE public."{name}" FORCE ROW LEVEL SECURITY'))
+            cx.execute(text(f'DROP POLICY IF EXISTS tenant_isolation ON public."{name}"'))
             cx.execute(
-                text(f'''CREATE POLICY tenant_isolation ON "{name}"
+                text(f'''CREATE POLICY tenant_isolation ON public."{name}"
                 USING (tenant = current_setting('sdd.tenant', true))
                 WITH CHECK (tenant = current_setting('sdd.tenant', true))''')
             )
         cx.execute(
-            text("""CREATE OR REPLACE FUNCTION sdd_reject_evidence_update() RETURNS trigger
+            text("""CREATE OR REPLACE FUNCTION public.sdd_reject_evidence_update() RETURNS trigger
             LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Evidence revisions are immutable'; END $$""")
         )
         for name in (
@@ -38,27 +38,27 @@ def secure(db, connection=None):
             "jev_operator_assertions",
             "jev_operator_definitions",
         ):
-            cx.execute(text(f'DROP TRIGGER IF EXISTS immutable_revision ON "{name}"'))
+            cx.execute(text(f'DROP TRIGGER IF EXISTS immutable_revision ON public."{name}"'))
             cx.execute(
-                text(f'''CREATE TRIGGER immutable_revision BEFORE UPDATE ON "{name}"
-                FOR EACH ROW EXECUTE FUNCTION sdd_reject_evidence_update()''')
+                text(f'''CREATE TRIGGER immutable_revision BEFORE UPDATE ON public."{name}"
+                FOR EACH ROW EXECUTE FUNCTION public.sdd_reject_evidence_update()''')
             )
         cx.execute(
-            text("""CREATE OR REPLACE FUNCTION sdd_protect_concept_definition() RETURNS trigger
+            text("""CREATE OR REPLACE FUNCTION public.sdd_protect_concept_definition() RETURNS trigger
           LANGUAGE plpgsql AS $$ BEGIN
             IF (to_jsonb(NEW) - 'status' - 'review') IS DISTINCT FROM (to_jsonb(OLD) - 'status' - 'review')
             THEN RAISE EXCEPTION 'Create a new concept revision instead of mutating its definition'; END IF;
             RETURN NEW;
           END $$""")
         )
-        cx.execute(text("DROP TRIGGER IF EXISTS immutable_concept ON concept_revisions"))
+        cx.execute(text("DROP TRIGGER IF EXISTS immutable_concept ON public.concept_revisions"))
         cx.execute(
-            text("""CREATE TRIGGER immutable_concept BEFORE UPDATE ON concept_revisions
-            FOR EACH ROW EXECUTE FUNCTION sdd_protect_concept_definition()""")
+            text("""CREATE TRIGGER immutable_concept BEFORE UPDATE ON public.concept_revisions
+            FOR EACH ROW EXECUTE FUNCTION public.sdd_protect_concept_definition()""")
         )
 
         cx.execute(
-            text("""CREATE OR REPLACE FUNCTION sdd_protect_feature_definition() RETURNS trigger
+            text("""CREATE OR REPLACE FUNCTION public.sdd_protect_feature_definition() RETURNS trigger
             LANGUAGE plpgsql AS $$ BEGIN
               IF (to_jsonb(NEW) - 'status' - 'review' - 'materialization') IS DISTINCT FROM
                  (to_jsonb(OLD) - 'status' - 'review' - 'materialization') THEN
@@ -67,8 +67,8 @@ def secure(db, connection=None):
               RETURN NEW;
             END $$""")
         )
-        cx.execute(text("DROP TRIGGER IF EXISTS immutable_feature ON dataset_feature_revisions"))
+        cx.execute(text("DROP TRIGGER IF EXISTS immutable_feature ON public.dataset_feature_revisions"))
         cx.execute(
-            text("""CREATE TRIGGER immutable_feature BEFORE UPDATE ON dataset_feature_revisions
-            FOR EACH ROW EXECUTE FUNCTION sdd_protect_feature_definition()""")
+            text("""CREATE TRIGGER immutable_feature BEFORE UPDATE ON public.dataset_feature_revisions
+            FOR EACH ROW EXECUTE FUNCTION public.sdd_protect_feature_definition()""")
         )
