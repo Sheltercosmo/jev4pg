@@ -160,4 +160,4 @@ def test_version_is_available_without_database_configuration():
         text=True,
         check=True,
     )
-    assert result.stdout.strip() == "jevsd-pg " + __version__
+    assert result.stdout.strip() == "jev4pg " + __version__

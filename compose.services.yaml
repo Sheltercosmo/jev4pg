@@ -7,7 +7,7 @@ x-database: &database
   SDD_DB_SSLMODE: ${SDD_DB_SSLMODE:-prefer}
   SDD_DB_SSLROOTCERT: ${SDD_DB_SSLROOTCERT:-}
   SDD_DB_CONNECT_TIMEOUT: ${SDD_DB_CONNECT_TIMEOUT:-10}
-  SDD_DB_APPLICATION_NAME: ${SDD_DB_APPLICATION_NAME:-jevsd-pg}
+  SDD_DB_APPLICATION_NAME: ${SDD_DB_APPLICATION_NAME:-jev4pg}
   SDD_DB_POOL_SIZE: ${SDD_DB_POOL_SIZE:-5}
   SDD_DB_MAX_OVERFLOW: ${SDD_DB_MAX_OVERFLOW:-10}
   SDD_DB_POOL_TIMEOUT: ${SDD_DB_POOL_TIMEOUT:-30}
@@ -41,7 +41,7 @@ x-runtime: &runtime
 services:
   migrate:
     build: .
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["migrate", "--sql-interface"]
     environment:
       <<: *database
@@ -53,7 +53,7 @@ services:
 
   app:
     build: .
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["serve", "--host", "0.0.0.0"]
     environment:
       <<: *runtime
@@ -74,12 +74,12 @@ services:
     stop_grace_period: 120s
 
   sql-worker:
-    image: jevsd-pg:local
+    image: jev4pg:local
     command: ["sql-worker", "--concurrency", "${SDD_SQL_WORKERS:-2}"]
     environment: *runtime
     secrets: [app_password, typesafe_api_key, jev_api_key, llm_api_key]
     healthcheck:
-      test: ["CMD", "jevsd-pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
+      test: ["CMD", "jev4pg", "ready", "--worker-heartbeat", "/tmp/jev-sql-worker.heartbeat"]
       interval: 15s
       timeout: 12s
       retries: 4

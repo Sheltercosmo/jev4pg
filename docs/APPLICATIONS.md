@@ -2,7 +2,7 @@
 
 This guide describes the development preview. The packaged v0.6.0 release does not yet include the table browser, cursor API or CSV review workflow.
 
-Keep large datasets in PostgreSQL. Attach an existing table instead of importing a copy through the browser. PostgreSQL retains its indexes, types, grants and row-level security; jevsd-pg supplies the catalog, query interface and semantic execution layer. Attachments are currently read-only and local to the service's PostgreSQL database. See [source onboarding](SOURCE_MANIFESTS.md).
+Keep large datasets in PostgreSQL. Attach an existing table instead of importing a copy through the browser. PostgreSQL retains its indexes, types, grants and row-level security; jev4pg supplies the catalog, query interface and semantic execution layer. Attachments are currently read-only and local to the service's PostgreSQL database. See [source onboarding](SOURCE_MANIFESTS.md).
 
 ## Load and query large data
 

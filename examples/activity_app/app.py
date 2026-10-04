@@ -1,4 +1,4 @@
-"""A small application backend using jevsd-pg's bounded read API."""
+"""A small application backend using jev4pg's bounded read API."""
 
 from contextlib import asynccontextmanager
 from decimal import Decimal

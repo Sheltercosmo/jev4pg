@@ -44,7 +44,7 @@ The `sql` profile starts the worker alongside the application. Grant each SQL lo
 
 ## Process-supervisor deployment
 
-The same configuration works without containers. Install the package and run `jevsd-pg serve` under your process supervisor. Set `SDD_DB_SSLMODE=verify-full`, `SDD_DB_SSLROOTCERT` to the CA file accessible to that process, and the structured database credentials. `SDD_DB_SSLCERT` and `SDD_DB_SSLKEY` optionally select client certificate files. The administrator and runtime structured connections share these TLS settings.
+The same configuration works without containers. Install the package and run `jev4pg serve` under your process supervisor. Set `SDD_DB_SSLMODE=verify-full`, `SDD_DB_SSLROOTCERT` to the CA file accessible to that process, and the structured database credentials. `SDD_DB_SSLCERT` and `SDD_DB_SSLKEY` optionally select client certificate files. The administrator and runtime structured connections share these TLS settings.
 
 An explicit `DATABASE_URL` or `DATABASE_URL_FILE` replaces the entire structured runtime connection configuration, including TLS options. Likewise, `SDD_ADMIN_DATABASE_URL` or its file variant replaces the structured administrator configuration. Put the required TLS parameters directly in an explicit URL. Password files and certificate-path settings serve different purposes: certificate settings contain paths, not PEM contents.
 

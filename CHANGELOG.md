@@ -2,7 +2,7 @@
 
 ## 0.7.0.dev0 — development preview
 
-The development line targets the next release. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jevsd-pg/releases/tag/v0.6.0).
+The development line targets the next release. The packaged application release remains [v0.6.0](https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.6.0).
 
 | Feature | What it adds |
 | --- | --- |

@@ -1,6 +1,6 @@
 # Domain model
 
-jevsd-pg is a semantic database built on PostgreSQL. Source relations remain relational data. A semantic predicate is a versioned typed question about a subject and its declared context. An observation records what an evaluator returned, rather than replacing source truth with a mutable label.
+jev4pg is a semantic database built on PostgreSQL. Source relations remain relational data. A semantic predicate is a versioned typed question about a subject and its declared context. An observation records what an evaluator returned, rather than replacing source truth with a mutable label.
 
 An evaluator identifies the provider, model and context construction revision. A decision policy resolves an observation into VALUE or UNKNOWN. NOT_EVALUATED means no result is available and is independent of operational status. An incomplete predicate population cannot silently become an exact aggregate or authorize a mutation.
 

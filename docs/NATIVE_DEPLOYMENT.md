@@ -9,8 +9,8 @@ This deployment uses application 0.7.0.dev0, catalog schema 2 and native extensi
 Use Docker Compose v2 and Python 3.11+. Clone the development source, then configure and start it:
 
 ```bash
-git clone https://github.com/Sheltercosmo/jevsd-pg.git
-cd jevsd-pg
+git clone https://github.com/Sheltercosmo/jev4pg.git
+cd jev4pg
 python deploy/configure.py --native
 docker compose -f compose.yaml -f compose.native.yaml build
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait

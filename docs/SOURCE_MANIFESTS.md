@@ -30,8 +30,8 @@ A manifest accepts 1–256 sources and 1–64 selected columns per source. CLI i
 ## Preview, review and apply
 
 ```sh
-jevsd-pg sources preview sources.json --tenant team --output sources.plan.json
-jevsd-pg sources apply sources.plan.json --tenant team
+jev4pg sources preview sources.json --tenant team --output sources.plan.json
+jev4pg sources apply sources.plan.json --tenant team
 ```
 
 Preview runs in a read-only transaction and inspects metadata without enumerating or sampling business rows. It writes a new JSON plan and refuses to overwrite an existing file. Review each source's selected columns, key, description, database identity and proposed action. `relationships` shows relationships among the sources in this manifest. Other already attached targets remain available through the catalog.

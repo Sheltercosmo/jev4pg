@@ -1,6 +1,6 @@
 # JEV providers
 
-jevsd-pg supports TypeSafe, HTTP services that implement the same typed decision contract, and local Python model adapters. The planner and operators use the same interface in all three cases.
+jev4pg supports TypeSafe, HTTP services that implement the same typed decision contract, and local Python model adapters. The planner and operators use the same interface in all three cases.
 
 ## TypeSafe
 

@@ -190,7 +190,7 @@ One context is limited to 1 MB before Rust deserialization. Source and result ba
 After building and installing the extension on the PostgreSQL server, run the application migration with administrator credentials:
 
 ```sh
-jevsd-pg migrate --native-interface
+jev4pg migrate --native-interface
 ```
 
 Set `SDD_SEMANTIC_ENGINE=native` for the application service. Its existing SQL and natural-language query routes then use Rust for ordinary `SEMANTIC(column, definition)` reads. The planner still produces inspectable SQL; the executor selects authorized source rows, batches questions in Rust, and returns temporary PostgreSQL relations for the remaining query. Full source populations do not pass through Python. Results identify `rust_postgresql` in the manifest and include the SQL execution steps.

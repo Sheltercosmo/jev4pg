@@ -51,7 +51,7 @@ jobs:
           cargo pgrx install --sudo --pg-config /usr/lib/postgresql/17/bin/pg_config
       - uses: actions/checkout@v4
         with:
-          repository: Sheltercosmo/jevsd-pg
+          repository: Sheltercosmo/jev4pg
           ref: 984dab8b551f6901b02661f5af7ffc93a4d43df7
           path: .native-baseline
       - name: Build published upgrade baseline
@@ -67,7 +67,7 @@ jobs:
           python-version: '3.13'
       - uses: actions/checkout@v4
         with:
-          repository: Sheltercosmo/jevsd-pg
+          repository: Sheltercosmo/jev4pg
           ref: 19f109dc966b8bd11fd741f9b40594c1609c281e
           path: .application-baseline
       - name: Install published application baseline

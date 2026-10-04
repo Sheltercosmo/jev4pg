@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jevsd-pg"
+name = "jev4pg"
 dynamic = ["version"]
 description = "A self-developing JEV-based SQL database with JEV-powered NL2SQL"
 license = "Apache-2.0"
@@ -18,12 +18,13 @@ browser-test = ["playwright>=1.50,<2"]
 dev = ["ruff==0.16.8"]
 
 [project.urls]
-Repository = "https://github.com/Sheltercosmo/jevsd-pg"
-Documentation = "https://github.com/Sheltercosmo/jevsd-pg/tree/main/docs"
-Issues = "https://github.com/Sheltercosmo/jevsd-pg/issues"
+Repository = "https://github.com/Sheltercosmo/jev4pg"
+Documentation = "https://github.com/Sheltercosmo/jev4pg/tree/main/docs"
+Issues = "https://github.com/Sheltercosmo/jev4pg/issues"
 
 [project.scripts]
 sdd = "sdd.cli:main"
+jev4pg = "sdd.cli:main"
 jevsd-pg = "sdd.cli:main"
 
 [tool.setuptools.packages.find]

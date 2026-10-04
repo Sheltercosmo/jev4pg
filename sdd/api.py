@@ -132,7 +132,7 @@ def create_app(executor=None, tokens=None):
 
     app = FastAPI(
         default_response_class=ExactJSONResponse,
-        title="jevsd-pg",
+        title="jev4pg",
         version=__version__,
         lifespan=lifespan,
         description="Query, inspect evidence, review decisions, and govern reusable concepts. Tenant is bound to the bearer token.",

@@ -9,10 +9,10 @@ For multiple sources and deployment automation, use a [reviewed source manifest]
 Run the matching migration first:
 
 ```sh
-jevsd-pg migrate
+jev4pg migrate
 ```
 
-For native execution, install the Rust extension and use `jevsd-pg migrate --native-interface`. See [native setup](../native/README.md).
+For native execution, install the Rust extension and use `jev4pg migrate --native-interface`. See [native setup](../native/README.md).
 
 A database administrator grants source access:
 
@@ -24,13 +24,13 @@ GRANT SELECT ON business.messages TO sdd_app;
 From the deployment environment, using its runtime database configuration:
 
 ```sh
-jevsd-pg attach messages --tenant team --schema business --table messages
+jev4pg attach messages --tenant team --schema business --table messages
 ```
 
 To select columns and supply a description:
 
 ```sh
-jevsd-pg attach messages --tenant team --schema business --table messages \
+jev4pg attach messages --tenant team --schema business --table messages \
   --column id --column body --column received_at \
   --description "Customer messages and their arrival times"
 ```
@@ -40,7 +40,7 @@ Choose another logical name if `messages` is already registered. Attachment is a
 The dataset appears in `/datasets` and the workspace selector. Query its logical name through `/data/sql`, `/ask` or the CLI:
 
 ```sh
-jevsd-pg ask "How many messages arrived this month?" --tenant team --dataset messages
+jev4pg ask "How many messages arrived this month?" --tenant team --dataset messages
 ```
 
 The SDK equivalent is:
@@ -77,7 +77,7 @@ SELECT id, body, received_at FROM business.messages;
 GRANT SELECT ON business.public_messages TO sdd_app;
 ```
 
-The runtime login also needs access to the underlying invoker-view sources. Materialized views expose their stored snapshot; jevsd-pg does not refresh them or reinterpret their original source policies. Foreign tables and custom types require an explicit supported integration or a local typed representation.
+The runtime login also needs access to the underlying invoker-view sources. Materialized views expose their stored snapshot; jev4pg does not refresh them or reinterpret their original source policies. Foreign tables and custom types require an explicit supported integration or a local typed representation.
 
 Execution verifies cluster, database and runtime-role identity, relation identity, selected column contracts, keys, comments and view definitions before semantic dispatch. Changed contracts stop the query. Unregistered added columns do not enter the catalog. View definitions are retained as fingerprints rather than copied SQL text. Attachments created without the database identity require an explicit rebind; matching relation OIDs cannot authorize a restored source.
 
@@ -86,7 +86,7 @@ Table locks precede the query's repeatable-read snapshot. Views and materialized
 ## Detach or accept a changed schema
 
 ```sh
-jevsd-pg detach messages --tenant team
+jev4pg detach messages --tenant team
 ```
 
 Detaching removes the dataset from the active catalog and preserves its source relation. Historical results and evidence remain stored. Register again to accept a changed schema; the new dataset identity prevents old planning approvals from silently applying to it. Historical SQL remains inspectable, while execution resolves against the current authorized catalog.

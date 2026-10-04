@@ -382,7 +382,7 @@ def test_serve_does_not_load_a_local_model_before_app_start(monkeypatch):
     from sdd import cli
 
     calls = []
-    monkeypatch.setattr(sys, "argv", ["jevsd-pg", "serve"])
+    monkeypatch.setattr(sys, "argv", ["jev4pg", "serve"])
     monkeypatch.setattr(cli, "runtime", lambda: pytest.fail("Model loaded outside the app factory"))
     monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
     cli.main()

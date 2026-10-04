@@ -1,6 +1,6 @@
 # Activity monitor
 
-A runnable read-only application built on jevsd-pg. It filters and pages through an existing PostgreSQL table while keeping the database API token on the application server. No inference call is needed for ordinary filters or pagination.
+A runnable read-only application built on jev4pg. It filters and pages through an existing PostgreSQL table while keeping the database API token on the application server. No inference call is needed for ordinary filters or pagination.
 
 ## Run locally
 

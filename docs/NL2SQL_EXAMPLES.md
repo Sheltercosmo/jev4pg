@@ -1,6 +1,6 @@
 # Natural language to SQL examples
 
-These queries were generated with jevsd-pg 0.5.0 and JEV 1.13.0, then checked against the [tutorial data](../examples/nl2sql/README.md). Each proposal required user review.
+These queries were generated with jev4pg 0.5.0 and JEV 1.13.0, then checked against the [tutorial data](../examples/nl2sql/README.md). Each proposal required user review.
 
 ## Total deliveries by supplier
 
