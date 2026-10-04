@@ -8,6 +8,7 @@ from threading import Event, Thread
 
 from .db import Database
 from .generic.query_jobs import QueryJobs
+from .generic.results import OversizedResultRow
 from .generic.sql import SQLService
 from .query_control import QueryControl, QueryInterrupted
 
@@ -88,6 +89,8 @@ class QueryWorker:
             )
         except QueryInterrupted as exc:
             state, error = exc.operation_state, exc.operation_state
+        except OversizedResultRow:
+            state, error = "FAILED", "RESULT_TOO_LARGE"
         except Exception as exc:
             state, error = "FAILED", type(exc).__name__
             log.warning("Query job %s failed: %s", job["id"], error)

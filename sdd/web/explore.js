@@ -211,7 +211,9 @@ function show(data) {
     $("status").textContent = t(manifest.complete ? "complete" : "partial");
     $("answer").textContent =
       t("resultRows", { count: data.result?.length || 0 }) +
-      (manifest.truncated ? t("truncated") : "");
+      (manifest.truncated
+        ? t(manifest.result_limited_by === "bytes" ? "truncatedBytes" : "truncated")
+        : "");
     if (!manifest.complete) $("answer").textContent += " · " + t("partialHint");
   }
   if (manifest) {

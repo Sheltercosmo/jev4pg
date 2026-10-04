@@ -13,6 +13,7 @@ from .native_admission import NativeAdmission
 from .native_relational import compile_relational_plan
 from .catalog import serial
 from .source_catalog import source_transaction
+from .results import RESULT_ROWS, ResultWindow
 
 
 def execute_relational(
@@ -61,7 +62,9 @@ def execute_relational(
 
         graph = compile_relational_plan(tree, bindings, render)
         target = graph["stages"][-1]
-        target["sql"] = "SELECT * FROM (" + target["sql"] + ") AS _sdd_result LIMIT 1001"
+        target["sql"] = (
+            "SELECT * FROM (" + target["sql"] + f") AS _sdd_result LIMIT {RESULT_ROWS + 1}"
+        )
         options = {
             "evidence_scope": tenant,
             "max_rows": max_rows,
@@ -89,6 +92,10 @@ def execute_relational(
         target_state = next(stage for stage in output["stages"] if stage["id"] == graph["target"])
         complete = target_state["output_state"] == "VALUE"
         rows = serial(json.loads(response["rows"], parse_float=Decimal))
+        result = ResultWindow(list(target["columns"]))
+        for row in rows:
+            if not result.append(row):
+                break
         states = Counter()
         for stage in output["stages"]:
             if stage["operator"] != "semantic":
@@ -130,12 +137,12 @@ def execute_relational(
             "result_operation_state": target_state["operation_state"],
             "result_hold_reason": target_state["reason"],
             "result_is_partial": not complete,
-            "truncated": len(rows) > 1000,
+            **result.manifest(),
             "operation": type(tree).__name__.lower(),
             "planning_ms": (plan or {}).get("planning_ms", 0),
             "execution_ms": round((time.perf_counter() - started) * 1000, 2),
             "execution_steps": [{"sql": statement, "parameters": parameters}],
         }
         return service.save(
-            connection, tenant, request, sql, statement, parameters, plan, manifest, rows[:1000]
+            connection, tenant, request, sql, statement, parameters, plan, manifest, result.rows
         )

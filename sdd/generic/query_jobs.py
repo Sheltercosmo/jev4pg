@@ -1,7 +1,6 @@
 """Durable query ownership, cancellation and result publication."""
 
 from contextlib import contextmanager
-import json
 import time
 
 from sqlalchemy import and_, insert, or_, select, text, update
@@ -11,6 +10,7 @@ from . import schema
 from .catalog import serial
 from .history import QueryHistory
 from .query_requests import QueryInput
+from .results import RESULT_BYTES, encoded_size
 from .sql import SQLService
 
 
@@ -240,13 +240,15 @@ class QueryJobs:
         if state == "SUCCEEDED" and not isinstance(result, dict):
             raise ValueError("Successful completion requires a query result")
         outcome = serial(result) if result is not None else None
-        if (
-            outcome is not None
-            and len(json.dumps(outcome, ensure_ascii=False).encode()) > 4 * 1024 * 1024
-        ):
-            outcome, state, error = None, "FAILED", "RESULT_TOO_LARGE"
-        if outcome and outcome.get("run_id"):
-            outcome = {key: value for key, value in outcome.items() if key != "result"}
+        if outcome is not None:
+            metadata = {key: value for key, value in outcome.items() if key != "result"}
+            if (
+                encoded_size(outcome.get("result")) > RESULT_BYTES
+                or encoded_size(metadata) > RESULT_BYTES
+            ):
+                outcome, state, error = None, "FAILED", "RESULT_TOO_LARGE"
+            elif outcome.get("run_id"):
+                outcome = metadata
         table = schema.query_jobs
         with self.transaction(job["tenant"]) as conn:
             current = (

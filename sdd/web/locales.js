@@ -129,7 +129,7 @@ const messages = {
     jobPreviewHint:
       "A change preview is ready. Open it and review the affected rows before committing.",
     jobTruncated:
-      "The saved result reached the row limit. Open it to inspect or export the returned rows.",
+      "The saved result reached a row or size limit. Open it to inspect or export the returned rows.",
     jobStatusUnavailable:
       "Status could not be refreshed. This does not cancel the server query. Reconnect or try Refresh.",
     jobCancelUnconfirmed:
@@ -369,7 +369,8 @@ const messages = {
     complete: "Query complete",
     partial: "Partial result · unresolved decisions",
     resultRows: "Rows returned: {count}",
-    truncated: " · first 1,000 shown",
+    truncated: " · row limit reached",
+    truncatedBytes: " · result size limit reached",
     partialHint: "Totals include resolved matches only. Resolve uncertain decisions and run remaining evaluations for a complete answer.",
     sourceRows: "Source rows",
     reused: "Evidence reused",
@@ -555,7 +556,7 @@ const messages = {
       "工作进程中断，未能确认最终结果；部分模型请求可能已经完成。请检查查询后再决定是否重新执行。",
     jobResultTooLarge: "结果超过了保存大小限制，请减少返回的列或行。",
     jobPreviewHint: "修改预览已生成。打开后核对受影响的记录，再决定是否提交修改。",
-    jobTruncated: "返回行数已达到上限。打开结果可查看或导出本次返回的记录。",
+    jobTruncated: "结果已达到行数或大小上限。打开结果可查看或导出本次返回的记录。",
     jobStatusUnavailable: "暂时无法刷新状态，服务器上的查询不会因此取消。请重新连接或点击刷新。",
     jobCancelUnconfirmed: "暂时无法确认是否已取消。请刷新状态，或再次点击取消查询。",
     jobNotAuthorized: "当前身份无权提交此查询，请检查访问令牌及所需权限。",
@@ -774,7 +775,8 @@ const messages = {
     complete: "查询完成",
     partial: "部分结果，仍有未确定的判断",
     resultRows: "共 {count} 条结果",
-    truncated: "，仅显示前 1,000 条",
+    truncated: "，已达到返回行数上限",
+    truncatedBytes: "，已达到结果大小上限",
     partialHint: "统计仅包含已确定的匹配记录。请处理未确定的判断并完成剩余评估，以获得完整结果。",
     sourceRows: "原始记录",
     reused: "复用评估",

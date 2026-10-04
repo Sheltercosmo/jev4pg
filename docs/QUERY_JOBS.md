@@ -78,7 +78,9 @@ Claims last 30 seconds by default and are renewed while work is active. If a wor
 
 The query deadline starts at execution, excluding queue wait. The job binds the catalog identities and definitions seen at submission, but reads source rows at execution time. A changed catalog requires a new request. PostgreSQL permissions, source checks, query limits and provider budgets are still enforced during execution.
 
-Results retain the SQL endpoint's 1,000-row cap. A job outcome above 4 MiB fails with `RESULT_TOO_LARGE`; reduce the projection or use PostgreSQL export tooling. Internal run storage and already incurred inference are not undone by this publication limit. Jobs and their idempotency keys are retained; automatic retention and resumable bulk execution remain planned. Revoking an API token does not revoke a previously accepted job: cancel it through the submitting identity or an administrator's controlled workflow.
+Results retain the SQL endpoint's 1,000-row and 4 MiB row-data caps. A bounded prefix publishes normally with `TRUNCATED`; `manifest.result_limited_by` distinguishes a row limit from a byte limit. If the first row cannot fit, the job fails with `RESULT_TOO_LARGE`. Select fewer or smaller fields, or use PostgreSQL export tooling.
+
+Publication checks row data and metadata separately, each against a 4 MiB compact JSON budget. SQL, the plan and receipts therefore do not displace an otherwise valid row result. Oversized metadata fails with `RESULT_TOO_LARGE`. Internal run storage and already incurred inference are not undone by a publication failure. Jobs and their idempotency keys are retained; automatic retention and resumable bulk execution remain planned. Revoking an API token does not revoke a previously accepted job: cancel it through the submitting identity or an administrator's controlled workflow.
 
 ## Validate
 

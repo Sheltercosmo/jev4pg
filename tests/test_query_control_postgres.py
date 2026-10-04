@@ -43,7 +43,7 @@ def running_query(owner, role):
             pid = conn.execute(
                 text(
                     "SELECT pid FROM pg_stat_activity WHERE usename=:role AND state='active' "
-                    "AND query LIKE 'SELECT * FROM (%_sdd_result%'"
+                    "AND (query LIKE 'FETCH %' OR query LIKE 'SELECT * FROM (%_sdd_result%')"
                 ),
                 {"role": role},
             ).scalar()

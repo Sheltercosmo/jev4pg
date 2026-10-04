@@ -11,6 +11,7 @@ from ..json_response import exact_json
 
 from .catalog import Catalog, coerce, serial
 from .source_catalog import source_transaction
+from .results import OversizedResultRow, result_cursor, result_mappings, result_row
 
 
 PAGE_BYTES = 4 * 1024 * 1024
@@ -119,12 +120,17 @@ class TableBrowser:
             table = self.catalog.table(dataset, connection, source_validated=True)
             query, names = page_query(table, dataset, columns, filters or [], after, limit)
             rows, last, size, more, boundary = [], None, 0, False, None
-            with connection.execution_options(stream_results=True, max_row_buffer=32).execute(
-                query
-            ) as result:
-                for row in result.mappings():
+            with result_cursor(connection, query, byte_limit=PAGE_BYTES) as (result, _, marker):
+                for raw in result_mappings(result, marker):
                     if len(rows) == limit:
                         more, boundary = True, "rows"
+                        break
+                    try:
+                        row = result_row(raw, marker, byte_limit=PAGE_BYTES)
+                    except OversizedResultRow:
+                        if not rows:
+                            raise
+                        more, boundary = True, "bytes"
                         break
                     entry = exact_json(serial({name: row[name] for name in names}))
                     cursor = exact_json(serial([row[key] for key in dataset["primary_key"]]))

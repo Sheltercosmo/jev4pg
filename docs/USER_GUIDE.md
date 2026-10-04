@@ -56,6 +56,8 @@ If the plan is held, inspect its review items. Correct a decision, choose anothe
 
 Execution status is separate. `FAILED`, `BLOCKED_BY_BUDGET` and `TRUNCATED` explain operational limits. A proposal, review result and execution result may therefore have different states. Partial results should not be interpreted as a complete population.
 
+Development SQL results stop at 1,000 rows or 4 MiB of row data. The result area distinguishes the row limit from the size limit. Returned cells remain complete; a first row too large to return produces an error. Choose fewer fields, calculate a summary in SQL, or use PostgreSQL export tooling for the full data. These presentation limits do not reduce the population used by aggregates and windows inside your query.
+
 Database changes have a separate preview and Commit changes action. Reviewing a plan or selecting an alternative never commits a write.
 
 ## Reuse a recent query

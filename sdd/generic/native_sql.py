@@ -14,6 +14,7 @@ from ..ledger import uid
 from .catalog import serial
 from .native_admission import NativeAdmission
 from .source_catalog import source_transaction
+from .results import read_result
 
 
 def _conjuncts(node):
@@ -433,15 +434,10 @@ def execute_native(
             )
         _replace(operators, relations)
         compiled, parameters = service.bind(tree, bindings)
-        result = connection.execute(
-            text("SELECT * FROM (" + compiled + ") AS _sdd_result LIMIT 1001"), parameters
-        )
-        if len(result.keys()) != len(set(result.keys())):
-            raise ValueError("Duplicate output names require distinct SQL aliases")
-        rows = [serial(dict(row)) for row in result.mappings()]
+        result = read_result(connection, compiled, parameters)
         manifest = {
             "execution_backend": "rust_postgresql",
-            "result_columns": list(result.keys()),
+            **result.manifest(),
             "admission_id": admission.identity,
             "native_version": version,
             "native_scheduler": "shared_round_robin",
@@ -464,12 +460,11 @@ def execute_native(
             "decision_policy": {"accept": accept, "reject": reject},
             "complete": complete,
             "result_is_partial": not complete,
-            "truncated": len(rows) > 1000,
             "operation": type(tree).__name__.lower(),
             "planning_ms": (plan or {}).get("planning_ms", 0),
             "execution_ms": round((time.perf_counter() - started) * 1000, 2),
             "execution_steps": steps + [{"sql": compiled, "parameters": serial(parameters)}],
         }
         return service.save(
-            connection, tenant, request, sql, compiled, parameters, plan, manifest, rows[:1000]
+            connection, tenant, request, sql, compiled, parameters, plan, manifest, result.rows
         )

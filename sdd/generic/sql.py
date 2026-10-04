@@ -22,6 +22,7 @@ from .catalog import Catalog, serial
 from .semantics import Semantics
 from . import schema as schema
 from .query_rewrites import decorrelate_scalar_aggregate
+from .results import read_result
 
 FUNCTIONS = {
     "EXISTS",
@@ -841,17 +842,11 @@ class SQLService:
                 "planning_ms": (plan or {}).get("planning_ms", 0),
             }
             if not is_write:
-                bounded = "SELECT * FROM (" + compiled + ") AS _sdd_result LIMIT 1001"
-                result = connection.execute(text(bounded), params)
-                if len(result.keys()) != len(set(result.keys())):
-                    raise ValueError("Duplicate output names require distinct SQL aliases")
-                manifest["result_columns"] = list(result.keys())
-                rows = [serial(dict(row)) for row in result.mappings()]
-                manifest["truncated"] = len(rows) > 1000
-                rows = rows[:1000]
+                result = read_result(connection, compiled, params)
+                manifest.update(result.manifest())
                 manifest["execution_ms"] = round((time.perf_counter() - started) * 1000, 2)
                 return self.save(
-                    connection, tenant, request, sql, compiled, params, plan, manifest, rows
+                    connection, tenant, request, sql, compiled, params, plan, manifest, result.rows
                 )
             before = []
             sample = []

@@ -43,7 +43,9 @@ def wait_active(owner, pid, *, lock=False):
     while monotonic() < deadline:
         record = activity(owner, pid)
         if record["state"] == "active" and (
-            record["wait_event_type"] == "Lock" if lock else "_sdd_result" in record["query"]
+            record["wait_event_type"] == "Lock"
+            if lock
+            else record["query"].startswith("FETCH ") or "_sdd_result" in record["query"]
         ):
             return
         sleep(0.01)

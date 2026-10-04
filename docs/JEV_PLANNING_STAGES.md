@@ -46,6 +46,7 @@ View guards share one bounded auxiliary connection pool per database instance. A
 | Embedding distance | Two complete matrices with the same basis and evaluator | Other candidate comparisons | Compare stored probability features locally after embedding the search input once. |
 | Selected-branch merge | Selector and projected branch decisions | Other ready SQL or semantic stages | Copy only the chosen typed result locally; unchosen skipped work cannot block it, while an unknown selector cannot choose a fallback. |
 | Relational consumption | Typed decisions and projected source rows | PostgreSQL joins and arithmetic | Exact membership requires resolved decisions; missing work cannot become false. |
+| Application result delivery | Final relational output and result budgets | Other queries and independent JEV work retain their schedulers | PostgreSQL guards cumulative transfer bytes before driver decoding; application serialization then bounds the exact returned prefix. Limits do not move into aggregates or semantic source selection. |
 
 A source batch is a memory and admission boundary, not a semantic dependency. Independent source populations feed one bounded round-robin batch. Source-local ordinals and opaque routing identities preserve lineage while the executor overlaps provider requests. The iterator completes one batch before fetching another; overlap between batches remains a measured optimization opportunity. PostgreSQL execution stays on its backend thread; provider I/O is concurrent on a current-thread Rust scheduler.
 

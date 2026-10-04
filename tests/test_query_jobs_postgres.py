@@ -142,7 +142,8 @@ def wait_query(env):
             active = conn.execute(
                 text(
                     "SELECT count(*) FROM pg_stat_activity WHERE usename=:role "
-                    "AND state='active' AND query LIKE 'SELECT * FROM (%_sdd_result%'"
+                    "AND state='active' "
+                    "AND (query LIKE 'FETCH %' OR query LIKE 'SELECT * FROM (%_sdd_result%')"
                 ),
                 {"role": env["roles"][0]},
             ).scalar_one()

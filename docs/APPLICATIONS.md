@@ -16,7 +16,11 @@ The browser CSV importer is for small, reviewed imports: 5 MB and 10,000 rows. I
 
 For API imports, send `name` and UTF-8 `content` to `POST /datasets/csv/preview`. Optional settings are `delimiter`, `null_empty` and explicit `columns`. The response includes inferred columns, a sample, conversion errors and a fingerprint. After reviewing a valid preview, send the same content and settings with its `columns` and `fingerprint` to `POST /datasets/csv`. A changed file or type definition requires another preview. Both routes require a reviewer token.
 
-Ordinary SQL filters, joins, windows and aggregates execute in PostgreSQL. The HTTP SQL endpoint returns at most 1,000 rows and reports truncation. Use the table scan below for interactive application pages, or a PostgreSQL client for a full export in one consistent snapshot. A small result limit does not make an unindexed filter or expensive aggregation cheap.
+Ordinary SQL filters, joins, windows and aggregates execute in PostgreSQL. The HTTP SQL endpoint returns at most 1,000 rows and 4 MiB of compact JSON row data. It retains an exact prefix and reports `manifest.result_limited_by` as `rows`, `bytes` or null, with `result_bytes` and both configured limits. A first row that cannot fit fails explicitly; values are never shortened or replaced with NULL to fit a response.
+
+PostgreSQL measures the cumulative UTF-8 value size before transferring the result. A server cursor fetches up to 128 rows at a time, with the batch size adjusted from the first row. Rows past the database byte boundary carry only an internal size marker; the application stops before exposing them. A second check accounts for JSON escaping and exact-number serialization. Table browsing uses the same transfer guard and retains its cursor budget.
+
+These are data-size limits, not a 4 MiB process-memory guarantee. Driver objects, JSON decoding and database execution have separate costs. SQLite checks serialized size after decoding. Native stage DAGs retain their existing 8 MB native result limit before applying the application row budget. Use the table scan below for interactive pages, or a PostgreSQL client for a full export in one consistent snapshot. A small result limit does not make an unindexed filter or expensive aggregation cheap.
 
 ## Cursor API
 
@@ -41,7 +45,7 @@ Rows use ascending primary-key order, including composite keys. The reader uses 
 | Contract | Behavior |
 | --- | --- |
 | Page limit | 1–1,000 rows, default 100. Row payloads plus cursor values have a conservative 4 MiB budget. |
-| Read memory | PostgreSQL server cursor with small fetch batches; no source-table copy in Python. A single oversized value still needs decoding before its size can be checked. |
+| Read memory | PostgreSQL checks cumulative value bytes before driver decoding; bounded server-cursor batches avoid a source-table copy in Python. |
 | Filters | Up to 16 conditions combined with AND: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `prefix`, `is_null`, `not_null`. `in` accepts 1–100 non-null values. |
 | Values | Typed and bound as parameters. Text prefixes are literal, including `%` and `_`. JSON columns support null checks here; use SQL for other JSON predicates. |
 | Precision | Decimals and integers outside JavaScript's safe range are JSON strings. Keep them as strings or use an exact numeric library. |
