@@ -26,6 +26,8 @@ If the submission response is lost, choose Retry submission to confirm the origi
 
 An administrator must start a separate query worker for your tenant; accepted work stays queued until a worker claims it. See [worker setup and query limits](QUERY_JOBS.md). Natural-language planning remains interactive: review its SQL, choose Edit SQL, then submit that SQL in the background.
 
+If a required stage did not run, the background card says Result not evaluated and shows the saved reason. Open it to inspect the SQL and evidence, then edit and submit a new revision. Its empty result area is not a calculated zero or proof that nothing matched. Recent queries retains this distinction when you reopen older work.
+
 ## Query modes
 
 | Mode | Use it for | How it works |

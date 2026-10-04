@@ -3,13 +3,14 @@
 from contextlib import contextmanager
 import time
 
-from sqlalchemy import and_, insert, or_, select, text, update
+from sqlalchemy import and_, func, insert, or_, select, text, update
 
 from ..ledger import digest, now, uid
 from . import schema
 from .catalog import serial
 from .history import QueryHistory
 from .query_requests import QueryInput
+from .query_outcome import history_status, query_states
 from .results import RESULT_BYTES, encoded_size
 from .sql import SQLService
 
@@ -284,15 +285,10 @@ class QueryJobs:
                 )
             )
             if state == "SUCCEEDED":
-                status = (
-                    "preview"
-                    if outcome.get("mutation_preview")
-                    else ("complete" if outcome.get("manifest", {}).get("complete") else "partial")
-                )
                 self._history(
                     conn,
                     current,
-                    status,
+                    history_status(outcome),
                     error=None,
                     run_id=outcome.get("run_id"),
                     preview_id=outcome.get("preview_token"),
@@ -353,27 +349,20 @@ class QueryJobs:
 
     @staticmethod
     def _public(job, result=None):
-        output, operation = "NOT_EVALUATED", job["state"]
-        if job["state"] == "SUCCEEDED":
-            manifest = (job["outcome"] or {}).get("manifest", {})
-            output = "VALUE" if manifest.get("complete") else "UNKNOWN"
-            operation = (
-                "TRUNCATED"
-                if manifest.get("truncated")
-                else (
-                    "AWAITING_REVIEW"
-                    if (job["outcome"] or {}).get("mutation_preview")
-                    else "SUCCEEDED"
-                    if output == "VALUE"
-                    else "PARTIAL"
-                )
-            )
+        states = (
+            query_states(job["outcome"] or {})
+            if job["state"] == "SUCCEEDED"
+            else {
+                "output_state": "NOT_EVALUATED",
+                "operation_state": job["state"],
+                "hold_reason": None,
+            }
+        )
         return {
             "id": job["id"],
             "history_id": job["id"],
             "job_state": job["state"],
-            "output_state": output,
-            "operation_state": operation,
+            **states,
             "created_at": job["created_at"],
             "updated_at": job["updated_at"],
             "error": job["error"],
@@ -392,6 +381,15 @@ class QueryJobs:
             table.c.error,
             table.c.outcome["manifest"]["complete"].as_boolean().label("complete"),
             table.c.outcome["manifest"]["truncated"].as_boolean().label("truncated"),
+            table.c.outcome["manifest"]["result_output_state"]
+            .as_string()
+            .label("result_output_state"),
+            table.c.outcome["manifest"]["result_operation_state"]
+            .as_string()
+            .label("result_operation_state"),
+            func.substr(
+                table.c.outcome["manifest"]["result_hold_reason"].as_string(), 1, 1000
+            ).label("result_hold_reason"),
             table.c.outcome["mutation_preview"].as_boolean().label("preview"),
         ).where(table.c.tenant == tenant, table.c.actor == actor)
         with self.transaction(tenant) as conn:
@@ -426,6 +424,9 @@ class QueryJobs:
                             "manifest": {
                                 "complete": row["complete"],
                                 "truncated": row["truncated"],
+                                "result_output_state": row["result_output_state"],
+                                "result_operation_state": row["result_operation_state"],
+                                "result_hold_reason": row["result_hold_reason"],
                             },
                             "mutation_preview": row["preview"],
                         },

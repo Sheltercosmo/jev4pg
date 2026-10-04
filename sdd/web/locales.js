@@ -126,6 +126,8 @@ const messages = {
     jobLeaseLost:
       "The worker stopped before confirming a result. Some model work may have completed. Inspect the query before submitting a new run.",
     jobResultTooLarge: "The saved result exceeded its size limit. Select fewer columns or rows.",
+    jobResultHeld: "Result not evaluated",
+    jobHeldHint: "A required step did not produce a result. Open the saved SQL and evidence to inspect or revise the query.",
     jobPreviewHint:
       "A change preview is ready. Open it and review the affected rows before committing.",
     jobTruncated:
@@ -161,6 +163,7 @@ const messages = {
     history_review: "Needs review",
     history_complete: "Complete",
     history_partial: "Partial",
+    history_held: "Not evaluated",
     history_cancelled: "Cancelled",
     history_timed_out: "Timed out",
     history_queued: "Queued",
@@ -555,6 +558,8 @@ const messages = {
     jobLeaseLost:
       "工作进程中断，未能确认最终结果；部分模型请求可能已经完成。请检查查询后再决定是否重新执行。",
     jobResultTooLarge: "结果超过了保存大小限制，请减少返回的列或行。",
+    jobResultHeld: "结果尚未计算",
+    jobHeldHint: "必要步骤未能产生结果。可打开已保存的 SQL 和判断依据，检查并修改查询。",
     jobPreviewHint: "修改预览已生成。打开后核对受影响的记录，再决定是否提交修改。",
     jobTruncated: "结果已达到行数或大小上限。打开结果可查看或导出本次返回的记录。",
     jobStatusUnavailable: "暂时无法刷新状态，服务器上的查询不会因此取消。请重新连接或点击刷新。",
@@ -583,6 +588,7 @@ const messages = {
     history_review: "待修正",
     history_complete: "已完成",
     history_partial: "部分结果",
+    history_held: "尚未计算",
     history_cancelled: "已取消",
     history_timed_out: "已超时",
     history_queued: "等待执行",

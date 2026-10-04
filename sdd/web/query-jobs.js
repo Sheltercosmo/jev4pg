@@ -24,6 +24,8 @@ window.BackgroundJobs = (() => {
     if (job.notice) return t(job.notice);
     if (job.error === "LEASE_EXPIRED" || job.error === "LEASE_LOST") return t("jobLeaseLost");
     if (job.error === "RESULT_TOO_LARGE") return t("jobResultTooLarge");
+    if (job.state === "SUCCEEDED" && job.output === "NOT_EVALUATED")
+      return t("jobHeldHint") + (job.reason ? " " + job.reason : "");
     if (job.operation === "PARTIAL") return t("partialHint");
     if (job.operation === "TRUNCATED") return t("jobTruncated");
     if (job.operation === "AWAITING_REVIEW") return t("jobPreviewHint");
@@ -42,7 +44,11 @@ window.BackgroundJobs = (() => {
       busy || !connected || Boolean(job && activeStates.has(job.state));
     $("background-job").hidden = !job;
     if (!job) return;
-    $("job-state").textContent = t("jobStatus" + job.state);
+    const held = job.state === "SUCCEEDED" && job.output === "NOT_EVALUATED";
+    const partial = job.state === "SUCCEEDED" && job.output === "UNKNOWN";
+    $("job-state").textContent = t(
+      held ? "jobResultHeld" : partial ? "partial" : "jobStatus" + job.state,
+    );
     $("job-state").dataset.state = job.state;
     $("job-query").textContent = (job.request?.sql || "").replace(/\s+/g, " ").slice(0, 180);
     $("job-message").textContent = message(job);
@@ -62,6 +68,8 @@ window.BackgroundJobs = (() => {
       id: response.id,
       state: response.job_state,
       operation: response.operation_state,
+      output: response.output_state,
+      reason: response.hold_reason,
       error: response.error,
       notice: null,
     };

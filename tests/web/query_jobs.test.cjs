@@ -435,3 +435,57 @@ test("expired status access keeps server work unresolved until reconnection", as
   assert.equal(f.element("job-open").disabled, false);
   assert.equal(f.calls.filter((call) => call.body).length, 1);
 });
+
+test("a published held outcome remains unexecuted when reopened from history", async () => {
+  const f = fixture();
+  responses(f, () =>
+    f.job("SUCCEEDED", {
+      output_state: "NOT_EVALUATED",
+      operation_state: "BLOCKED_BY_DEPENDENCY",
+      hold_reason: "必要判断尚未完成 <source>",
+      result: { result: [], manifest: { complete: false, result_output_state: "NOT_EVALUATED" } },
+    }),
+  );
+  await f.connect();
+  await f.context.openHistory("job-1");
+  assert.equal(f.current().job.output, "NOT_EVALUATED");
+  assert.equal(f.element("job-state").textContent, "jobResultHeld");
+  assert.equal(f.element("job-message").textContent, "jobHeldHint 必要判断尚未完成 <source>");
+  assert.equal(f.element("job-open").hidden, false);
+  assert.equal(f.shown.at(-1).manifest.result_output_state, "NOT_EVALUATED");
+  assert.equal(f.calls.filter((call) => call.body).length, 0);
+});
+
+test("a new revision clears the old hold and preserves a genuine zero result", async () => {
+  const f = fixture();
+  responses(f, () =>
+    f.job("SUCCEEDED", {
+      output_state: "NOT_EVALUATED",
+      operation_state: "BLOCKED_BY_BUDGET",
+      hold_reason: "Needs review",
+      result: { result: [], manifest: { result_output_state: "NOT_EVALUATED" } },
+    }),
+  );
+  await f.connect();
+  await f.context.openHistory("job-1");
+  const firstCalls = f.calls.length;
+  responses(f, () =>
+    f.job("SUCCEEDED", {
+      id: "job-2",
+      history_id: "job-2",
+      output_state: "VALUE",
+      operation_state: "SUCCEEDED",
+      hold_reason: null,
+      result: { result: [{ total: 0 }], manifest: { complete: true } },
+    }),
+  );
+  await f.input("SELECT COUNT(*) AS total FROM items WHERE false");
+  await f.click("run-background");
+  assert.equal(f.current().job.id, "job-2");
+  assert.equal(f.current().job.reason, null);
+  assert.equal(f.current().job.output, "VALUE");
+  assert.equal(f.element("job-state").textContent, "jobStatusSUCCEEDED");
+  const submissions = f.calls.slice(firstCalls).filter((call) => call.body);
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].body.parent_history_id, "job-1");
+});

@@ -70,7 +70,11 @@ Each job also appears in query history. `parent_history_id` connects a revised r
 | `FAILED` | Validation, execution or worker ownership failed. `error` contains a category, not raw driver messages or source values. |
 | `REDACTED` | Managed source deletion removed this job's request and result and fenced further publication. |
 
-`VALUE` means a resolved SQL outcome. `UNKNOWN` with `operation_state: PARTIAL` means unresolved semantic work remains; an empty partial result is not proof that no rows match. `NOT_EVALUATED` means no completed job output is available. Truncated results report `TRUNCATED`; mutation previews report `AWAITING_REVIEW`. These states remain separate from job scheduling status.
+`VALUE` means a resolved SQL outcome. `UNKNOWN` with `operation_state: PARTIAL` means unresolved semantic work remains; an empty partial result is not proof that no rows match. `NOT_EVALUATED` means no calculated query result is available. Truncated results report `TRUNCATED`; mutation previews report `AWAITING_REVIEW`. These states remain separate from job scheduling status.
+
+An executor can publish a held outcome: `job_state` is `SUCCEEDED` because the worker saved its response, while `output_state` remains `NOT_EVALUATED` and `operation_state` retains the dependency, budget or failure reason. The response contains the SQL and manifest for inspection; an empty row array in this outcome does not mean the query found no matches. A truncation flag cannot replace a held or failed operation state.
+
+Job details and status lists preserve the executor's explicit states. `hold_reason` explains a held target; lists show at most its first 1,000 characters and do not load saved rows or full plans. The workspace labels held outcomes as not evaluated and keeps them openable for correction. Query history presents the same states, including older entries previously labeled partial, without rerunning them. Legacy partial reads without explicit target states retain their `UNKNOWN / PARTIAL` contract.
 
 Cancellation of a queued job prevents claiming. Running cancellation targets only that execution's connections. Already admitted JEV requests can finish, incur usage and contribute reusable evidence; the worker renews its lease while they settle. A cancellation accepted before publication wins over a concurrently computed result. A terminal job is not changed by a later cancel request.
 

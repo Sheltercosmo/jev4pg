@@ -7,6 +7,7 @@ from ..query_control import QueryInterrupted
 from . import schema
 from .catalog import Catalog
 from .planning_review import PlanReviewRequired, public_plan
+from .query_outcome import history_status, query_states
 
 
 class QueryHistory:
@@ -55,17 +56,7 @@ class QueryHistory:
                 plan = source["plan"]
                 dataset_ids = plan.get("_selected_dataset_ids", plan["dataset_ids"])
                 status = (
-                    (
-                        "committed"
-                        if run["manifest"].get("committed")
-                        else "complete"
-                        if run["manifest"].get("complete")
-                        else "partial"
-                    )
-                    if run
-                    else "review"
-                    if plan["review"]["reason"]
-                    else "plan"
+                    history_status(run) if run else "review" if plan["review"]["reason"] else "plan"
                 )
                 connection.execute(
                     insert(schema.query_history).values(
@@ -121,7 +112,18 @@ class QueryHistory:
 
     def recent(self, tenant, actor, limit=20, before=None):
         table = schema.query_history
-        query = select(table).where(table.c.tenant == tenant, table.c.actor == actor)
+        runs = schema.runs
+        query = (
+            select(
+                table,
+                runs.c.manifest["result_output_state"].as_string().label("result_output_state"),
+                runs.c.manifest["result_operation_state"]
+                .as_string()
+                .label("result_operation_state"),
+            )
+            .outerjoin(runs, and_(runs.c.tenant == table.c.tenant, runs.c.id == table.c.run_id))
+            .where(table.c.tenant == tenant, table.c.actor == actor)
+        )
         if before:
             cursor = self.get(tenant, actor, before)
             query = query.where(
@@ -142,7 +144,17 @@ class QueryHistory:
             {
                 "id": r["id"],
                 "created_at": r["created_at"],
-                "status": r["status"],
+                "status": history_status(
+                    {
+                        "manifest": {
+                            "result_output_state": r["result_output_state"],
+                            "result_operation_state": r["result_operation_state"],
+                        }
+                    },
+                    previous=r["status"],
+                )
+                if r["result_output_state"] is not None
+                else r["status"],
                 "mode": r["input"].get("mode", "natural"),
                 "title": r["input"].get("text", "")[:180],
                 "parent_id": r["parent_id"],
@@ -161,12 +173,15 @@ class QueryHistory:
             output.update(
                 result=run["result"], manifest=run["manifest"], plan=public_plan(run["plan"])
             )
+        output.update(query_states(output))
         return {
             "id": identity,
             "query_job_id": identity if record["job_state"] is not None else None,
             "input": record["input"],
             "dataset_ids": record["dataset_ids"],
-            "status": record["status"],
+            "status": history_status(output, previous=record["status"])
+            if output.get("manifest", {}).get("result_output_state") is not None
+            else record["status"],
             "created_at": record["created_at"],
             "parent_id": record["parent_id"],
             "output": output,
@@ -236,17 +251,7 @@ class QueryHistory:
             # Error classes are useful in history; DB exception text may contain source values.
             self.update(tenant, actor, identity, status="error", error=type(exc).__name__)
             raise
-        status = (
-            "preview"
-            if result.get("mutation_preview")
-            else "committed"
-            if result.get("manifest", {}).get("committed")
-            else "complete"
-            if result.get("manifest", {}).get("complete")
-            else "partial"
-            if result.get("manifest")
-            else "plan"
-        )
+        status = history_status(result)
         self.finish(tenant, actor, identity, result, status)
         result["history_id"] = identity
         return result
