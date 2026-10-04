@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 from statistics import median
-from threading import Event
+from threading import Barrier, Event
 from time import perf_counter
 import tracemalloc
 
@@ -242,6 +242,7 @@ def test_million_row_bounded_write_measurement(writes):
         "thousand_row_python_peak_mib": round(peak / 1024**2, 2),
         "provider_calls": 0,
     }
+    Path(".runtime").mkdir(exist_ok=True)
     Path(".runtime/mutation-validation.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )
@@ -385,3 +386,42 @@ def test_application_api_review_and_lock_conflict(writes):
         assert result.status_code == 200, result.text
         assert result.json()["manifest"]["affected_rows"] == 1
         assert read(writes, 83)["amount"] == Decimal("1.83")
+
+
+def test_simultaneous_commit_returns_one_success_and_one_conflict(writes, monkeypatch):
+    from fastapi.testclient import TestClient
+    from sdd.api import create_app
+    from sdd.execution import Executor
+
+    app = create_app(
+        Executor(writes["app"], {}),
+        tokens={"review": {"tenant": "tenant-a", "name": "reviewer", "role": "reviewer"}},
+    )
+    headers = {"Authorization": "Bearer review"}
+    before = read(writes, 987654)["amount"]
+    with TestClient(app) as client:
+        preview = client.post(
+            "/data/sql",
+            headers=headers,
+            json={"sql": "UPDATE events SET amount=amount+1 WHERE id=987654"},
+        )
+        assert preview.status_code == 200, preview.text
+        token = preview.json()["preview_token"]
+        barrier, pending = Barrier(2), mutation._pending
+
+        def synchronized(*args):
+            barrier.wait(timeout=10)
+            return pending(*args)
+
+        monkeypatch.setattr(mutation, "_pending", synchronized)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(
+                pool.map(
+                    lambda _: client.post(f"/data/mutations/{token}/commit", headers=headers),
+                    range(2),
+                )
+            )
+    assert sorted(result.status_code for result in results) == [200, 409]
+    rejected = next(result for result in results if result.status_code == 409)
+    assert rejected.json()["code"] == "40001"
+    assert read(writes, 987654)["amount"] == before + 1

@@ -68,7 +68,7 @@ def test_cli_worker_visits_separate_tenants_with_chinese_catalogs(installation, 
         env=environment,
         capture_output=True,
         timeout=15,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     assert completed.returncode == 0
     for tenant, value, job in saved:

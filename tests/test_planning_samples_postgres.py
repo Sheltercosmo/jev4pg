@@ -164,6 +164,7 @@ def test_model_catalog_million_row_measurement(corpus):
         "provider_calls": 0,
         "limits": "SQL service only; local warm cache; samples are not a complete vocabulary.",
     }
+    Path(".runtime").mkdir(exist_ok=True)
     Path(".runtime/planning-samples-validation.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )

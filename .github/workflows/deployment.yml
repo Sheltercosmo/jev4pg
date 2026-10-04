@@ -48,7 +48,7 @@ jobs:
           url = URL.create('postgresql+psycopg', username='sdd_admin', password=password,
                            host='127.0.0.1', port=15432, database='sdd')
           runtime_url = url.set(username='sdd_app', password=Path('.secrets/app_password').read_text().strip())
-          subprocess.run(['python', '-m', 'pytest', '-q', '--tb=no'],
+          subprocess.run(['python', '-m', 'pytest', '-q', '--tb=short'],
                          env={**os.environ, 'SDD_TEST_ADMIN_URL': url.render_as_string(hide_password=False),
                               'SDD_TEST_POSTGRES_URL': runtime_url.render_as_string(hide_password=False)}, check=True)
           PY

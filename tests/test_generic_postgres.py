@@ -85,6 +85,9 @@ def test_two_reviewers_cannot_commit_same_preview(pgdata):
             return sql.commit(tenant, p["preview_token"], "r")["manifest"]["committed"]
         except ValueError:
             return False
+        except DBAPIError as error:
+            assert getattr(error.orig, "sqlstate", None) == "40001"
+            return False
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(lambda _: commit(), range(2))) == [False, True]

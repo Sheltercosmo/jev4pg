@@ -175,6 +175,7 @@ def test_concurrent_application_requests_and_memory(workload):
         "provider_calls": 0,
         "limitations": "Local warm-cache generated data; traced Python allocations exclude database, driver native memory and process RSS.",
     }
+    Path(".runtime").mkdir(exist_ok=True)
     Path(".runtime/application-scale-validation.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )
