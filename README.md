@@ -21,11 +21,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural-language queries, 41 JEV operators and exact SQL execution so you can search by meaning, analyze relational data and turn documents into structured records in one workflow. PostgreSQL handles joins, calculations and transactions; JEV brings typed language understanding to your data.
+jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural-language queries with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
 
-Independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused to reduce repeated model calls. Choose JEV planning or a hybrid pipeline that uses JEV to select context and review LLM-generated SQL. Inspectable plans, saved queries and reviewed semantic features let you correct interpretations and build on previous work through the web workspace, HTTP API or SQL clients.
+The execution model makes each model call count: independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused. Choose JEV planning or combine LLM plan generation with JEV context selection and review. Inspect generated SQL and refine previous queries through the web workspace, HTTP API or SQL clients. A shared provider interface supports compatible hosted services and local adapters.
 
-Explore the interactive product tour at [jevsdpg.com](https://jevsdpg.com).
+Visit [jevsdpg.com](https://jevsdpg.com) for interactive examples of natural-language queries, parallel execution and probability embeddings.
 
 <p align="center">
   <img src="docs/assets/product-tour-94ace4f0.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
