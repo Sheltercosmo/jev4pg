@@ -15,6 +15,8 @@
 
 <p align="center">
   <a href="https://jev4pg.com">Website</a> ·
+  <a href="#why-choose-jev4pg">Advantages</a> ·
+  <a href="#what-you-can-build">What you can build</a> ·
   <a href="https://jev4pg.com/guide/">Project guide</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
@@ -23,54 +25,54 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg is an open-source semantic database built on PostgreSQL. It combines natural language to SQL (text-to-SQL) in English and Simplified Chinese with 41 JEV operators for filtering, extraction, ranking and verification, bringing structured records and free-form text into one query workflow. PostgreSQL handles joins, calculations and transactions; JEV evaluates meaning through typed decisions. Useful definitions and corrections become reviewed, reusable database features.
+jev4pg makes the meaning of your data queryable in PostgreSQL. Build applications that understand requests, extract records from documents and search by business criteria, then join those decisions with ordinary tables. Its 41 JEV operators bring semantic filtering, extraction, ranking and verification into SQL workflows, with natural-language queries in English and Simplified Chinese.
 
-Use the web workspace, HTTP API or SQL clients. Choose JEV planning or combine LLM plan generation with JEV context selection and review, then inspect the SQL and refine saved queries before execution.
+The core advantage is reusable semantic work. JEV evaluates constrained questions and retains typed answers and probabilities. Reviewed definitions become virtual columns, compatible observations serve later queries, and independent judgments run in parallel. PostgreSQL performs the joins and exact calculations. Each useful interpretation can become part of the application's data model.
 
-Visit [jev4pg.com](https://jev4pg.com) for interactive examples of natural-language queries, parallel execution and probability embeddings.
+Explore the interactive demos at [jev4pg.com](https://jev4pg.com), or use the web workspace, HTTP API and PostgreSQL interfaces to build your own application.
+
+## Why choose jev4pg
+
+Its distinctive combination is a semantic layer you can query, a record of evidence you can reuse, and an execution model that separates model judgment from exact computation.
+
+| Advantage | What it gives your application |
+| --- | --- |
+| Fewer repeated model calls | Store answer probabilities separately from acceptance thresholds. Tighten a review policy and replay compatible evidence with zero new inference. The native registry also reuses observations across PostgreSQL connections when context, questions and evaluator revision match. [Evidence reuse](docs/NATIVE_EVIDENCE.md). |
+| Business definitions that work like columns | Define and review `needs_follow_up` once, then use it in filters, groups and reports. Versioned definitions and source-bound corrections give applications a shared interpretation they can inspect and reuse. This is the foundation of the self-developing layer. [Semantic features](docs/SEMANTIC_FEATURES.md). |
+| Parallel execution for complex semantic queries | Batch questions sharing context, overlap independent JEV branches and materialize shared SQL stages once. Dependent work starts when its own inputs are ready. Multi-step analysis avoids unnecessary serial model calls while PostgreSQL owns joins, windows and arithmetic. [Native plans](docs/NATIVE_PLANS.md). |
+| Embeddings with a business meaning for every dimension | Choose questions such as “Requests a refund?” and “Issue resolved?” Each record becomes an answer-probability matrix and vector. Inspect why records differ, project existing judgments and compare compatible vectors locally without another model call. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md). |
+| Focused LLM generation with independent review | JEV selects relevant schema and evidence before the LLM proposes SQL, then reviews operations, populations, formulas and missing context in parallel. Generation can be limited to one LLM call with concepts and repair disabled; JEV usage is accounted for separately. [Hybrid planning](docs/HYBRID_QUERY.md). |
+| Uncertainty your application can act on | `VALUE`, `UNKNOWN` and `NOT_EVALUATED` remain distinct from execution failures. Route unresolved decisions to review, preserve held SQL for correction and require a separate commit for proposed writes. Missing judgments cannot silently become false matches or zero totals. [Decision states](docs/JEV_OPERATORS.md). |
+
+Native stage plans, the durable native evidence registry and probability embeddings are development-preview features on `main`. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
 
 <p align="center">
   <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
 
-## What makes jev4pg different
-
-Define meaning once. Query it, review it and reuse it.
-
-jev4pg connects natural-language planning, typed semantic decisions and reusable database features. The advantages below come from that execution model. Native plans, the durable evidence registry and probability embeddings are available in the development preview.
-
-### Change decision thresholds without another model call
-
-Keep the original answer probabilities separately from the policy that accepts or rejects them. A review team can tighten its acceptance threshold and reconsider stored observations locally. Compatible requests reuse evidence across PostgreSQL connections, reducing repeated inference while retaining the source context and model revision. [Evidence reuse](docs/NATIVE_EVIDENCE.md).
-
-### Turn business definitions into reusable columns
-
-Define concepts such as `needs_follow_up`, `return_requested` or a named urgency rubric, review examples, then use them in queries as virtual columns. The same definition can support filtering, grouping and maintained results across an application. Corrections remain attributable to their source and revision, so teams can build on reviewed knowledge. [Semantic features](docs/SEMANTIC_FEATURES.md).
-
-### Run SQL and semantic stages in one parallel plan
-
-The native executor combines relational and semantic stages in a shared dependency graph. Independent JEV branches overlap, questions about the same context share a request, and shared CTEs materialize once. Each consumer waits only for the evidence it needs. This supports multi-step analysis while avoiding unnecessary sequential model calls; PostgreSQL still performs the joins and arithmetic. [Native plans](docs/NATIVE_PLANS.md).
-
-### Build embeddings whose dimensions you can explain
-
-Choose the questions that define similarity, such as whether a message requests action or reports a resolved issue. Each record becomes a matrix of answer probabilities and a vector with named dimensions. Inspect those dimensions, project existing decisions and compare compatible vectors locally without further inference. This gives applications direct control over what their semantic representation measures. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md).
-
-### Make uncertainty usable in application logic
-
-An unresolved judgment, a skipped branch and a failed request have different meanings. jev4pg preserves those distinctions through execution. Applications can route uncertain records for review, hold an exact aggregate when required decisions are missing, and require a separate commit for proposed writes. Users can correct a saved interpretation and query again with that context. [Operator states](docs/JEV_OPERATORS.md) · [Query review](docs/NATURAL_LANGUAGE.md).
-
 ## What you can build
 
-| Build | What jev4pg adds |
+| Build | Put the advantages to work |
 | --- | --- |
-| A support operations console | Classify requests by meaning, join them to account data, and reuse reviewed definitions across queues and reports. |
-| A document intake application | Extract typed records from text with source passages for review, then import approved entries transactionally. [Example](docs/TEXT_IMPORT.md). |
-| An analyst copilot | Ask in English or Simplified Chinese, inspect SQL and assumptions, and correct a previous query instead of starting over. [Tutorial](examples/nl2sql/README.md). |
-| An evidence review workflow | Verify claims against supplied records and keep supported, unresolved and unexecuted checks visible. [Operators](docs/JEV_FUNCTION_REFERENCE.md). |
-| Search with explicit criteria | Represent documents through a shared set of named questions and compare their answer distributions. Native preview. [Example](examples/operators/native_embedding.sql). |
-| Semantic tools for an existing PostgreSQL database | Attach authorized tables and views in place, preserving source types and access controls. Read-only attachments in the development preview. [Setup](docs/EXISTING_DATA.md). |
+| Support and operations queues | Identify unresolved requests from message text, join them to account data and reuse the same reviewed definition in queues and reports. Route uncertain cases to a person. |
+| Document intake and enrichment | Describe the fields you need, extract typed entries with source passages and approve a transactional import. Turn incoming text into queryable records with less manual entry. [Guide](docs/TEXT_IMPORT.md). |
+| An analyst workspace inside your product | Let users ask in English or Simplified Chinese, inspect proposed SQL and refine a saved interpretation. Expose the workflow through the HTTP API. [Tutorial](examples/nl2sql/README.md). |
+| Search organized around your own criteria | Rank records using named questions and answer distributions. Reuse stored compatible vectors for local comparison and make the dimensions visible to reviewers. Native preview. [Example](examples/operators/native_embedding.sql). |
+| A review and enrichment layer for existing PostgreSQL data | Attach authorized tables and views in place, preserving source types and access controls. Add semantic queries without copying every row into a second database. Read-only attachments in the development preview. [Setup](docs/EXISTING_DATA.md). |
 
-## Features
+### A business definition becomes part of a query
+
+Define `needs_action` as “The author explicitly requests an action; exclude quoted requests from someone else,” then preview and activate it. In the application SQL interface, that reviewed definition can select records:
+
+```sql
+SELECT id
+FROM documents
+WHERE SEMANTIC_FEATURE(body, 'needs_action');
+```
+
+The definition, source dependencies and reviewer corrections stay attached to the feature. Reuse it in another query or refer to its name in natural language. This is how a useful interpretation becomes a repeatable application capability. [Define your first feature](docs/SEMANTIC_FEATURES.md).
+
+## Features and integration
 
 | Feature | Available interface |
 | --- | --- |
@@ -79,12 +81,6 @@ An unresolved judgment, a skipped branch and a failed request have different mea
 | PostgreSQL integration | Asynchronous `jev.*` jobs in the release; direct Rust `jev_native.*` execution in the preview. [SQL interfaces](docs/POSTGRESQL_INTERFACE.md). |
 | Workspace and query history | Separate English and Simplified Chinese interfaces, editable interpretations and reviewed data changes. [User guide](docs/USER_GUIDE.md). |
 | Provider choice | TypeSafe, compatible hosted HTTP endpoints and local Python adapters through the same typed decision contract. [Configuration](docs/PROVIDERS.md). |
-
-## Where it fits
-
-Related projects emphasize different workflows: [Vanna](https://github.com/vanna-ai/vanna) provides database chat and text-to-SQL interfaces, [LOTUS](https://github.com/lotus-data/lotus) provides semantic and agentic bulk data operators, and [pgai](https://github.com/timescale/pgai) provides PostgreSQL embedding pipelines and a semantic catalog.
-
-Choose jev4pg when you need semantic decisions to become queryable, reviewable and reusable parts of a PostgreSQL application. Its focus is the combination of typed uncertainty, reviewed virtual columns, parallel semantic plans and question-defined probability embeddings.
 
 Previously published as JevSDSQL and jevsd-pg; the current project and development package are named jev4pg.
 
