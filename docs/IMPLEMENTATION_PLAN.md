@@ -1,48 +1,36 @@
-# Native database implementation plan
+# Native execution roadmap
 
-The goal is a coherent semantic PostgreSQL database, with inspectable natural-language planning, native relational execution and reusable evidence. This plan is not complete when a Rust library compiles or a small example works.
+The native preview moves semantic row execution into PostgreSQL while keeping natural-language planning and the workspace in Python. It is available in the source tree; v0.6.0 remains the packaged application release.
 
-## Work and acceptance gates
+## Available in the preview
 
-| Work | Required evidence |
+| Capability | Interface and behavior |
 | --- | --- |
-| Correct relational execution | Reproduce unsafe rewrites, repair only proven scopes, and compare results on PostgreSQL with NULLs, duplicates, empty inputs, correlations and unrelated subqueries. |
-| Native semantic scan | Execute through PostgreSQL without Python row materialization. Test bounded source batches, exact structured filtering, projection, caller permissions, cancellation, memory use and all three output states. |
-| Evidence and source identity | Persist raw observations separately from policies. Test compatible reuse, provider/context/source changes, concurrent claims, row deletion and consistent population snapshots. |
-| Shared execution DAG | Retain parallel independent judgments and real dependencies. Test conditional branches, cross-process budgets, retries, cancellation and lease fencing without duplicated provider work. |
-| Relational semantic operations | Compose filtering, scoring, ranking, joining and extraction with SQL. Prevent incomplete populations from masquerading as exact counts, absence or mutation eligibility. Preserve supported public operators and declare their physical strategies. |
-| Catalog and planner integration | Read authorized PostgreSQL schema and existing tables without requiring a full copy. Route generated plans and corrected history through the new execution module. Preserve English, Simplified Chinese and schema-renaming behavior. |
-| Maintained features and writes | Test revisions, review, incremental refresh and atomic publication. Validate mutations against the exact reviewed source/evidence scope. |
-| Installation and migration | Build versioned native artifacts and containers. Test clean install, 0.6.0 upgrade, backup restore, restart and standard PostgreSQL clients. Keep the web workspace optional for SQL users. |
-| Comparative evaluation | Separate development, validation and a frozen final test. Compare old/new execution latency, peak memory, provider requests, tokens and exact results. Include selective and broad scans, repeated reads, updates, and complex SQL across unrelated schemas. |
-| Public release | Publish concise operator, architecture, installation and measured performance documentation only after the gates pass. |
+| Direct semantic scans | `scan` and `scan_many` use bounded PostgreSQL sources, concurrent requests and shared limits. |
+| Typed stage plans | `execute_plan` combines SQL and semantic stages under one snapshot and scheduler. Independent stages remain parallel. |
+| Conditional execution | Row guards and selected-branch merges preserve skipped work and uncertainty. The application compiler lowers supported SQL CASE expressions. |
+| Query service integration | Opt-in native execution handles supported `SEMANTIC` reads over base columns, CTEs and derived relations. |
+| Existing sources | Read-only attachments retain PostgreSQL types, privileges, row security and source contract checks. |
+| Durable evidence | Optional registry storage separates observations from policy, coordinates requests and reuses compatible results. |
+| Probability embeddings | A fixed question basis produces matrices and vectors; projection and compatible distance comparisons run locally. |
 
-## Execution placement
+Build and usage are in the [native guide](../native/README.md). Exact language and plan boundaries are documented in [native plans](NATIVE_PLANS.md), rather than implied by a general SQL compatibility claim.
 
-PostgreSQL performs exact relational filtering and projection before semantic dispatch. Missing independent observations are batched by shared context, then scheduled concurrently under one admission policy. Dependent stages wait only for their inputs. Typed outcomes return to PostgreSQL for joins and arithmetic. Maintained evidence removes model latency from repeated transactional queries.
+## Remaining work
 
-The native path and legacy path coexist during development. They are compared through the same external contracts; a fallback must be visible, never represented as native execution. The live 0.6.0 installation stays on the verified release while this checkout changes.
+| Area | Needed before a native production release |
+| --- | --- |
+| Relational coverage | Broader dependent query shapes and explicit provenance across joins and projections. |
+| Evidence lifecycle | Reuse across differently packed questions, live source revision tracking and retention controls. |
+| Maintained features and writes | Native refresh, reviewed semantic mutations and atomic publication against the reviewed source scope. These currently use Python. |
+| Resource accounting | Measure combined memory, connections and provider admission under concurrent workloads. |
+| Distribution | Versioned native packages and containers, upgrade from v0.6.0, restart and backup/restore verification. |
+| Evaluation | Frozen comparisons of exact results, latency, memory and provider usage across unrelated schemas; separate language and embedding retrieval evaluations. |
 
-## Initial findings
+## Design and evaluation rules
 
-The scalar-aggregate optimizer passed a whole AST to SQLGlot after validating only one subtree. A sibling aggregate EXISTS was changed incorrectly: an empty scalar aggregate still produces a row, whereas the rewritten grouped join did not. That reproducer is now a regression, not a final evaluation case.
+PostgreSQL filters and projects before inference where scope is proven safe. JEV batches independent questions; a consumer waits only for the results it needs. Observations remain separate from decisions, and missing work never becomes false. [Stage notes](JEV_PLANNING_STAGES.md) explain these placements.
 
-The released semantic population snapshots and per-batch freshness checks materialize full rows. Provider throttling and duplicate suppression are process-local. Its PostgreSQL interface is an asynchronous queue. These are architectural gaps; adding a different implementation language alone does not close them.
+Improvements must use catalog metadata, types and declared meaning. Production logic must not identify benchmark questions or expected answers. Develop and select changes on development and validation cases, then freeze the implementation before a final test. Previously inspected failures become regressions. Check paraphrases, Simplified Chinese, schema renaming, NULLs, duplicates and ties where relevant.
 
-The development native scan builds on PostgreSQL 17 and passes direct SQL integration checks. Ordinary `SEMANTIC` reads now use it through the existing query service, including generated SQL. Source selection and relational consumption share a PostgreSQL snapshot. Query allowances span datasets, and durable daily reservations are shared with Python requests. Saved observations support local policy replay.
-
-The compiler groups questions by required source population and permits incomplete results only within a proven row-local fragment. It rejects unsupported alias lineage and direct evaluation on synthetic outer-join or subtotal rows. Explicit base-source evaluation remains composable with subsequent joins and grouping. These boundaries protect correctness while broader evaluation-site support is developed.
-
-Independent source populations now feed one native scheduler with shared query admission and cross-source context reuse. The optional native registry adds automatic reuse across queries, separately committed observations, shared provider admission and request reconciliation. Source rollback does not erase a committed observation or authorize another uncertain dispatch. The [registry guide](NATIVE_EVIDENCE.md) documents configuration, receipts and limits.
-
-The native stage executor now composes typed SQL and semantic stages under one snapshot, scheduler and budget. The service automatically lowers supported derived semantic SQL, including generated SQL, into that DAG. Source authorization precedes compilation; held outputs and stage receipts remain visible in results and history. Deterministic fixtures verify the execution contract across English, Simplified Chinese and renamed schemas. They do not measure natural-language accuracy.
-
-Existing PostgreSQL tables and local views can now be attached without importing their rows. The catalog records physical identity, types, keys and complete foreign-key groups. Query execution pins and validates source contracts before inference; a changed schema requires a new attachment identity. Migration version 2 adds source bindings, and operator commands attach or detach relations without taking ownership. View sources use an additional guard connection whose cost must be included in capacity measurements.
-
-Explicit native plans now support row conditions and deterministic selected-branch merges. Conditions preserve every source row while limiting provider dispatch to selected contexts. Merge decisions retain uncertainty and operational status, and exact downstream calculations require resolved selected answers. Independent branches retain the shared scheduler and allowance.
-
-The query service also lowers SQL CASE to guarded branches with stable row identities. SQL NULL conditions fall through, while unresolved semantic selectors hold the result. Selected decision requirements allow exact consumers to proceed without requiring skipped alternatives. Internal routing fields remain outside provider context, preserving duplicate-context reuse.
-
-Native multi-question embeddings now expose complete answer probability distributions and vectors through SQL. They share scan scheduling and evidence reuse. Matrix projection and compatible distance comparisons run locally, while missing distributions retain their operational states. Retrieval-quality measurements remain distinct from deterministic execution verification.
-
-Broader dependency shapes and provenance, reuse across differently packed questions, live source revisions, maintained features and aggregate resource accounting remain open gates. Versioned installation packages, upgrade and restore checks, comparative measurements and a frozen final evaluation are also required before release.
+Deterministic tests establish execution contracts. They do not establish natural-language generalization, retrieval quality or a performance advantage over an LLM.

@@ -1,10 +1,12 @@
 # Dependencies
 
-jevsd-pg uses these libraries for storage, API handling and SQL validation. Exact installed versions are recorded in `requirements.lock.txt`; supported ranges are in `pyproject.toml`.
+jevsd-pg uses these libraries for storage, API handling and SQL validation. Python versions are recorded in `requirements.lock.txt`, with supported ranges in `pyproject.toml`. The native Rust workspace pins its dependencies in `native/Cargo.lock`.
 
 | Component | Purpose | Upstream |
 | --- | --- | --- |
 | PostgreSQL | Persistent data, transactions and tenant policies | [postgresql.org](https://www.postgresql.org/) |
+| Rust and pgrx | Native PostgreSQL extension, typed decisions and database integration | [Rust](https://www.rust-lang.org/), [pgrx](https://github.com/pgcentralfoundation/pgrx) |
+| Tokio and Reqwest | Bounded concurrent provider requests in the Rust executor | [Tokio](https://github.com/tokio-rs/tokio), [Reqwest](https://github.com/seanmonstar/reqwest) |
 | SQLAlchemy | Database connections and SQL construction | [sqlalchemy.org](https://www.sqlalchemy.org/) |
 | Psycopg | PostgreSQL driver | [psycopg.org](https://www.psycopg.org/) |
 | SQLGlot | Parse, inspect and translate SQL syntax | [tobymao/sqlglot](https://github.com/tobymao/sqlglot) |

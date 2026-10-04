@@ -39,3 +39,21 @@ For the other operators, copy a request from the [function reference](../../docs
 ## Text extraction and import
 
 Run `python examples/operators/text_import.py` for a preview, or add `--commit` to create entries automatically when resolved. Set `SDD_TOKEN` to a reviewer token and optionally `SDD_URL`. The [text import guide](../../docs/TEXT_IMPORT.md) explains field descriptions, source evidence, missing-value policies and appending to existing datasets.
+
+## Native SQL
+
+Build and configure the [Rust extension](../../native/README.md) first. These scripts use synthetic data in your PostgreSQL session and require the native function grants. They call the configured JEV provider; results depend on its responses.
+
+| Example | Purpose |
+| --- | --- |
+| [native_embedding.sql](native_embedding.sql) | Define a question basis, store answer probabilities and rank messages against one search input. |
+| [native_plan.sql](../planning/native_plan.sql) | Compose SQL and semantic stages under a shared scheduler. |
+| [conditional_plan.sql](../planning/conditional_plan.sql) | Route rows to selected questions and merge decisions without treating skipped work as false. |
+
+From the repository root, connect using your configured PostgreSQL role:
+
+```bash
+psql -X -v ON_ERROR_STOP=1 -d your_database -f examples/operators/native_embedding.sql
+```
+
+See [embedding contracts](../../docs/NATIVE_EMBEDDINGS.md) and [stage dependencies](../../docs/NATIVE_PLANS.md) before adapting the examples to persistent tables.

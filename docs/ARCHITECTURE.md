@@ -27,7 +27,7 @@ PostgreSQL owns storage, transactions, indexes and relational execution through 
 
 Python handles the HTTP API, catalog integration, natural-language planning and compilation of application queries into native plans. Maintained semantic features, semantic mutation reviews and operators without a native strategy still use the Python runtime. The web workspace uses JavaScript, HTML and CSS. Shell scripts handle installation and service startup.
 
-The running 0.6.0 release uses the Python semantic runtime and queued SQL interface. The development Rust extension is a separate deployment; its presence in the source tree does not mean the running service uses it.
+Release v0.6.0 and the default Compose stack use the Python semantic runtime and queued SQL interface. The Rust extension is built and enabled separately. Installing the application from `main` does not automatically enable native execution.
 
 ## Hybrid stage placement
 

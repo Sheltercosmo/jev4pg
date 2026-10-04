@@ -1,9 +1,9 @@
 name: Native PostgreSQL
 on:
   push:
-    paths: ['native/**', 'sdd/**', '.github/workflows/native.yml']
+    paths: ['native/**', 'sdd/**', 'pyproject.toml', 'examples/planning/*.sql', 'examples/operators/native_*.sql', '.github/workflows/native.yml']
   pull_request:
-    paths: ['native/**', 'sdd/**', '.github/workflows/native.yml']
+    paths: ['native/**', 'sdd/**', 'pyproject.toml', 'examples/planning/*.sql', 'examples/operators/native_*.sql', '.github/workflows/native.yml']
   workflow_dispatch:
 permissions:
   contents: read

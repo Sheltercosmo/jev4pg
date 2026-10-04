@@ -10,7 +10,7 @@ For reusable probability features, `jev_native.embed` batches a fixed basis of q
 
 ## Build
 
-The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed:
+Build from the repository's `main` branch. The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed. The default Compose image does not include this extension. From the repository root:
 
 ```sh
 cargo install --locked cargo-pgrx --version 0.19.2
@@ -219,8 +219,8 @@ One native invocation evaluates the query's independent source populations, shar
 
 Maintained `SEMANTIC_FEATURE` reviews and semantic mutation previews still require `SDD_SEMANTIC_ENGINE=python`, the default. Native mode reports these unsupported paths explicitly. Ordinary relational mutations retain the existing preview and confirmation flow. With the registry configured, the query service retains durable receipts; otherwise it retains coverage summaries and explicit saved observation tables remain available.
 
-## Remaining integration
+## Current limitations
 
-The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Explicit plans support row conditions and local selected-branch merges; the query service uses them to lower [conditional SQL](../docs/NATIVE_PLANS.md#conditional-sql), including nested CASE. Reuse across differently packed question batches, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [implementation plan](../docs/IMPLEMENTATION_PLAN.md) tracks the larger change.
+The optional registry provides automatic observation reuse, concurrent claims and provider admission across scans. Explicit plans support row conditions and local selected-branch merges; the query service uses them to lower [conditional SQL](../docs/NATIVE_PLANS.md#conditional-sql), including nested CASE. Reuse across differently packed question batches, live source revision tracking and maintained features remain acceptance gates. This implementation does not replace all public JEV operators. The [roadmap](../docs/IMPLEMENTATION_PLAN.md) tracks remaining release work.
 
 Model calls are external effects: transaction rollback cannot undo provider usage. Synchronous scans hold a PostgreSQL backend while inference runs. Restrict execution grants during development and use the released queue interface where its asynchronous behavior is required.

@@ -1,10 +1,17 @@
 # Installation
 
-jevsd-pg runs a Python service and worker beside PostgreSQL. The SQL extension exposes durable operator jobs to PostgreSQL clients. Model calls run in the worker; PostgreSQL performs storage, joins, arithmetic and transactions.
+Choose the application deployment or the native execution preview:
+
+| Path | Requirements | Execution |
+| --- | --- | --- |
+| Released application, v0.6.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Python service and worker; asynchronous `jev.*` SQL jobs. |
+| Native preview on `main` | PostgreSQL 17 on Linux, Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+
+The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
 ## Docker Compose
 
-Install Docker with Compose v2 and Python 3.11 or newer. From a fresh checkout:
+Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.6.0` tag for the released deployment, or `main` to develop the application. From that checkout:
 
 ```bash
 python deploy/configure.py
@@ -63,9 +70,25 @@ jevsd-pg sql-worker --concurrency 2 --heartbeat-file /tmp/jev-sql-worker.heartbe
 
 Run these as separate processes. On Windows choose a writable heartbeat path, such as `.runtime/sql-worker.heartbeat`. Production startup rejects SQLite, administrative runtime roles, missing migration state and invalid API token mappings. Use a separate PostgreSQL login for each SQL client; follow [SQL access setup](POSTGRESQL_INTERFACE.md#grant-access).
 
-## Credentials and providers
+## Native preview
 
-To query tables already in PostgreSQL, use [source attachments](EXISTING_DATA.md). This development feature registers authorized relations without importing their data and requires the matching schema migration.
+Use a checkout of `main` and follow the [native build guide](../native/README.md#build). Install `jev_native` on the PostgreSQL server, configure its provider through `JEV_NATIVE_CONFIG_FILE` in the server environment, then grant SQL callers access. Direct SQL use does not require the Python application.
+
+For application integration, install Python from that same checkout and run:
+
+```bash
+jevsd-pg migrate --native-interface
+```
+
+Set `SDD_SEMANTIC_ENGINE=native` in the application environment and start the service. This enables supported semantic reads through `/ask` and `/data/sql`. It does not switch all operators to Rust. Maintained semantic features and semantic mutation review require the default Python engine. The [roadmap](IMPLEMENTATION_PLAN.md) lists remaining native packaging and upgrade work; use a separate database for preview evaluation.
+
+The application and native extension configure providers separately. The Rust executor calls a compatible HTTP endpoint; a local Python adapter needs an HTTP wrapper to serve it. See [providers](PROVIDERS.md) and [native configuration](../native/README.md#configure).
+
+## Existing source data
+
+The development application can register authorized PostgreSQL tables and views without importing their rows. Follow [source attachments](EXISTING_DATA.md) after the matching migration. Attachments are read-only through the workspace and preserve source ownership and PostgreSQL permissions.
+
+## Credentials and providers
 
 A runtime connection can use `DATABASE_URL`, or `SDD_DB_HOST`, `SDD_DB_PORT`, `SDD_DB_NAME`, `SDD_DB_USER` and `SDD_DB_PASSWORD_FILE`. Structured settings handle special characters in passwords. Setup uses `SDD_ADMIN_DATABASE_URL` or `SDD_ADMIN_DB_USER` with `SDD_ADMIN_DB_PASSWORD_FILE` and the same host/database settings.
 
