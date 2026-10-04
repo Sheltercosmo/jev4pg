@@ -142,6 +142,8 @@ Stop the API, workers and administrative writes before upgrading. Catalog versio
 
 Run the API and workers from the same application version after upgrading. Processes that expect the public catalog or version 3 cannot serve the version 4 lifecycle. Update any administrator scripts that directly query internal tables to use `sdd_catalog`. Do not add compatibility views in `public`. Never run two migration versions against the same database at once. Test migration and restore on a database copy before deployment, and do not repoint Compose at an unrelated database volume. A legacy upgrade does not undo public-schema grants changed by earlier releases; the administrator remains responsible for those grants. Configure application query workers using the [query job guide](QUERY_JOBS.md).
 
+Review pending writes again after upgrading. Ordinary mutation previews created by v0.6.0 use the former snapshot contract and are rejected as stale by the bounded write executor. Their SQL remains available for inspection. Generate a new preview and approve its current targets before committing; migration does not apply those writes automatically.
+
 Check the installed application version with `jev4pg --version`, or `docker compose exec app jev4pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
 
 ```sql

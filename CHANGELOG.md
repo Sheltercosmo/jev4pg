@@ -25,6 +25,8 @@ The application is version 0.7.0, the catalog schema is version 4, the asynchron
 
 The Python distribution name changed. Install into a fresh virtual environment instead of layering `jev4pg` over `jevsd-pg`. Compose project and volume identities are unchanged. A committed catalog upgrade has no automatic downgrade; rollback requires the old application and pre-upgrade backup. Follow the [upgrade procedure](docs/INSTALLATION.md#upgrade).
 
+Pending ordinary write previews from v0.6.0 need a fresh preview and approval under the new bounded-target contract. A stale preview is rejected without applying its write.
+
 Background query retention and queue admission limits remain manual operational responsibilities. The release does not claim unrestricted semantic scans, high availability, cross-host recovery qualification or a new model-accuracy result. Use the documented limits and test your workload before production adoption.
 
 ## 0.6.0

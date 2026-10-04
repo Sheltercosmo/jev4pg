@@ -204,7 +204,20 @@ def verify_application_upgrade(admin, release_python):
                 pass
             else:
                 raise AssertionError("Upgrade lost history ownership")
-            committed = python.commit(tenant, item["preview"], actor)
+            before_review = serial(catalog.rows(tenant, dataset))
+            try:
+                python.commit(tenant, item["preview"], actor)
+            except ValueError as error:
+                assert "preview is stale" in str(error)
+            else:
+                raise AssertionError("Legacy preview bypassed the new bounded write review")
+            assert serial(catalog.rows(tenant, dataset)) == before_review
+            preview = python.execute(
+                tenant, "UPDATE records SET amount=12.25 WHERE seq=3", actor=actor
+            )
+            assert preview["manifest"]["snapshot_mode"] == "reviewed_targets"
+            assert preview["affected_rows"] == 1
+            committed = python.commit(tenant, preview["preview_token"], actor)
             assert committed["manifest"]["committed"]
             assert python.execute(tenant, "SELECT amount FROM records WHERE seq=3")["result"] == [
                 {"amount": "12.2500000000"}
@@ -236,5 +249,5 @@ def verify_application_upgrade(admin, release_python):
         "Published v0.6.0 application data survives failed, successful and repeated migration without changed rows or passwords",
         "Upgraded typed data, reviewed features, zero-call evidence and owned query history remain usable",
         "Upgrade preserves SQL output states and isolates tenants; expired workers are fenced without replay",
-        "Pre-upgrade mutation previews remain usable and native reads plus source attachments work after migration",
+        "Legacy write previews require fresh review without changing rows; newly reviewed writes, native reads and source attachments work after migration",
     ]
