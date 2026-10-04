@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://jevsdpg.com">Website</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/zh/USER_GUIDE.md">简体中文</a> ·
@@ -20,9 +21,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jevsd-pg adds 41 semantic operators, natural-language queries and reusable evidence to PostgreSQL. Its Rust extension evaluates independent questions in parallel and represents text as named answer probabilities. PostgreSQL performs the joins, calculations and transactions; JEV supplies typed semantic decisions.
+jevsd-pg is an open-source semantic database built on PostgreSQL. It combines natural-language queries, 41 JEV operators and exact SQL execution so you can search by meaning, analyze relational data and turn documents into structured records in one workflow. PostgreSQL handles joins, calculations and transactions; JEV brings typed language understanding to your data.
 
-Use the web workspace, HTTP API or PostgreSQL clients. Choose JEV planning or hybrid planning, where JEV selects context, an LLM proposes SQL, and JEV reviews it. Inspect the proposal, correct its interpretation and rerun it from history.
+Independent semantic tasks run in parallel, questions sharing context are batched, and compatible evidence is reused to reduce repeated model calls. Choose JEV planning or a hybrid pipeline that uses JEV to select context and review LLM-generated SQL. Inspectable plans, saved queries and reviewed semantic features let you correct interpretations and build on previous work through the web workspace, HTTP API or SQL clients.
+
+Explore the interactive product tour at [jevsdpg.com](https://jevsdpg.com).
 
 <p align="center">
   <img src="docs/assets/product-tour.gif" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
