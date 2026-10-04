@@ -5,7 +5,8 @@ Choose the application deployment or the native execution preview:
 | Path | Requirements | Execution |
 | --- | --- | --- |
 | Released application, v0.6.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Python service and worker; asynchronous `jev.*` SQL jobs. |
-| Native preview on `main` | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+| Development application, 0.7.0.dev0 | Same application requirements; optional native build below | Current catalog and query service, including source attachments. |
+| Native extension, 0.2.0 preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
 
 The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
@@ -100,6 +101,13 @@ Hybrid queries require `SDD_LLM_TRANSPORT`, `SDD_LLM_MODEL` and the correspondin
 
 ## Upgrade
 
+Application, catalog and extension versions are separate:
+
+| Source | Application | Catalog schema | Optional native extension |
+| --- | --- | --- | --- |
+| Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
+| Development `main` | 0.7.0.dev0 | 2 | 0.2.0 preview |
+
 Back up the database and retain its role credentials first. Check out the desired release, then run:
 
 ```bash
@@ -110,6 +118,17 @@ docker compose up -d --wait
 ```
 
 The current migration is additive and preserves source data and evidence. It does not rotate passwords. Never run two migration versions against the same database at once. Before adopting this deployment on an existing installation, test migration and restore on a database copy. Do not repoint Compose at an unrelated database volume.
+
+On a development build, check the installed application version with `jevsd-pg --version`, or `docker compose exec app jevsd-pg --version`. `/health` and the OpenAPI document report the same application version. Inspect database versions as an administrator:
+
+```sql
+SELECT version FROM sdd_schema_version;
+SELECT extname, extversion
+FROM pg_extension
+WHERE extname IN ('jevsd_pg', 'jev_native');
+```
+
+Use the [native update procedure](NATIVE_DEPLOYMENT.md#updates-and-backups) when the Rust extension is installed. The default and native Compose projects use separate volumes; starting the native project does not upgrade an existing default project.
 
 ## Backup and restore
 
@@ -135,3 +154,5 @@ On a new server, install the extension files and recreate the original roles fir
 ## Deployment tests
 
 The [deployment workflow](../.github/workflows/deployment.yml) builds the images and checks fresh installation, SQL authorization, worker recovery, HTTP and `psql` calls, batching, repeat migration, restart persistence and backup restoration. Its explicit synthetic provider tests integration, not language accuracy. The default stack never enables this fixture.
+
+The [native workflow](../.github/workflows/native.yml) also installs the published v0.6.0 package into an isolated environment, creates a populated database and upgrades it on PostgreSQL 17. It checks migration rollback and repeatability, unchanged data and passwords, reviewed features, evidence reuse, query history, job states and tenant isolation. Native reads and source attachments are exercised after migration. This covers the application upgrade on one PostgreSQL version; it does not establish a PostgreSQL major-version or cross-host migration procedure.

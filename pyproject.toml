@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jevsd-pg"
-version = "0.6.0"
+dynamic = ["version"]
 description = "A self-developing JEV-based SQL database with JEV-powered NL2SQL"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
@@ -28,6 +28,9 @@ jevsd-pg = "sdd.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["sdd*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "sdd._version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

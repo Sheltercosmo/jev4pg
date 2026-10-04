@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +10,7 @@ from sdd.api import create_app
 from sdd.config import api_tokens, database_url, load_secrets
 from sdd.db import Database
 from sdd.execution import Executor
+from sdd import __version__
 
 
 def test_production_requires_real_token_mapping(monkeypatch):
@@ -78,10 +81,21 @@ def test_readiness_fails_without_exposing_connection_details(monkeypatch):
     db = Database("sqlite:///:memory:")
     db.initialize()
     client = TestClient(create_app(Executor(db, {}), tokens={}))
-    assert client.get("/health").status_code == 200
+    assert client.get("/health").json() == {"status": "ok", "version": __version__}
+    assert client.get("/openapi.json").json()["info"]["version"] == __version__
     assert client.get("/ready").status_code == 200
     monkeypatch.setenv("SDD_ENV", "production")
     response = client.get("/ready")
     assert response.status_code == 503
     assert response.json() == {"detail": "Database is not ready"}
     db.engine.dispose()
+
+
+def test_version_is_available_without_database_configuration():
+    result = subprocess.run(
+        [sys.executable, "-m", "sdd.cli", "--version"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "jevsd-pg " + __version__

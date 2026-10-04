@@ -14,6 +14,7 @@ The native preview moves semantic row execution into PostgreSQL while keeping na
 | Durable evidence | Optional registry storage separates observations from policy, coordinates requests and reuses compatible results. |
 | Probability embeddings | A fixed question basis produces matrices and vectors; projection and compatible distance comparisons run locally. |
 | Native container deployment | A Compose overlay builds the optimized extension, provisions the registry and enables native application reads. Extension 0.2.0 adds backup registration with a 0.1.0 upgrade path. |
+| Application upgrade | A populated v0.6.0 database upgrades to catalog schema 2 on PostgreSQL 17, preserving data, credentials, evidence, history and job states. |
 
 Build and usage are in the [native guide](../native/README.md). Exact language and plan boundaries are documented in [native plans](NATIVE_PLANS.md), rather than implied by a general SQL compatibility claim.
 
@@ -25,7 +26,7 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 | Evidence lifecycle | Reuse across differently packed questions, live source revision tracking and retention controls. |
 | Maintained features and writes | Native refresh, reviewed semantic mutations and atomic publication against the reviewed source scope. These currently use Python. |
 | Resource accounting | Measure combined memory, connections and provider admission under concurrent workloads. |
-| Distribution | Published binary packages and images, full application upgrade from v0.6.0 and broader recovery testing across hosts and versions. |
+| Distribution | Published binary packages and images, plus broader migration and recovery testing across hosts and PostgreSQL versions. |
 | Evaluation | Frozen comparisons of exact results, latency, memory and provider usage across unrelated schemas; separate language and embedding retrieval evaluations. |
 
 ## Design and evaluation rules

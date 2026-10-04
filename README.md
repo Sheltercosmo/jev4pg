@@ -43,9 +43,11 @@ The self-developing layer stores definitions, evidence and corrections as reusab
 | Path | Includes | Setup |
 | --- | --- | --- |
 | Release v0.6.0 | Workspace, HTTP API, Python semantic runtime and asynchronous `jev.*` SQL jobs | [Compose or existing PostgreSQL](docs/INSTALLATION.md) |
-| Development source on `main` | The application plus Rust `jev_native.*`, source attachments and native SQL compilation | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
+| Development source, 0.7.0.dev0 | The application plus Rust `jev_native.*`, source attachments and native SQL compilation | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
 
 The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. Use the native Compose overlay to build and enable it; the default Compose stack uses Python. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).
+
+See the [changelog](CHANGELOG.md) for the features added since v0.6.0. Development builds report their application version through `jevsd-pg --version` and `/health`; the native extension has its own version.
 
 To start the released application with Python 3.11+ and Docker Compose v2:
 

@@ -352,6 +352,10 @@ def verify(connection, config):
         from upgrade import verify_upgrade
 
         checks.extend(verify_upgrade(connection))
+    if release_python := os.getenv("SDD_TEST_RELEASE_PYTHON"):
+        from application_upgrade import verify_application_upgrade
+
+        checks.extend(verify_application_upgrade(connection, release_python))
     return {
         "checks": checks,
         "passed": len(checks),
