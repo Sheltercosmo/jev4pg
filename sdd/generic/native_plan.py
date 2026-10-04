@@ -5,7 +5,15 @@ from dataclasses import asdict
 
 
 def native_plan(
-    dag, target, *, questions=None, requirements=None, guards=None, row_guards=None, selections=None
+    dag,
+    target,
+    *,
+    questions=None,
+    requirements=None,
+    guards=None,
+    row_guards=None,
+    selections=None,
+    contexts=None,
 ):
     """Attach semantic questions; default consumers require all parent decisions.
 
@@ -14,16 +22,20 @@ def native_plan(
     guards maps consumer IDs to {input, question, equals} scalar conditions.
     row_guards maps semantic stages to {column, equals} decision conditions.
     selections maps merge stages to named, deterministic decision selections.
+    contexts maps semantic stages to the projected columns sent to the provider.
     """
     questions = questions or {}
     requirements = requirements or {}
     guards = guards or {}
     row_guards = row_guards or {}
     selections = selections or {}
+    contexts = contexts or {}
     if set(questions) & set(selections):
         raise ValueError("A stage either evaluates questions or merges decisions")
     identities = [identity for layer in dag.layers(target) for identity in layer]
-    if (set(questions) | set(guards) | set(row_guards) | set(selections)) - set(identities):
+    if (set(questions) | set(guards) | set(row_guards) | set(selections) | set(contexts)) - set(
+        identities
+    ):
         raise ValueError("Semantic declarations must belong to the target graph")
     edges = {(identity, parent) for identity in identities for parent in dag.nodes[identity].inputs}
     if set(requirements) - edges:
@@ -71,5 +83,24 @@ def native_plan(
             if not selections[identity]:
                 raise ValueError("A merge stage needs at least one selection")
             stage["selections"] = deepcopy(selections[identity])
+        if identity in contexts:
+            columns = contexts[identity]
+            subjects = {
+                q["subject_column"]
+                for q in questions.get(identity, {}).values()
+                if q.get("subject_column")
+            }
+            if (
+                identity not in questions
+                or not columns
+                or len(set(columns)) != len(columns)
+                or set(columns) - set(node.columns)
+                or subjects - set(columns)
+                or row_guards.get(identity, {}).get("column") in columns
+            ):
+                raise ValueError(
+                    "Semantic context must name distinct projected columns, include every subject and exclude routing metadata"
+                )
+            stage["context_columns"] = list(columns)
         stages.append(stage)
     return {"version": 1, "target": target, "stages": stages}

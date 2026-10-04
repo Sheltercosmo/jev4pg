@@ -19,6 +19,7 @@ def test_native_contract_reaches_generation_and_independent_review(monkeypatch):
     contract = backend_contract(catalog)
     assert contract["semantic_engine"] == "native"
     assert "derived table" in " ".join(contract["semantic_rules"])
+    assert "CASE routes" in " ".join(contract["semantic_rules"])
     compact = review_context({"backend_contract": contract, "catalog": []})
     assert compact["semantic_rules"] == contract["semantic_rules"]
     assert "backend_contract" not in compact

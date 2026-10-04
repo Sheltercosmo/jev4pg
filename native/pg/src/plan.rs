@@ -327,6 +327,7 @@ pub fn execute(value: Value, options: Value) -> JsonB {
                     stage.questions.clone(),
                     stage.row_guard.clone(),
                     stage.selections.clone(),
+                    stage.context_columns.clone(),
                 ));
                 for question in stage.decision_ids() {
                     progress[index].decisions.insert(question.clone(), [0; 3]);

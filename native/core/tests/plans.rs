@@ -112,3 +112,26 @@ fn validates_row_conditions_and_selected_decision_dependencies() {
         assert!(Plan::parse(wrong).is_err());
     }
 }
+
+#[test]
+fn context_projection_excludes_internal_fields_without_losing_subjects() {
+    let mut input = stage("input", json!([]));
+    input["operator"] = json!("semantic");
+    input["columns"]["route"] = json!({"kind":"json","label":"Routing"});
+    input["questions"] = json!({"q":{"type":"noul","instructions":"Check","subject_column":"id"}});
+    input["row_guard"] = json!({"column":"route","equals":true});
+    input["context_columns"] = json!(["id"]);
+    let plan = json!({"version":1,"target":"input","stages":[input]});
+    assert!(Plan::parse(plan.clone()).is_ok());
+    for columns in [
+        json!([]),
+        json!(["route"]),
+        json!(["id", "id"]),
+        json!(["id", "missing"]),
+        json!(["id", "route"]),
+    ] {
+        let mut invalid = plan.clone();
+        invalid["stages"][0]["context_columns"] = columns;
+        assert!(Plan::parse(invalid).is_err());
+    }
+}

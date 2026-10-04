@@ -91,6 +91,8 @@ def execute_relational(
         rows = serial(json.loads(response["rows"], parse_float=Decimal))
         states = Counter()
         for stage in output["stages"]:
+            if stage["operator"] != "semantic":
+                continue
             for counts in stage["decisions"].values():
                 states.update(counts)
         coverage = {

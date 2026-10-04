@@ -26,6 +26,7 @@ def backend_contract(catalog):
             [
                 "SEMANTIC can read a named column of an uncorrelated CTE or derived table. Put required calculations or text aggregation in that relation first, then judge its actual output. Project only the context needed for the judgment.",
                 "Native dependent stages share one DAG and budget. Independent branches run concurrently; exact consumers wait for resolved input decisions. A held result is NOT_EVALUATED, never a zero count.",
+                "CASE routes semantic work to each row's selected branch, including nested or simple CASE. A SQL NULL condition falls through; an unresolved semantic condition holds the result instead of choosing ELSE. Project aggregate or window conditions in a preceding CTE.",
                 "Dependent semantic plans do not support recursive CTEs, correlated or scalar subqueries, SEMANTIC_FEATURE, or semantic writes. Base-column scans require registered primary keys; derived relations retain row multiplicity without requiring a key.",
             ]
         )

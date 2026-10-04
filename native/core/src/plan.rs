@@ -30,6 +30,8 @@ pub struct Stage {
     #[serde(default)]
     pub selections: BTreeMap<String, Selection>,
     #[serde(default)]
+    pub context_columns: Option<Vec<String>>,
+    #[serde(default)]
     pub grain: Option<Vec<String>>,
     #[serde(default)]
     pub keys: Vec<Vec<String>>,
@@ -149,6 +151,28 @@ impl Plan {
                 validate_questions(&stage.questions)?;
             } else if !stage.questions.is_empty() {
                 return Err("Only semantic stages declare questions");
+            }
+            if let Some(columns) = &stage.context_columns {
+                let names: BTreeSet<_> = columns.iter().collect();
+                if stage.operator != "semantic"
+                    || names.is_empty()
+                    || names.len() != columns.len()
+                    || names.iter().any(|name| !stage.columns.contains_key(*name))
+                    || stage.questions.values().any(|question| {
+                        question
+                            .subject_column
+                            .as_ref()
+                            .is_some_and(|name| !names.contains(name))
+                    })
+                    || stage
+                        .row_guard
+                        .as_ref()
+                        .is_some_and(|guard| names.contains(&guard.column))
+                {
+                    return Err(
+                        "Semantic context must name distinct projected columns, include every subject and exclude routing metadata",
+                    );
+                }
             }
             let decision_column = |name: &String| {
                 stage

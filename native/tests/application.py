@@ -141,8 +141,10 @@ def verify_application(connection, observations):
         )
         checks.append("restricted application role retains tenant row security during native scans")
         from derived_application import verify_derived_application
+        from conditional_application import verify_conditional_application
 
         checks.extend(verify_derived_application(sql, catalog, tenant, observations))
+        checks.extend(verify_conditional_application(sql, catalog, tenant, observations))
 
         catalog.create(
             tenant,
@@ -292,7 +294,6 @@ def verify_application(connection, observations):
             "SELECT id FROM work_items WHERE COALESCE(SEMANTIC(note,'Complete?'),FALSE)=FALSE",
             "SELECT id FROM work_items WHERE SEMANTIC(note,'Complete?') IS NOT TRUE",
             "SELECT id FROM work_items WHERE SEMANTIC(note,'Complete?') ORDER BY id LIMIT 1",
-            "SELECT CASE WHEN SEMANTIC(note,'Complete?') THEN 1 ELSE 0 END AS decision FROM work_items",
             "SELECT id FROM work_items WHERE SEMANTIC(note,'Complete?') IS NULL",
             "SELECT id FROM work_items WHERE SEMANTIC(note,'Complete?') INTERSECT SELECT id FROM work_items",
         ]:
@@ -302,6 +303,14 @@ def verify_application(connection, observations):
                 assert "Unresolved native decisions" in str(error)
             else:
                 raise AssertionError("Incomplete population produced an exact result")
+        held = sql.execute(
+            tenant,
+            "SELECT CASE WHEN SEMANTIC(note,'Complete?') THEN 1 ELSE 0 END AS decision FROM work_items",
+            max_evaluations=0,
+        )
+        assert held["result"] == [] and not held["manifest"]["complete"], held
+        assert held["manifest"]["result_output_state"] == "NOT_EVALUATED"
+        assert held["manifest"]["result_operation_state"] == "BLOCKED_BY_DEPENDENCY"
         for predicate, expected in [
             ("SEMANTIC(note,'Complete?')", [{"id": 1}]),
             ("NOT SEMANTIC(note,'Complete?')", []),

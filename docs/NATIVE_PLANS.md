@@ -12,7 +12,7 @@ The plan contains `version: 1`, a `target` stage ID and up to 32 `stages`. Each 
 
 The result contains target `rows`, separate `stages` receipts, shared `usage`, the applied `policy` and `completion_order`. A sealed empty target has `VALUE`, zero rows and `population_closed: true`. A held target has `NOT_EVALUATED` and a reason. Decision counts within each stage preserve VALUE, UNKNOWN and NOT_EVALUATED independently of relation availability.
 
-Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=..., row_guards=..., selections=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
+Existing Python `StageDAG` programs can call `sdd.generic.native_plan.native_plan(dag, target, questions=..., requirements=..., guards=..., row_guards=..., selections=..., contexts=...)` to produce this JSON. The adapter lowers executable SQL and typed dependencies. It does not turn descriptive LLM plan steps into executable instructions.
 
 ## Use generated or handwritten SQL
 
@@ -38,6 +38,28 @@ This path accepts uncorrelated relational stages, including joins, aggregates, w
 An exact consumer waits for every required input decision. Missing evidence holds the target with `NOT_EVALUATED`; it does not return a zero count. The query response and saved history retain the proposed SQL, stage receipts, usage, applied policy and hold reason. The web workspace distinguishes a held query from an executed query with no matching rows. The generation and review contracts describe the configured engine's capabilities; compiler checks do not establish natural-language accuracy.
 
 The query service preserves decimal JSON tokens as exact strings in returned rows and history, matching its numeric serialization convention. Provider usage and policy metadata remain separate from result values.
+
+### Conditional SQL
+
+Use `CASE` to limit semantic work to the rows that need it. For `messages(id, body, needs_review)`:
+
+```sql
+SELECT id,
+       CASE WHEN needs_review
+            THEN SEMANTIC(body, 'The message requests further action.')
+            ELSE false
+       END AS follow_up
+FROM messages
+ORDER BY id;
+```
+
+Only rows with `needs_review = true` require a judgment. A SQL NULL condition follows the next WHEN or ELSE, as in PostgreSQL. An UNKNOWN or NOT_EVALUATED semantic condition holds the result; it cannot select ELSE. A missing ELSE produces SQL NULL after all conditions have resolved without a match.
+
+Searched, simple and nested CASE are supported. The compiler materializes the input once, gives each row an internal identity, and joins branch results using that identity. Duplicates remain separate result rows. Internal identities and routing fields are excluded from model context, so identical data can still reuse an observation. Independent questions with the same eligibility share a request; independent branches share the native scheduler.
+
+Exact Boolean conditions can remove unnecessary calls, such as `false AND SEMANTIC(...)` or `true OR SEMANTIC(...)`. Other unresolved combinations are held conservatively. A branch that is never selected can complete with zero model allowance. Selected judgments must resolve before an exact aggregate consumes the result. PostgreSQL performs the final CASE expression and arithmetic.
+
+Project aggregate or window conditions into a preceding CTE. Conditional lowering does not add routing for COALESCE or remove the restrictions on correlated subqueries. The additional intermediate relations count against the shared stage and row limits.
 
 ## One graph for relational and semantic work
 
@@ -71,7 +93,9 @@ A semantic stage can add `row_guard: {"column":"route","equals":true}`. Its SQL 
 
 Every input row remains in the branch result. A known nonmatch produces `NOT_EVALUATED / SKIPPED` for that branch's questions. An unknown or unexecuted selector produces `BLOCKED_BY_DEPENDENCY`. Malformed or missing decisions produce `FAILED`; incompatible scalar types produce `BLOCKED_BY_POLICY`. None supplies a false answer. An empty input remains a sealed empty relation.
 
-The routing column stays in the result but is removed from the provider context. Other projected columns form the context. This permits identical selected contexts to reuse evidence despite different routing observations, without removing duplicate rows. To replay an observation manually, supply that same context without the routing column. Skipped rows have no observation or provider receipt.
+The routing column stays in the result but is removed from the provider context. Other projected columns form the context by default. An optional `context_columns: ["body", "account_id"]` restricts context to named projected fields. It must be nonempty, include every question's subject column, and exclude the routing column. The adapter accepts this as `contexts={stage_id: ["body", "account_id"]}`. Fields omitted from context still remain in the stage's SQL result.
+
+This permits identical selected contexts to reuse evidence despite different routing observations or internal identities, without removing duplicate rows. To replay an observation manually, supply exactly the projected context. Skipped rows have no observation or provider receipt.
 
 Use `require_values: []` on the guarded input when the branch is meant to receive unresolved selectors and report their state per row. The default remains whole-input completeness. Independent branches share the existing scheduler, limits and evidence registry.
 
@@ -97,7 +121,7 @@ The selected decision retains its value, uncertainty or operational failure. Unc
 
 Declare merge inputs with `require_values: []` to accept those skipped alternatives. Keep a stable key in each branch and preserve its multiplicity when joining. Key contracts can detect accidental fanout; the executor does not infer the intended identity from arbitrary SQL. Merge stages do not create model observations. Preserve upstream receipt columns in the projection when their row-level provenance is needed.
 
-See the [conditional SQL example](../examples/planning/conditional_plan.sql). These contracts are available through explicit native plans and the Python adapter. Automatic lowering of SQL `CASE` into guarded branches remains separate work; ordinary generated semantic SQL does not yet acquire this routing automatically.
+See the [explicit conditional plan example](../examples/planning/conditional_plan.sql). The query service uses the same row guards and selections when compiling ordinary SQL CASE. Explicit plans remain useful when callers need their own routing, decision types or completeness contracts.
 
 ## Snapshot and resource contract
 

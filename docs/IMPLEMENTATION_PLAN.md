@@ -41,4 +41,6 @@ Existing PostgreSQL tables and local views can now be attached without importing
 
 Explicit native plans now support row conditions and deterministic selected-branch merges. Conditions preserve every source row while limiting provider dispatch to selected contexts. Merge decisions retain uncertainty and operational status, and exact downstream calculations require resolved selected answers. Independent branches retain the shared scheduler and allowance.
 
-Automatic conditional SQL lowering, broader dependency shapes and provenance, reuse across differently packed questions, live source revisions, maintained features and aggregate resource accounting remain open gates. Versioned installation packages, upgrade and restore checks, comparative measurements and a frozen final evaluation are also required before release.
+The query service also lowers SQL CASE to guarded branches with stable row identities. SQL NULL conditions fall through, while unresolved semantic selectors hold the result. Selected decision requirements allow exact consumers to proceed without requiring skipped alternatives. Internal routing fields remain outside provider context, preserving duplicate-context reuse.
+
+Broader dependency shapes and provenance, reuse across differently packed questions, live source revisions, maintained features and aggregate resource accounting remain open gates. Versioned installation packages, upgrade and restore checks, comparative measurements and a frozen final evaluation are also required before release.

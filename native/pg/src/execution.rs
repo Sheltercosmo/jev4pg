@@ -29,6 +29,7 @@ pub struct SourceSpec {
     nested_context: bool,
     row_guard: Option<RowGuard>,
     selections: BTreeMap<String, Selection>,
+    context_columns: Option<Vec<String>>,
 }
 
 impl SourceSpec {
@@ -46,6 +47,7 @@ impl SourceSpec {
             nested_context: false,
             row_guard: None,
             selections: BTreeMap::new(),
+            context_columns: None,
         }
     }
 
@@ -55,6 +57,7 @@ impl SourceSpec {
         questions: Questions,
         row_guard: Option<RowGuard>,
         selections: BTreeMap<String, Selection>,
+        context_columns: Option<Vec<String>>,
     ) -> Self {
         if id.is_empty() || id.len() > 200 || sql.is_empty() || sql.len() > 30_000 {
             error!("Supply a source identity and one bounded source SELECT");
@@ -66,6 +69,7 @@ impl SourceSpec {
             nested_context: true,
             row_guard,
             selections,
+            context_columns,
         }
     }
 
@@ -84,11 +88,22 @@ impl SourceSpec {
                 }),
             );
         }
-        let Some(guard) = &self.row_guard else {
-            return (None, None);
-        };
-        let blocked = match guard.evaluate(source) {
+        let matched = self
+            .row_guard
+            .as_ref()
+            .map_or(Ok(true), |guard| guard.evaluate(source));
+        let blocked = match matched {
             Ok(true) => {
+                if let Some(columns) = &self.context_columns {
+                    let context = columns
+                        .iter()
+                        .map(|name| (name.clone(), source[name].clone()))
+                        .collect();
+                    return (Some(Value::Object(context)), None);
+                }
+                let Some(guard) = &self.row_guard else {
+                    return (None, None);
+                };
                 let mut context = source.clone();
                 context
                     .as_object_mut()

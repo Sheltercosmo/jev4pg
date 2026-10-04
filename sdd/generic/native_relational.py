@@ -18,6 +18,8 @@ def needs_relational_plan(tree):
                 or function.find_ancestor(exp.Select) is not scope.expression
             ):
                 continue
+            if function.find_ancestor(exp.Case) is not None:
+                return True
             if function.expressions and isinstance(function.expressions[0], exp.Column):
                 if isinstance(scope.sources.get(function.expressions[0].table), Scope):
                     return True
@@ -47,19 +49,24 @@ def compile_relational_plan(tree, bindings, render):
         raise ValueError("Recursive semantic populations require a bounded stage contract")
     stages, completed = [], {}
 
-    def add(query, inputs, *, columns=None, questions=None):
+    def add(query, inputs, *, columns=None, questions=None, **contracts):
         if len(stages) >= 32:
             raise ValueError("At most 32 stages per dependent native query")
         identity = f"native_stage_{len(stages)}"
         stage = {
             "id": identity,
-            "operator": "semantic" if questions else "source",
+            "operator": "semantic"
+            if questions
+            else "merge"
+            if contracts.get("selections")
+            else "source",
             "sql": render(query),
             "columns": columns or _columns(query),
             "inputs": [{"stage": parent, "alias": parent} for parent in dict.fromkeys(inputs)],
         }
         if questions:
             stage["questions"] = questions
+        stage.update(contracts)
         stages.append(stage)
         return stage
 
@@ -142,6 +149,13 @@ def compile_relational_plan(tree, bindings, render):
             raise ValueError(
                 "Dependent semantic join conditions need an explicit projected relation"
             )
+        if any(function.find_ancestor(exp.Case) is not None for function in functions):
+            from .native_conditionals import ConditionalScope
+
+            completed[id(scope)] = ConditionalScope(add, population, inputs, metadata).finish(
+                query, names
+            )
+            continue
         questions, replacements = {}, []
         for function in functions:
             args = function.expressions

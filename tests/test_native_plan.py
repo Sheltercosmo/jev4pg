@@ -91,3 +91,29 @@ def test_row_guard_requires_a_projected_json_decision_and_semantic_stage():
     ):
         with pytest.raises(ValueError):
             native_plan(dag, source, **options)
+
+
+def test_context_projection_preserves_subject_and_omits_routing_identity():
+    dag = StageDAG()
+    source = dag.source(
+        sqlglot.parse_one("SELECT id,route,body FROM evidence"),
+        {
+            "id": Column("integer", "Identity"),
+            "route": Column("json", "Routing"),
+            "body": Column("text", "Description"),
+        },
+    )
+    questions = {
+        source: {"review": {"type": "noul", "instructions": "Review", "subject_column": "body"}}
+    }
+    options = {"questions": questions, "row_guards": {source: {"column": "route", "equals": True}}}
+    contexts = {source: ["body"]}
+    plan = native_plan(dag, source, contexts=contexts, **options)
+    assert plan["stages"][0]["context_columns"] == ["body"]
+    plan["stages"][0]["context_columns"].append("id")
+    assert contexts[source] == ["body"]
+    for columns in ([], ["id"], ["body", "body"], ["missing", "body"], ["route", "body"]):
+        with pytest.raises(ValueError, match="context"):
+            native_plan(dag, source, contexts={source: columns}, **options)
+    with pytest.raises(ValueError):
+        native_plan(dag, source, contexts={"missing": ["body"]}, **options)
