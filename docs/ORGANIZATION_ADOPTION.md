@@ -16,7 +16,7 @@ This is not yet a supported high-availability or cross-database migration produc
 | Catalog isolation | Explicit application catalog schema and a transactional legacy migration. | Custom search paths cannot redirect runtime queries; source ownership and grants remain intact; rollback and restore succeed. Implemented in development; cross-host recovery remains separate deployment work. |
 | External PostgreSQL | Application-only Compose configuration, verified TLS and bounded main and source-guard pools. | TLS identity failures stop connections; source guards cannot create unbounded pools; administrator credentials are absent from runtime services. See the [deployment guide](EXTERNAL_POSTGRESQL.md). Container-host qualification and cross-host recovery remain open. |
 | Source onboarding | A declarative, inspectable attachment manifest with selected columns, keys, relationships and tenant scope. | Implemented in development: metadata-only preview, atomic and repeatable apply, explicit rebind and a two-cluster logical-restore check. See [source manifests](SOURCE_MANIFESTS.md). Physical failover and cross-host recovery remain open. |
-| Remote sources | Separate source adapters for federated reads and replicated local data, each declaring consistency and freshness. | Two-server tests cover disconnects, schema changes, source authorization, duplicate keys and stale evidence. |
+| Remote sources | Separate source adapters for federated reads and replicated local data, each declaring consistency and freshness. | The [acquisition protocol](REMOTE_POSTGRESQL_PROTOCOL.md) now has real two-server race, permission and disconnect tests. Expression admission, catalog/native integration, source mapping and stale-evidence checks remain open. |
 | Operations | Documented connection and inference budgets, metrics, cancellation, rolling service changes, backup restoration and extension distribution. | Concurrent workloads stay within limits; uncertain calls are not silently repeated; recovery is verified on a second host. |
 | Maintained semantics | Native typed generations with source-version checks and attributable review overlays. | Parallel evaluation publishes atomically; stale workers cannot overwrite newer generations. |
 
@@ -24,7 +24,7 @@ No step may narrow the planner to a dataset or sector. Keep installation, source
 
 ## PostgreSQL mechanisms to build on
 
-PostgreSQL's [foreign-data wrapper](https://www.postgresql.org/docs/17/postgres-fdw.html) provides remote tables, user mappings and query pushdown. A future adapter should use these facilities with an explicit remote snapshot and authorization contract. Supporting local attachments does not establish safe foreign-table support.
+PostgreSQL's [foreign-data wrapper](https://www.postgresql.org/docs/17/postgres-fdw.html) provides remote tables, user mappings and query pushdown. The remote adapter builds on these facilities with an explicit snapshot and authorization contract. The acquisition primitive is implemented; supporting local attachments or passing protocol tests does not yet establish application foreign-table support.
 
 [Logical replication](https://www.postgresql.org/docs/17/logical-replication.html) is a candidate for maintaining a local copy during gradual adoption. Its replication state, schema handling and cutover checks must be part of the integration; do not promise automatic or zero-downtime migration without testing them.
 

@@ -30,7 +30,7 @@ Build and usage are in the [native guide](../native/README.md). Exact language a
 | Maintained features and writes | Native typed generations, source-scope checks, human review overlays and semantic mutations. Python refresh has a publication gate; native refresh still needs its own source contract. |
 | Resource accounting | Measure combined memory, connections and provider admission under concurrent workloads. |
 | Distribution | Published binary packages and images, plus broader migration and recovery testing across hosts and PostgreSQL versions. |
-| Organization adoption | A tested external-database deployment path, staged source onboarding, and cross-host restoration. See the [adoption plan](ORGANIZATION_ADOPTION.md). |
+| Organization adoption | Container-host qualification, a complete remote-source adapter and cross-host restoration. External connection checks and reviewed source manifests are implemented. The [remote acquisition protocol](REMOTE_POSTGRESQL_PROTOCOL.md) has two-server qualification but is not yet connected to application queries. See the [adoption plan](ORGANIZATION_ADOPTION.md). |
 | Evaluation | Frozen comparisons of exact results, latency, memory and provider usage across unrelated schemas; separate language and embedding retrieval evaluations. |
 
 ## Design and evaluation rules

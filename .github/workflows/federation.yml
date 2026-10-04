@@ -1,0 +1,53 @@
+name: Remote source protocol
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      primary:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: protocol-test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+      peer:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: protocol-test
+        ports:
+          - 15433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      SDD_TEST_ADMIN_URL: postgresql+psycopg://postgres:protocol-test@127.0.0.1:15432/postgres
+      SDD_TEST_PEER_ADMIN_URL: postgresql+psycopg://postgres:protocol-test@127.0.0.1:15433/postgres
+      SDD_TEST_PEER_FDW_HOST: peer
+      SDD_TEST_PEER_FDW_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements.lock.txt
+          python -m pip install --no-deps .
+      - name: Qualify remote locks and source contracts
+        run: python -m pytest tests/test_remote_guard_postgres.py -q --tb=short
