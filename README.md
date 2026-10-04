@@ -26,11 +26,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build smarter search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
+jev4pg brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with **natural-language queries in English and Simplified Chinese**.
 
-Define business concepts once and reuse them across queries, reports and applications. JEV evaluates independent questions in parallel and preserves typed decisions and answer probabilities, so compatible evidence can serve future queries without repeating inference. PostgreSQL handles joins, windows and exact arithmetic. The self-developing semantic layer grows through reviewed definitions and corrections, keeping your team's knowledge inspectable and reusable.
+**Define once, reuse across queries.** Turn business concepts into reviewed definitions that power reports, work queues and applications. JEV combines **parallel evaluation and evidence reuse**, preserving typed decisions and answer probabilities so compatible results can serve future queries without repeating inference. PostgreSQL handles joins, windows and exact arithmetic. Reviewed definitions and corrections build a **self-developing semantic layer** your team can inspect and improve.
 
-Explore the interactive demos at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
+See it in action at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
 <p align="center">
   <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
