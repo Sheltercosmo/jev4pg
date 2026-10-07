@@ -1,5 +1,7 @@
 # Installation
 
+For a short install-and-query walkthrough, start with the [GitHub quick start](../README.md#quick-start), or follow the [existing-server setup and first query](EXTERNAL_POSTGRESQL.md) to use your PostgreSQL database.
+
 The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available from v0.7.0; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
 
 Choose the application deployment or the native execution preview:

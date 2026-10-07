@@ -4,9 +4,18 @@ The application can run separately from PostgreSQL 17. This path starts no datab
 
 The HTTP workspace requires the Python application and application catalog. The asynchronous SQL interface additionally needs the `jevsd_pg` extension files on the server. Managed services that cannot install custom extension files can use the HTTP path. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
 
+Use the [README quick start](../README.md#quick-start) for a new bundled database. To connect an existing server, start from the released source:
+
+```bash
+git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+cd jev4pg
+```
+
+Requires Python 3.11+ and Docker Compose v2. Run the remaining commands from that checkout. Back up the target database before migration.
+
 ## Configure the connection
 
-Copy [the environment example](../deploy/external.env.example) to `deployment.env`. Set the existing server's hostname, port, database, restricted runtime login and migration owner. The database must already exist. Use the hostname covered by its TLS certificate.
+Copy [the environment example](../deploy/external.env.example) to `deployment.env`. Set the existing server's hostname, port, database, restricted runtime login and migration owner. The database must already exist. Use a hostname reachable from the containers and covered by the server's TLS certificate; `127.0.0.1` inside a container refers to that container, not the host's PostgreSQL service.
 
 ```bash
 python deploy/configure.py --no-prompt
@@ -24,16 +33,42 @@ The external Compose file mounts the CA certificate and uses `sslmode=verify-ful
 docker compose --env-file deployment.env -f compose.external.yaml build app
 docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate migrate --check
 docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate
-docker compose --env-file deployment.env -f compose.external.yaml up -d --wait
+docker compose --env-file deployment.env -f compose.external.yaml --profile queries up -d --wait
 ```
 
-Migration is an explicit operation. Normal startup launches only the application and requires no administrator secret. The migration service belongs to the `tools` profile and is enabled when explicitly targeted. Application startup checks the catalog version and runtime role before serving requests. For upgrades, stop the application and workers first and follow the [catalog upgrade procedure](INSTALLATION.md#upgrade).
+Migration is an explicit operation. Normal startup launches the runtime services and requires no administrator secret. The migration service belongs to the `tools` profile and is enabled when explicitly targeted. Application startup checks the catalog version and runtime role before serving requests. For upgrades, stop the application and workers first and follow the [catalog upgrade procedure](INSTALLATION.md#upgrade).
 
 The HTTP port binds to localhost. Put a TLS reverse proxy and your organization's access controls in front of remote users. `/health` reports process liveness; `/ready` checks PostgreSQL readiness without model calls. Inspect container health and logs with the same environment and Compose arguments.
 
+## Attach a table and run a query
+
+For example, if the target database already contains `business.messages`, its owner or an administrator grants the runtime login access:
+
+```sql
+GRANT USAGE ON SCHEMA business TO semantic_runtime;
+GRANT SELECT ON business.messages TO semantic_runtime;
+```
+
+Replace `semantic_runtime` with your `SDD_DB_USER`, and replace the schema and table with your source. Register it using the application container's configured runtime connection:
+
+```bash
+docker compose --env-file deployment.env -f compose.external.yaml exec app jev4pg attach messages --tenant demo --schema business --table messages
+python deploy/configure.py --show-token
+```
+
+Open [the English workspace](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh), connect with that workspace token, select `messages`, and run this in SQL mode:
+
+```sql
+SELECT COUNT(*) AS total FROM messages;
+```
+
+This reads the existing table without copying rows or calling a model. For natural-language questions, configure a [JEV provider](PROVIDERS.md), choose Natural language · JEV, and preview the generated SQL. Hybrid mode also needs [LLM settings](HYBRID_QUERY.md#configuration).
+
+The generated token map and environment example use tenant `demo`; keep the attachment tenant, token map and `SDD_QUERY_TENANT` consistent if you change it. The `queries` profile above starts its background query worker; omit that profile if you only need interactive queries. Source grants and row-security policies control the visible population. Attachments are read-only through the workspace; see [source attachments](EXISTING_DATA.md) for column selection, views and tenant policies.
+
 ## Optional SQL clients
 
-For workspace background queries, set `SDD_QUERY_TENANT` to the tenant in your API token map and start with `--profile queries`. This worker does not require the SQL extension. See [query workers](QUERY_JOBS.md#start-a-worker).
+The `queries` profile above does not require a SQL extension. The separate `sql` profile below is for clients that submit asynchronous `jev.*` jobs from PostgreSQL.
 
 Have the PostgreSQL administrator install the packaged extension files using [SQL access setup](POSTGRESQL_INTERFACE.md). Then stop the application, set `SDD_SQL_INTERFACE=1` in `deployment.env`, and run:
 

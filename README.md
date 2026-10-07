@@ -15,6 +15,8 @@
 
 <p align="center">
   <a href="https://jev4pg.com">Website</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#use-an-existing-postgresql-database">Existing PostgreSQL</a> ·
   <a href="#why-choose-jev4pg">Advantages</a> ·
   <a href="#bird-challenging-100-questions-11-databases">Benchmark</a> ·
   <a href="#what-you-can-build">What you can build</a> ·
@@ -37,6 +39,85 @@ See it in action at [jev4pg.com](https://jev4pg.com), then build with the worksp
 <p align="center">
   <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
+
+## Quick start
+
+Requires **Python 3.11+** and **Docker with Compose v2**. This starts PostgreSQL, the web workspace and its workers. Configure a [JEV provider](docs/PROVIDERS.md) for natural-language and semantic queries; ordinary SQL needs no model key.
+
+```bash
+git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+cd jev4pg
+python deploy/configure.py
+docker compose build
+docker compose up -d --wait
+python deploy/configure.py --show-token
+```
+
+The configuration prompt accepts a TypeSafe key; leave it empty if you will configure another provider. Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh) and connect with the workspace token printed by the last command. Keep that token private.
+
+### Run your first query
+
+Save this as `deliveries.csv`. In the workspace, choose **Import CSV**, name the dataset `deliveries`, review the column types and create it. Use integer `id`, text `supplier` and numeric `quantity`; the empty quantity is NULL.
+
+```csv
+id,supplier,quantity
+1,Aster,12
+2,Aster,18
+3,Birch,30
+4,Cedar,8
+5,Cedar,
+6,Birch,6
+```
+
+Select `deliveries`, choose **SQL** mode, and run:
+
+```sql
+SELECT supplier, SUM(quantity) AS total
+FROM deliveries
+GROUP BY supplier
+ORDER BY total DESC;
+```
+
+Expected result: **Birch 36 · Aster 30 · Cedar 8**. Then switch to **Natural language · JEV**, ask “For each supplier, show the total quantity delivered, largest total first,” and choose **Preview plan** to inspect the generated SQL before running it. Hybrid mode additionally needs [LLM configuration](docs/HYBRID_QUERY.md#configuration).
+
+[More query examples](docs/NL2SQL_EXAMPLES.md) · [HTTP API](docs/NATURAL_LANGUAGE.md) · [Semantic SQL](#native-semantic-sql) · [Full installation guide](docs/INSTALLATION.md)
+
+### Use an existing PostgreSQL database
+
+Keep your **PostgreSQL 17** database and query its tables in place. The application-only setup runs the workspace beside your server; it does not start a second PostgreSQL instance or require custom extension files. It adds jev4pg's catalog and runtime permissions. Business-table ownership stays unchanged, and attached sources are read-only through the workspace.
+
+<details>
+<summary><strong>Connect, install and attach an existing table</strong></summary>
+
+From the release checkout above, run `python deploy/configure.py` if you have not already. Copy `deploy/external.env.example` to `deployment.env`. Set your existing host, port, database and login names. Follow the [connection setup](docs/EXTERNAL_POSTGRESQL.md#configure-the-connection) to supply the server CA certificate, migration-owner password and runtime password. Generated passwords do not change existing logins. Back up the target database before migration.
+
+```bash
+docker compose --env-file deployment.env -f compose.external.yaml build app
+docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate migrate --check
+docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate
+docker compose --env-file deployment.env -f compose.external.yaml --profile queries up -d --wait
+```
+
+For an existing `business.messages` table, run these grants as its owner or an administrator in that database. `semantic_runtime` is the runtime login in the supplied environment example; replace it if you chose another name.
+
+```sql
+GRANT USAGE ON SCHEMA business TO semantic_runtime;
+GRANT SELECT ON business.messages TO semantic_runtime;
+```
+
+Register the table without copying rows:
+
+```bash
+docker compose --env-file deployment.env -f compose.external.yaml exec app jev4pg attach messages --tenant demo --schema business --table messages
+```
+
+`demo` matches the generated workspace token and query worker. For another tenant, use that same tenant in the token map, `SDD_QUERY_TENANT` and attachment command. Source PostgreSQL grants and row-security policies determine which rows are visible.
+
+Open the workspace, connect with your token, select `messages` and run `SELECT COUNT(*) AS total FROM messages;` in SQL mode. You can then ask questions about its actual columns or [attach more tables and views](docs/EXISTING_DATA.md).
+
+For synchronous semantic functions inside PostgreSQL, use the optional [native extension build and configuration](native/README.md#build). After installing its files and configuring the provider, enable it with `CREATE EXTENSION jev_native;` and grant callers access as documented. The separate [asynchronous SQL interface](docs/POSTGRESQL_INTERFACE.md) uses `jevsd_pg` and a worker. There is no `CREATE EXTENSION jev4pg` shortcut in this release.
+
+</details>
 
 ## BIRD Challenging: 100 questions, 11 databases
 
@@ -130,19 +211,7 @@ The native extension is a development preview for PostgreSQL 17 on Linux. It can
 
 Use a release tag for a fixed deployment and `main` to evaluate ongoing development. See the [changelog](CHANGELOG.md) for changes and the [upgrade guide](docs/INSTALLATION.md#upgrade) for component compatibility.
 
-To start the released application with Python 3.11+ and Docker Compose v2:
-
-```bash
-git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
-cd jev4pg
-python deploy/configure.py
-docker compose build
-docker compose up -d --wait
-```
-
-Configuration creates local credentials and asks for a TypeSafe key. For another endpoint or local model, follow [provider setup](docs/PROVIDERS.md). Hybrid planning also needs an LLM provider.
-
-Open the [English workspace](http://127.0.0.1:8000/ask/en) or [Simplified Chinese workspace](http://127.0.0.1:8000/ask/zh). Run `python deploy/configure.py --show-token` to retrieve your workspace token.
+Follow the [quick start](#quick-start) for a new deployment, or [connect your existing PostgreSQL database](#use-an-existing-postgresql-database). The full [installation guide](docs/INSTALLATION.md) covers process-supervisor deployment, upgrades and backups.
 
 ## From question to SQL
 
