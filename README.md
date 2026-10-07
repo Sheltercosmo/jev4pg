@@ -42,7 +42,9 @@ See it in action at [jev4pg.com](https://jev4pg.com), then build with the worksp
 
 ## Quick start
 
-Requires **Python 3.11+** and **Docker with Compose v2**. This starts PostgreSQL, the web workspace and its workers. Configure a [JEV provider](docs/PROVIDERS.md) for natural-language and semantic queries; ordinary SQL needs no model key.
+### 1. Install and connect
+
+Requires **Python 3.11+** and **Docker with Compose v2**. The following installs a PostgreSQL database, the analysis workspace and its workers. To use a database you already operate, follow [existing PostgreSQL setup](#use-an-existing-postgresql-database) instead of starting the bundled stack.
 
 ```bash
 git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
@@ -53,34 +55,37 @@ docker compose up -d --wait
 python deploy/configure.py --show-token
 ```
 
-The configuration prompt accepts a TypeSafe key; leave it empty if you will configure another provider. Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh) and connect with the workspace token printed by the last command. Keep that token private.
+The configuration prompt accepts your TypeSafe key; other JEV endpoints use [provider settings](docs/PROVIDERS.md). Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh) and connect with the workspace token printed by the last command. JEV powers natural-language planning and semantic analysis; **Hybrid** mode additionally needs [LLM configuration](docs/HYBRID_QUERY.md#configuration). Ordinary SQL requires no model key.
 
-### Run your first query
+### 2. Bring your data
 
-Save this as `deliveries.csv`. In the workspace, choose **Import CSV**, name the dataset `deliveries`, review the column types and create it. Use integer `id`, text `supplier` and numeric `quantity`; the empty quantity is NULL.
+- **Existing tables or views:** grant the runtime login access and [attach the relations](#use-an-existing-postgresql-database). Queries read the data in place, using PostgreSQL permissions and row-security policies.
+- **CSV or TSV exports:** choose **Import CSV**, select your file, name the dataset and choose **Preview import**. Review inferred types, delimiters and NULL handling, then **Create table**. Re-preview after changing types. Browser imports support up to 5 MB and 10,000 rows.
+- **Larger datasets:** load them into PostgreSQL with your existing pipeline or `psql`'s `\copy`, then attach the tables. See [bulk loading and API imports](docs/APPLICATIONS.md#load-and-query-large-data).
 
-```csv
-id,supplier,quantity
-1,Aster,12
-2,Aster,18
-3,Birch,30
-4,Cedar,8
-5,Cedar,
-6,Birch,6
-```
+Use the catalog to inspect columns and select the relevant datasets. Supply business definitions, reporting periods and join relationships where they matter to the analysis.
 
-Select `deliveries`, choose **SQL** mode, and run:
+### 3. Analyze with JEV and SQL
+
+In **Natural language · JEV** or **Hybrid** mode, describe the analysis you need. For a support-ticket dataset, for example:
+
+> Which products have the most tickets describing unresolved billing problems?
+
+Choose **Preview plan**, inspect the interpretation and generated SQL, then execute or revise it. You can also write the analysis directly in the workspace's **SQL** mode. For a registered `tickets` dataset with `product` and `body` columns:
 
 ```sql
-SELECT supplier, SUM(quantity) AS total
-FROM deliveries
-GROUP BY supplier
-ORDER BY total DESC;
+SELECT product, COUNT(*) AS unresolved_tickets
+FROM tickets
+WHERE SEMANTIC(body, 'The ticket describes an unresolved billing problem.')
+GROUP BY product
+ORDER BY unresolved_tickets DESC;
 ```
 
-Expected result: **Birch 36 · Aster 30 · Cedar 8**. Then switch to **Natural language · JEV**, ask “For each supplier, show the total quantity delivered, largest total first,” and choose **Preview plan** to inspect the generated SQL before running it. Hybrid mode additionally needs [LLM configuration](docs/HYBRID_QUERY.md#configuration).
+`SEMANTIC` asks JEV to evaluate the text; PostgreSQL performs the grouping and counting. This syntax runs through the workspace or `POST /data/sql`; direct PostgreSQL clients use the [native functions](#native-semantic-sql). Check decision states and result completeness before treating a count as final: uncertainty and unevaluated rows remain explicit.
 
-[More query examples](docs/NL2SQL_EXAMPLES.md) · [HTTP API](docs/NATURAL_LANGUAGE.md) · [Semantic SQL](#native-semantic-sql) · [Full installation guide](docs/INSTALLATION.md)
+For longer analyses, choose **Run in background** in SQL mode. Export returned results as CSV or JSON, and reopen the question, SQL and decisions from **Recent queries** to refine the analysis. [Workspace guide](docs/USER_GUIDE.md) · [Query API](docs/NATURAL_LANGUAGE.md) · [Reusable semantic features](docs/SEMANTIC_FEATURES.md).
+
+[More query examples](docs/NL2SQL_EXAMPLES.md) · [Full installation guide](docs/INSTALLATION.md)
 
 ### Use an existing PostgreSQL database
 
@@ -98,24 +103,24 @@ docker compose --env-file deployment.env -f compose.external.yaml run --rm migra
 docker compose --env-file deployment.env -f compose.external.yaml --profile queries up -d --wait
 ```
 
-For an existing `business.messages` table, run these grants as its owner or an administrator in that database. `semantic_runtime` is the runtime login in the supplied environment example; replace it if you chose another name.
+For an existing `business.tickets` table, run these grants as its owner or an administrator in that database. `semantic_runtime` is the runtime login in the supplied environment example; replace it if you chose another name.
 
 ```sql
 GRANT USAGE ON SCHEMA business TO semantic_runtime;
-GRANT SELECT ON business.messages TO semantic_runtime;
+GRANT SELECT ON business.tickets TO semantic_runtime;
 ```
 
 Register the table without copying rows:
 
 ```bash
-docker compose --env-file deployment.env -f compose.external.yaml exec app jev4pg attach messages --tenant demo --schema business --table messages
+docker compose --env-file deployment.env -f compose.external.yaml exec app jev4pg attach tickets --tenant demo --schema business --table tickets
 ```
 
 `demo` matches the generated workspace token and query worker. For another tenant, use that same tenant in the token map, `SDD_QUERY_TENANT` and attachment command. Source PostgreSQL grants and row-security policies determine which rows are visible.
 
-Open the workspace, connect with your token, select `messages` and run `SELECT COUNT(*) AS total FROM messages;` in SQL mode. You can then ask questions about its actual columns or [attach more tables and views](docs/EXISTING_DATA.md).
+Retrieve your workspace token with `python deploy/configure.py --show-token`, open the workspace and select the attached datasets. Continue with the analysis workflow above, adapting queries to your source columns. [Attach more tables and views](docs/EXISTING_DATA.md) or use a [source manifest](docs/SOURCE_MANIFESTS.md) to register multiple relations.
 
-For synchronous semantic functions inside PostgreSQL, use the optional [native extension build and configuration](native/README.md#build). After installing its files and configuring the provider, enable it with `CREATE EXTENSION jev_native;` and grant callers access as documented. The separate [asynchronous SQL interface](docs/POSTGRESQL_INTERFACE.md) uses `jevsd_pg` and a worker. There is no `CREATE EXTENSION jev4pg` shortcut in this release.
+For synchronous semantic functions inside PostgreSQL, use the optional [native extension build and configuration](native/README.md#build). After installing its files and configuring the provider, enable it with `CREATE EXTENSION jev_native;` and grant callers access as documented. The separate [asynchronous SQL interface](docs/POSTGRESQL_INTERFACE.md) uses `jevsd_pg` and a worker.
 
 </details>
 
