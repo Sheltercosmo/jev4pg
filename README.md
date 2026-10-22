@@ -49,7 +49,7 @@ See it in action at [jev4pg.com](https://jev4pg.com), then build with the worksp
 
 Current `main` optimizes the shared Python operator runtime and native 0.4.0 executor. Bulk evidence reads, exact-size request packing and direct probability projection reduce work across operator families.
 
-| Operation | v0.8.0 | Optimized | Speedup |
+| Operation | Baseline | Optimized | Speedup |
 | --- | ---: | ---: | ---: |
 | Read 600 cached operator judgments | 162.1 ms | **8.0 ms** | **20.4×** |
 | Pack 1,024 questions into requests | 22.5 ms | **7.4 ms** | **3.0×** |
