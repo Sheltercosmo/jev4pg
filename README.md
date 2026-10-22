@@ -18,7 +18,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#use-an-existing-postgresql-database">Existing PostgreSQL</a> ·
   <a href="#why-choose-jev4pg">Advantages</a> ·
-  <a href="#benchmark-leading-semantic-filtering">Semantic benchmark</a> ·
+  <a href="#performance-highlights">Performance</a> ·
   <a href="#bird-challenging-100-questions-11-databases">NL2SQL benchmark</a> ·
   <a href="#what-you-can-build">What you can build</a> ·
   <a href="https://jev4pg.com/guide/">Project guide</a> ·
@@ -31,7 +31,7 @@
 
 jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
 
-**Higher accuracy, lower latency.** In our paired semantic-filtering benchmark, jev4pg outperformed pg-jev's request path on real reviews: **98% accuracy versus 92%, with 36% lower median latency**. Parallel request packing also cut three-predicate requests from 60 to 38. [Explore the results](#benchmark-leading-semantic-filtering).
+**Higher accuracy, lower latency.** In our paired semantic-filtering benchmark, jev4pg reached **98% accuracy versus 92%, with 36% lower median latency** than pg-jev's request path. Current development also delivers **20.4× faster cached operator lookups**, **3× faster request packing** and **3.7× faster native probability-matrix projection** against v0.8.0 in paired local microbenchmarks. Shared execution improvements support filtering, extraction, ranking, matching and verification by reducing evidence reads, repeated computation and request preparation. [Performance highlights](#performance-highlights).
 
 **Explainable embeddings** represent data through named questions and answer probabilities, making similarity inspectable. The native preview combines these with **parallel execution and input deduplication**: independent work runs concurrently, while repeated values with the same context and questions share judgments, preserving every source row.
 
@@ -39,11 +39,23 @@ jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for 
 
 See it in action at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
-<p align="center">
-  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
-</p>
+## Performance highlights
 
-## Benchmark-leading semantic filtering
+### Faster operator execution
+
+Current `main` optimizes the shared Python operator runtime and native 0.4.0 executor. Bulk evidence reads, exact-size request packing and direct probability projection reduce work across operator families.
+
+| Operation | v0.8.0 | Optimized | Speedup |
+| --- | ---: | ---: | ---: |
+| Read 600 cached operator judgments | 162.1 ms | **8.0 ms** | **20.4×** |
+| Pack 1,024 questions into requests | 22.5 ms | **7.4 ms** | **3.0×** |
+| Project 10,000 probability matrices | 61.1 ms | **16.7 ms** | **3.7×** |
+
+Cached operator reads drop from **600 SQL queries to 3**, while request packing produces the same 32 bundles. Native cache retention also removes **32 redundant provider requests** in the mixed recurring/new-context workload. Compatible evidence replay and stored-embedding comparisons need no new inference.
+
+These are paired component measurements with a deterministic local provider, separate from the live accuracy comparison below. [All timings, cache tradeoffs and reproduction](docs/benchmarks/NATIVE_OPTIMIZATION.md) · [Optimizations by function](docs/NATIVE_OPTIMIZATION.md).
+
+### Benchmark-leading semantic filtering
 
 Native preview 0.3.0 packs independent judgments into parallel requests and reuses exact evidence as new records arrive. In a frozen, paired executor test, it was faster on seven of eight workloads against the pinned pg-jev 0.2.1 request path.
 
@@ -55,6 +67,10 @@ Native preview 0.3.0 packs independent judgments into parallel requests and reus
 The three-predicate case used **38 requests instead of 60**. With identical required-column projections on both sides, jev4pg used **36.2% fewer input tokens**. Warm passes made no provider calls on either side.
 
 Measured with JEV 1.13, concurrency 16 and three repeats across 132 runs. Timings cover executor and HTTP paths. The full report includes every workload, token usage and held-answer scoring. [Full comparison and reproduction](docs/benchmarks/SEMANTIC_FILTERING.md) · [Use mapped SQL](docs/NATIVE_RECORD_MAP.md).
+
+<p align="center">
+  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+</p>
 
 ## Quick start
 

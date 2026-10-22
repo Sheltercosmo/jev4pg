@@ -1,6 +1,12 @@
 # Performance and cost
 
-Native preview 0.3.0 has a [paired semantic filtering comparison](benchmarks/SEMANTIC_FILTERING.md) against the pg-jev 0.2.1 request path. It measures language accuracy, executor latency, provider calls, tokens and continuous reuse. PostgreSQL scans and indexes are excluded; end-to-end database throughput and embedding retrieval quality still need separate measurements.
+Performance records cover two distinct workloads: [operator execution](benchmarks/NATIVE_OPTIMIZATION.md) compares current development with v0.8.0, and [semantic filtering](benchmarks/SEMANTIC_FILTERING.md) compares native 0.3.0 with the pg-jev 0.2.1 request path. The former measures local computation and reuse; the latter measures language accuracy, executor latency, provider calls and tokens.
+
+## Optimized operator execution
+
+In paired local measurements, reading 600 cached operator judgments fell from 162.1 to 8.0 ms (**20.4× faster**), packing 1,024 questions from 22.5 to 7.4 ms (**3×**), and projecting 10,000 native probability matrices from 61.1 to 16.7 ms (**3.7×**). Bulk lookup reduced evidence SELECTs from 600 to 3; exact-size packing retained the same 32 request bundles.
+
+These changes serve the shared Python operator runtime and native 0.4.0 executor. Native cache retention removed 32 redundant provider requests under mixed recurring and new inputs. The deterministic provider makes these computation and request-count measurements; it does not measure billed savings or language accuracy. Warm native scan latency was 9% higher in this run. See [all results and reproduction](benchmarks/NATIVE_OPTIMIZATION.md) and [optimizations by function](NATIVE_OPTIMIZATION.md).
 
 ## Semantic filtering comparison
 
@@ -18,7 +24,7 @@ The [archived 100-question BIRD evaluation](benchmarks/BIRD_CHALLENGING_100.md) 
 | Native scan or embedding | Missing questions sharing one context are batched in a request. Independent contexts run concurrently within configured limits. |
 | Native `scan_mapped` | Missing exact question/context pairs are packed together. Per-question dictionaries and a bounded invocation cache reduce repeated inference across windows. |
 | Compatible observation reuse | No new inference for the reused observation. Persistent reuse requires the evidence registry. |
-| `decide`, `answer_matrix`, `embedding_distance` | None. These apply policy, project distributions or compare stored matrices locally. |
+| `decide`, `answer_matrix`, `embedding_distance`, `embedding_distances` | None. These apply policy, project distributions or compare stored matrices locally. Batch distance is available in native 0.4.0 development. |
 | Hybrid planning | One SQL generation by default; a supported repair can add one. JEV context selection and review have separate usage. |
 
 Sharing context reduces repeated input; concurrency overlaps independent requests. Neither guarantees a fixed speedup. Distinct questions still count as separate judgments. SQL rollback cannot undo provider usage.
