@@ -39,6 +39,10 @@ jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for 
 
 See it in action at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
+<p align="center">
+  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
+</p>
+
 ## Performance highlights
 
 ### Faster operator execution
@@ -68,22 +72,23 @@ The three-predicate case used **38 requests instead of 60**. With identical requ
 
 Measured with JEV 1.13, concurrency 16 and three repeats across 132 runs. Timings cover executor and HTTP paths. The full report includes every workload, token usage and held-answer scoring. [Full comparison and reproduction](docs/benchmarks/SEMANTIC_FILTERING.md) · [Use mapped SQL](docs/NATIVE_RECORD_MAP.md).
 
-<p align="center">
-  <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
-</p>
-
 ## Why choose jev4pg
 
-Bring semantic analysis to your PostgreSQL workflows, reuse prior computation and keep decisions inspectable.
+### Define once, reuse across queries
 
-| Benefit | How jev4pg delivers it |
-| --- | --- |
-| Fewer model judgments | Filter and project with SQL first. Native `scan_mapped` evaluates distinct contexts per question, then maps decisions back to every source row. Three and two distinct inputs need five judgments, even across thousands of rows. [Context dictionaries](docs/NATIVE_RECORD_MAP.md). |
-| Parallel work without repeated stages | Independent records and branches share a bounded scheduler. Shared SQL stages materialize once; dependent work starts when its inputs are ready. [Stage plans](docs/NATIVE_PLANS.md). |
-| Reuse across queries and policy changes | Keep raw probabilities separate from decision thresholds. Replay compatible evidence without inference; source, question and evaluator identities control reuse. Bulk cache reads and bounded native retention reduce lookup work. [Evidence reuse](docs/NATIVE_EVIDENCE.md). |
-| Similarity you can explain | Define dimensions with questions such as “Requests a refund?” and “Issue resolved?” Inspect the answer probabilities, then compare compatible stored embeddings locally. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md). |
-| Business definitions your team can reuse | Turn a reviewed concept such as `needs_action` into a semantic feature for queues, reports and natural-language questions. Version definitions and retain corrections against their sources. [Semantic features](docs/SEMANTIC_FEATURES.md). |
-| Decisions users can inspect and correct | Keep `VALUE`, `UNKNOWN` and `NOT_EVALUATED` distinct from failures. Retain held SQL for revision and preview proposed writes before approval. [Query review](docs/USER_GUIDE.md#inspect-and-correct-a-plan). |
+Turn a reviewed concept such as `needs_action` into a semantic feature for queues, reports and natural-language questions. Version the definition, retain corrections against their sources and give every workflow the same interpretation. [Semantic features](docs/SEMANTIC_FEATURES.md).
+
+### Reuse judgments when policies change
+
+Keep raw answer probabilities separate from decision thresholds. Replay compatible evidence without new inference, including across PostgreSQL connections. Source, question and evaluator identities control reuse; bulk cache reads and bounded native retention reduce repeated lookup work. [Evidence reuse](docs/NATIVE_EVIDENCE.md).
+
+### Run independent judgments in parallel
+
+Independent records and branches share a bounded scheduler. Shared SQL stages materialize once, while dependent work starts when its inputs are ready. Native `scan_mapped` evaluates distinct contexts per question: three and two distinct inputs need five judgments, even across thousands of rows. [Stage plans](docs/NATIVE_PLANS.md) · [Context dictionaries](docs/NATIVE_RECORD_MAP.md).
+
+### Search with dimensions you can explain
+
+Define similarity through questions such as “Requests a refund?” and “Issue resolved?” Inspect each answer probability, project existing decisions into embeddings and compare compatible stored vectors locally without new model calls. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md).
 
 ### Give the LLM a focused job
 
@@ -91,17 +96,11 @@ JEV selects relevant schema and evidence before an LLM proposes SQL, then review
 
 <a id="bird-challenging-100-questions-11-databases"></a>
 
-In the historical **BIRD Challenging evaluation of 100 questions across 11 databases**, JEV used zero LLM generation calls and **88.1% lower estimated token cost** than GPT-5.6 Terra. Hybrid used **20.8% fewer LLM input tokens**.
+On the historical **BIRD Challenging sample of 100 questions across 11 databases**, JEV used **88.1% less estimated token cost** and hybrid used **20.8% fewer LLM input tokens** than GPT-5.6 Terra. Answer matches were 20/99 for JEV, 34/99 for hybrid and 39/99 for Terra, including held proposals. [September 2026 Python planner results](docs/benchmarks/BIRD_CHALLENGING_100.md).
 
-| Planner | SQL answer matches | Estimated cost / 100 attempts |
-| --- | ---: | ---: |
-| JEV | 20/99 | $0.389 |
-| GPT-5.6 Terra | 39/99 | $3.262 |
-| JEV + GPT-5.6 Terra | 34/99 | $2.839 |
+### Keep uncertain decisions reviewable
 
-Measured on the frozen Python planner on 23 September 2026; held proposals were included and 99 references were scorable. These historical savings came with fewer correct answers than the LLM baseline. [Timing, accounting and full methodology](docs/benchmarks/BIRD_CHALLENGING_100.md).
-
-The Python application supplies planning, maintained features and review. The optional Rust preview supplies native stage execution and embeddings. [Choose your setup](#choose-your-setup).
+`VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay distinct from execution failures. Retain held SQL for correction, route uncertain judgments to review and preview proposed writes before approval. Skipped work never silently becomes false. [Query review](docs/USER_GUIDE.md#inspect-and-correct-a-plan).
 
 ## Quick start
 
