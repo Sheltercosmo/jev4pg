@@ -139,6 +139,7 @@ impl Session {
             unique_judgments: 0,
         };
         let mut observed = HashMap::new();
+        let mut resolved: HashMap<usize, Decisions> = HashMap::new();
         let mut missing: Vec<Work> = Vec::new();
         let mut unique = HashMap::new();
         let mut replayed: HashMap<String, Replayed> = HashMap::new();
@@ -163,11 +164,6 @@ impl Session {
             for (id, question) in active {
                 let context = project(row, projections.get(&id))?;
                 let identity = format!("{}:{}", definitions[&id], context_identity(&context)?);
-                let question = Question {
-                    instructions: json!({"record": context, "question": question.instructions}),
-                    subject_column: None,
-                    ..question
-                };
                 if let Some(saved) = replayed.get(&identity) {
                     if let Some(receipt) = &saved.receipt {
                         output.receipts.push(MappedReceipt {
@@ -190,8 +186,21 @@ impl Session {
                     .get(&identity)
                     .filter(|saved| saved.inserted.elapsed() < self.max_age)
                 {
-                    let decision = cached_decision(cached, &question, executor)?;
                     let pointer = Arc::as_ptr(&cached.observation) as usize;
+                    // The key binds context, question and evaluator. Replay each authentic batch once.
+                    let decisions = match resolved.entry(pointer) {
+                        std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+                        std::collections::hash_map::Entry::Vacant(entry) => entry.insert(resolve(
+                            &cached.observation.response,
+                            &cached.observation.questions,
+                            &cached.observation.evaluator.model,
+                            &executor.limits.policy(),
+                        )?),
+                    };
+                    let decision = decisions
+                        .get(&cached.question)
+                        .ok_or("Cached question is missing")?
+                        .clone();
                     let observation = *observed.entry(pointer).or_insert_with(|| {
                         output.observations.push(cached.observation.clone());
                         output.observations.len() - 1
@@ -226,6 +235,11 @@ impl Session {
                     let work: &mut Work = &mut missing[index];
                     work.targets.push((ordinal, id));
                 } else {
+                    let question = Question {
+                        instructions: json!({"record": context, "question": question.instructions}),
+                        subject_column: None,
+                        ..question
+                    };
                     prepared_bytes += serde_json::to_vec(&question)
                         .map_err(|_| "Invalid mapped question")?
                         .len();
@@ -414,34 +428,4 @@ fn project(row: &Value, columns: Option<&Vec<String>>) -> Result<Value, &'static
         );
     }
     Ok(Value::Object(selected))
-}
-
-fn cached_decision(
-    cached: &Cached,
-    question: &Question,
-    executor: &Executor,
-) -> Result<Decision, &'static str> {
-    let saved = cached
-        .observation
-        .questions
-        .get(&cached.question)
-        .ok_or("Cached question is missing")?;
-    if context_identity(&serde_json::to_value(saved).expect("Question serializes"))?
-        != context_identity(&serde_json::to_value(question).expect("Question serializes"))?
-        || cached.observation.evaluator != executor.evaluator()
-    {
-        return Err("Cached evidence does not match this mapped judgment");
-    }
-    let questions = BTreeMap::from([(cached.question.clone(), question.clone())]);
-    let response = json!({"model": cached.observation.evaluator.model, "answers": {
-        &cached.question: cached.observation.response["answers"][&cached.question]
-    }});
-    Ok(resolve(
-        &response,
-        &questions,
-        &cached.observation.evaluator.model,
-        &executor.limits.policy(),
-    )?
-    .remove(&cached.question)
-    .expect("Question resolved"))
 }

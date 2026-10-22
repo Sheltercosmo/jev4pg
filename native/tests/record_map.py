@@ -113,13 +113,29 @@ def verify_record_maps(connection, observations, must_fail):
     )
     connection.execute("SET ROLE mapped_reader")
     try:
-        must_fail(lambda: mapped(connection, "SELECT note,p FROM work"), "authorized")
+        must_fail(lambda: mapped(connection, "SELECT note,p FROM work"), "permission denied")
         assert mapped(connection, "SELECT 'done' AS note,1 AS p")[0][1][0]["decisions"]["done"][
             "value"
         ]
     finally:
         connection.execute("RESET ROLE")
     checks.append("mapped SQL is denied to PUBLIC and reads source data with invoker privileges")
+    connection.execute("CREATE TABLE mapped_tenants(tenant text,note text,p numeric)")
+    connection.execute("INSERT INTO mapped_tenants VALUES ('mapped_reader','visible',0.95),('other','private',0.05)")
+    connection.execute("ALTER TABLE mapped_tenants ENABLE ROW LEVEL SECURITY")
+    connection.execute("CREATE POLICY mapped_scope ON mapped_tenants USING (tenant = current_user)")
+    connection.execute("GRANT SELECT ON mapped_tenants TO mapped_reader")
+    connection.execute("SET ROLE mapped_reader")
+    try:
+        scoped = mapped(connection, "SELECT note,p FROM mapped_tenants")
+        assert len(scoped) == 1 and len(scoped[0][1]) == 1
+        assert scoped[0][1][0]["source"]["note"] == "visible"
+        assert len(scoped[0][2]["observations"]) == 1
+        sent = scoped[0][2]["observations"][0]["questions"]
+        assert len(sent) == 1 and next(iter(sent.values()))["instructions"]["record"]["note"] == "visible"
+    finally:
+        connection.execute("RESET ROLE")
+    checks.append("mapped source rows and provider context both respect row-level security")
     return checks
 
 

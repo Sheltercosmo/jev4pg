@@ -415,6 +415,47 @@ fn adding_or_reordering_questions_reuses_their_independent_evidence() {
 }
 
 #[test]
+fn replay_checks_current_policy_and_changed_candidates_across_shared_batches() {
+    let server = Fixture::new(false);
+    let mut executor = server.executor(100);
+    let mut cache = Session::default();
+    let questions: Questions = serde_json::from_value(json!({
+        "choose":{"type":"choice","instructions":"Select.","criteria":{"a":"First","b":"None"}},
+        "rate":{"type":"score","instructions":"Rate.","criteria":["Low","High"]}
+    }))
+    .unwrap();
+    let rows: Vec<_> = (0..40).map(|i| json!({"value":i})).collect();
+    cache
+        .evaluate(&mut executor, &rows, &questions, &Projections::new(), || {})
+        .unwrap();
+    executor.limits.choice_min = 0.95;
+    executor.limits.score_confidence_min = 0.5;
+    let replay = cache
+        .evaluate(&mut executor, &rows, &questions, &Projections::new(), || {})
+        .unwrap();
+    assert_eq!(server.count(), 3);
+    assert_eq!(replay.reused_judgments, 80);
+    assert!(
+        replay
+            .decisions
+            .iter()
+            .flat_map(|row| row.values())
+            .all(|d| matches!(d, Decision::Unknown { .. }))
+    );
+    let mut changed = questions;
+    changed.get_mut("choose").unwrap().criteria = Some(json!({"a":"Revised candidate","b":"None"}));
+    let revised = cache
+        .evaluate(&mut executor, &rows, &changed, &Projections::new(), || {})
+        .unwrap();
+    assert_eq!(server.count(), 5);
+    assert_eq!(
+        (revised.unique_judgments, revised.reused_judgments),
+        (40, 40)
+    );
+    assert_eq!(revised.decisions.len(), 40);
+}
+
+#[test]
 fn bounded_cache_evicts_old_batches_without_discarding_recently_used_values() {
     let server = Fixture::new(false);
     let mut executor = server.executor(100);
