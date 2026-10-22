@@ -1,6 +1,6 @@
 # Queued PostgreSQL interface
 
-This guide covers asynchronous `jev.*` functions, installed through the `jevsd_pg` extension or the [portable SQL setup](EASY_SETUP.md). Both use the same operator implementation and worker. For synchronous Rust execution, use the separate [native extension](../native/README.md), with `jev_native.scan`, stage plans and embeddings.
+This guide covers the Python application's asynchronous `jev.*` queue, installed as ordinary objects through [portable setup](EASY_SETUP.md) or as the `jevsd_pg` SQL extension package. Both installations use the same Python operator runtime and worker. For synchronous SQL execution without a Python worker, use the separate Rust [native extension](../native/README.md), with `jev_native.scan`, stage plans and embeddings.
 
 Run JEV operators from `psql` or any PostgreSQL driver. `jev.submit` queues an operator, `jev.result` reads its result, and `jev.cancel` cancels a queued request. The Python worker executes the same operator implementation used by the HTTP API.
 
@@ -8,7 +8,7 @@ The interface is asynchronous. Submit and commit before polling; a worker cannot
 
 ## Grant access
 
-Install the extension and worker using [installation](INSTALLATION.md). Open an administrator session:
+Install the queue and worker using [installation](INSTALLATION.md). The commands below use the bundled Compose stack; [guided setup](EASY_SETUP.md#2-install-and-grant-access) provides the equivalent commands for an existing server. Open an administrator session:
 
 ```bash
 docker compose exec postgres psql -U sdd_admin -d sdd

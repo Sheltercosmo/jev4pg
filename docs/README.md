@@ -1,8 +1,15 @@
 # Documentation
 
-[Native optimization](NATIVE_OPTIMIZATION.md) covers shared caching, request preparation and batch embedding comparisons in native 0.4.0 development.
+Start with the [quick start](../README.md#quick-start), then choose the guide for your workflow:
 
-Start with [installation](INSTALLATION.md) for the released application or [native Compose](NATIVE_DEPLOYMENT.md) for the Rust preview. Start with [guided setup and portable SQL](EASY_SETUP.md) for an existing PostgreSQL server. Synchronous native SQL uses the [native build guide](../native/README.md). The default Compose stack uses the Python runtime.
+| You want | Guide |
+| --- | --- |
+| Workspace, natural-language queries and HTTP APIs | [Python application deployment](INSTALLATION.md#docker-compose) |
+| The application or queued operators beside an existing database | [Guided Python setup](EASY_SETUP.md) |
+| Synchronous semantic SQL without a Python service | [Native Rust extension](../native/README.md) |
+| The workspace with native semantic reads | [Combined Compose deployment](NATIVE_DEPLOYMENT.md) |
+
+The [capability map](CAPABILITIES.md#python-and-native-roles) explains each component's role. PostgreSQL stores data and executes relational SQL in every setup. [Installation](INSTALLATION.md) covers prerequisites, credentials and upgrades.
 
 ## Use the database
 
@@ -40,7 +47,8 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Installation](INSTALLATION.md) | Release deployment, native preview, credentials and backups. |
 | [External PostgreSQL](EXTERNAL_POSTGRESQL.md) | Application-only deployment, verified TLS, connection capacity and recovery. |
 | [Remote source protocol](REMOTE_POSTGRESQL_PROTOCOL.md) | Development-only federation guards, schema maintenance and two-server qualification. |
-| [Native Compose](NATIVE_DEPLOYMENT.md) | Optimized Rust image, registry setup, upgrades and recovery. |
+| [Combined Compose deployment](NATIVE_DEPLOYMENT.md) | Workspace with native semantic reads, registry setup, upgrades and recovery. |
+| [Native optimization](NATIVE_OPTIMIZATION.md) | Shared caching, request preparation and batch embedding comparison in native 0.4.0 development. |
 | [Providers](PROVIDERS.md) | TypeSafe, third-party services and local models. |
 | [Hybrid queries](HYBRID_QUERY.md) | LLM configuration, context selection and JEV review. |
 | [Planning context](PLANNING_CONTEXT.md) | Bounded source samples, indexed literal lookup, completeness and parallel collection. |

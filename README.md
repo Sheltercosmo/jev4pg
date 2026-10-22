@@ -58,49 +58,25 @@ Measured with JEV 1.13, concurrency 16 and three repeats across 132 runs. Timing
 
 ## Quick start
 
-### Use JEV with your PostgreSQL database
+### Choose your setup
 
-Install the **v0.8.0** package with Python 3.11+, create a connection profile, and start a SQL worker beside your PostgreSQL 17 server:
+PostgreSQL stores your data and executes relational SQL in every setup. jev4pg adds two complementary components:
 
-```bash
-python -m pip install https://github.com/Sheltercosmo/jev4pg/releases/download/v0.8.0/jev4pg-0.8.0-py3-none-any.whl
-jev4pg setup
-cd jev4pg-local
-jev4pg --env-file admin.env migrate --sql-interface portable
-jev4pg --env-file admin.env sql-grant analyst --tenant demo --actor analyst
-jev4pg sql-worker --heartbeat-file sql-worker.heartbeat
-```
-
-The wizard creates separate installation and runtime credentials. Use an owner with migration permissions and replace `analyst` with your existing SQL login. The portable interface installs ordinary PostgreSQL tables and functions: **no server extension files, Rust compilation or database restart**.
-
-Connect as `analyst` in psql and submit your first semantic judgment:
-
-```sql
-SELECT jev.submit(
-    'JEV.NOUL',
-    '{"state":"The refund has not arrived.",
-      "proposition":"The customer needs follow-up."}'
-) AS job_id \gset
-
-SELECT jsonb_pretty(jev.result(:'job_id'));
-```
-
-Commit the submission, then poll for the worker's result. In another terminal, run `jev4pg serve` from the profile directory to open the web workspace. [Connection setup, access grants and first query](docs/EASY_SETUP.md).
-
-### Choose your execution path
-
-| Path | Best for | Execution |
+| Component | Use it for | Where it runs |
 | --- | --- | --- |
-| [Application · v0.8.0](#python-application) | Workspace, NL2SQL, imports, history and asynchronous `jev.*` jobs | Python coordinates; PostgreSQL executes relational SQL. |
-| [Native · 0.3.0 preview](#native-postgresql-extension) | Synchronous semantic SQL, parallel stage plans and explainable embeddings | Rust executes `jev_native.*` inside PostgreSQL. Direct SQL use needs no Python service. |
+| **Python application** | Natural-language queries, the web workspace, HTTP APIs, all 41 operators, reviewed features and query history | Beside PostgreSQL; no custom server extension required. |
+| **Native Rust extension** | Synchronous semantic SQL, parallel stage plans, repeated-context reuse and explainable embeddings | Inside PostgreSQL 17 on Linux; works directly from SQL without Python. |
+| **Combined deployment** | The workspace and natural-language planning with native semantic reads | Python plans and manages the workflow; Rust executes supported semantic stages in PostgreSQL. |
 
-Native 0.3.0 adds [`scan_mapped`](docs/NATIVE_RECORD_MAP.md): per-question context dictionaries, parallel request packing and continuous input caching. The native Compose stack also includes the workspace. Use the Python engine for maintained-feature refresh and semantic write review.
+Use Python when you want a complete application or need to integrate with an existing server without installing native libraries. Use native execution when your application already speaks SQL and needs bounded semantic scans over PostgreSQL data. It keeps source reads and relational stages in the database and shares scheduling and evidence across semantic work. Both call your configured JEV provider.
+
+`JEV` and `Hybrid` are **planning modes** in the application, independent of the execution engine. Hybrid adds LLM generation. The native extension consumes explicit SQL and typed questions; natural-language planning comes from the application.
+
+The commands below use the **v0.8.0 release**, which includes native preview 0.3.0. Current `main` includes native preview 0.4.0. See [component compatibility](docs/INSTALLATION.md#upgrade) before upgrading.
 
 ### Python application
 
-#### 1. Install and connect
-
-Requires **Python 3.11+** and **Docker with Compose v2**. The following installs a PostgreSQL database, the analysis workspace and its workers. To use a database you already operate, follow [existing PostgreSQL setup](#use-an-existing-postgresql-database) instead of starting the bundled stack.
+For a complete local workspace, install Python 3.11+ and Docker Compose v2:
 
 ```bash
 git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
@@ -111,23 +87,13 @@ docker compose up -d --wait
 python deploy/configure.py --show-token
 ```
 
-The configuration prompt accepts your TypeSafe key; other JEV endpoints use [provider settings](docs/PROVIDERS.md). Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh) and connect with the workspace token printed by the last command. JEV powers natural-language planning and semantic analysis; **Hybrid** mode additionally needs [LLM configuration](docs/HYBRID_QUERY.md#configuration). Ordinary SQL requires no model key.
+This starts PostgreSQL, the application and its workers. The setup prompt accepts a TypeSafe key; [provider settings](docs/PROVIDERS.md) cover other hosted or local models. Open [English](http://127.0.0.1:8000/ask/en) or [简体中文](http://127.0.0.1:8000/ask/zh) and connect with the workspace token printed by the last command. Hybrid mode also needs [LLM configuration](docs/HYBRID_QUERY.md#configuration). Ordinary SQL requires no model key.
 
-#### 2. Bring your data
-
-- **Existing tables or views:** grant the runtime login access and [attach the relations](#use-an-existing-postgresql-database). Queries read the data in place, using PostgreSQL permissions and row-security policies.
-- **CSV or TSV exports:** choose **Import CSV**, select your file, name the dataset and choose **Preview import**. Review inferred types, delimiters and NULL handling, then **Create table**. Re-preview after changing types. Browser imports support up to 5 MB and 10,000 rows.
-- **Larger datasets:** load them into PostgreSQL with your existing pipeline or `psql`'s `\copy`, then attach the tables. See [bulk loading and API imports](docs/APPLICATIONS.md#load-and-query-large-data).
-
-Use the catalog to inspect columns and select the relevant datasets. Supply business definitions, reporting periods and join relationships where they matter to the analysis.
-
-#### 3. Analyze with JEV and SQL
-
-In **Natural language · JEV** or **Hybrid** mode, describe the analysis you need. For a support-ticket dataset, for example:
+Import a CSV or TSV, select the dataset and ask a question. For a ticket dataset:
 
 > Which products have the most tickets describing unresolved billing problems?
 
-Choose **Preview plan**, inspect the interpretation and generated SQL, then execute or revise it. You can also write the analysis directly in the workspace's **SQL** mode. For a registered `tickets` dataset with `product` and `body` columns:
+Choose **Preview plan**, inspect the interpretation, then execute or revise it. SQL mode also accepts semantic predicates over registered datasets:
 
 ```sql
 SELECT product, COUNT(*) AS unresolved_tickets
@@ -137,107 +103,45 @@ GROUP BY product
 ORDER BY unresolved_tickets DESC;
 ```
 
-`SEMANTIC` asks JEV to evaluate the text; PostgreSQL performs the grouping and counting. This syntax runs through the workspace or `POST /data/sql`; direct PostgreSQL clients use the [native functions](#native-semantic-sql). Check decision states and result completeness before treating a count as final: uncertainty and unevaluated rows remain explicit.
+`SEMANTIC(...)` is application SQL syntax, accepted by the workspace and `POST /data/sql`. PostgreSQL clients use `jev_native.*` for synchronous execution. Inspect decision states and completeness before using an aggregate as a final result.
 
-For longer analyses, choose **Run in background** in SQL mode. Export returned results as CSV or JSON, and reopen the question, SQL and decisions from **Recent queries** to refine the analysis. [Workspace guide](docs/USER_GUIDE.md) · [Query API](docs/NATURAL_LANGUAGE.md) · [Reusable semantic features](docs/SEMANTIC_FEATURES.md).
+Browser imports support 5 MB and 10,000 rows. For larger data, load it with PostgreSQL tools and [attach the table](docs/EXISTING_DATA.md) without copying rows. [Workspace guide](docs/USER_GUIDE.md) · [Application API](docs/APPLICATIONS.md) · [Query examples](docs/NL2SQL_EXAMPLES.md).
 
-[More query examples](docs/NL2SQL_EXAMPLES.md) · [Full installation guide](docs/INSTALLATION.md)
+### Use an existing PostgreSQL database
 
-#### Use an existing PostgreSQL database
-
-Keep your **PostgreSQL 17** database and query its tables in place. The application-only setup runs the workspace beside your server; it does not start a second PostgreSQL instance or require custom extension files. It adds jev4pg's catalog and runtime permissions. Business-table ownership stays unchanged, and attached sources are read-only through the workspace.
-
-<details>
-<summary><strong>Connect, install and attach an existing table</strong></summary>
-
-From the release checkout above, run `python deploy/configure.py` if you have not already. Copy `deploy/external.env.example` to `deployment.env`. Set your existing host, port, database and login names. Follow the [connection setup](docs/EXTERNAL_POSTGRESQL.md#configure-the-connection) to supply the server CA certificate, migration-owner password and runtime password. Generated passwords do not change existing logins. Back up the target database before migration.
+Run the Python application beside your PostgreSQL 17 server. With Python 3.11+, install the release package and create a connection profile:
 
 ```bash
-docker compose --env-file deployment.env -f compose.external.yaml build app
-docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate migrate --check
-docker compose --env-file deployment.env -f compose.external.yaml run --rm migrate
-docker compose --env-file deployment.env -f compose.external.yaml --profile queries up -d --wait
+python -m pip install https://github.com/Sheltercosmo/jev4pg/releases/download/v0.8.0/jev4pg-0.8.0-py3-none-any.whl
+jev4pg setup
+cd jev4pg-local
+jev4pg --env-file admin.env migrate --check --sql-interface portable
+jev4pg --env-file admin.env migrate --sql-interface portable
+jev4pg serve
 ```
 
-For an existing `business.tickets` table, run these grants as its owner or an administrator in that database. `semantic_runtime` is the runtime login in the supplied environment example; replace it if you chose another name.
+The wizard creates separate installation and runtime credentials. Migration adds the application catalog and portable SQL queue using ordinary PostgreSQL objects; it needs an owner with migration permissions. Open the workspace on port 8000 and use the token stored in `.secrets/api-tokens.json`. Grant the runtime login access to your source tables, then [attach them](docs/EXISTING_DATA.md).
 
-```sql
-GRANT USAGE ON SCHEMA business TO semantic_runtime;
-GRANT SELECT ON business.tickets TO semantic_runtime;
-```
+For asynchronous operators from psql or DBeaver, [grant a SQL login and start `jev4pg sql-worker`](docs/EASY_SETUP.md#2-install-and-grant-access). For **Run in background** in the workspace, start a separate [query worker](docs/QUERY_JOBS.md#start-a-worker). The foreground workspace does not require either worker.
 
-Register the table without copying rows:
-
-```bash
-docker compose --env-file deployment.env -f compose.external.yaml exec app jev4pg attach tickets --tenant demo --schema business --table tickets
-```
-
-`demo` matches the generated workspace token and query worker. For another tenant, use that same tenant in the token map, `SDD_QUERY_TENANT` and attachment command. Source PostgreSQL grants and row-security policies determine which rows are visible.
-
-Retrieve your workspace token with `python deploy/configure.py --show-token`, open the workspace and select the attached datasets. Continue with the analysis workflow above, adapting queries to your source columns. [Attach more tables and views](docs/EXISTING_DATA.md) or use a [source manifest](docs/SOURCE_MANIFESTS.md) to register multiple relations.
-
-For asynchronous `jev.*` jobs from a PostgreSQL client, use the [portable SQL setup](docs/EASY_SETUP.md) and its worker. For synchronous native SQL, follow the native version below.
-
-</details>
+[Guided setup and first queued operator](docs/EASY_SETUP.md) · [Docker against an existing server](docs/EXTERNAL_POSTGRESQL.md).
 
 ### Native PostgreSQL extension
 
-#### 1. Install
+For a SQL-only application, [build and configure `jev_native`](native/README.md#build) on your PostgreSQL 17 Linux server, then enable it with `CREATE EXTENSION jev_native` and grant function and source access. Call it from psql, a SQL editor or any PostgreSQL driver. No Python service or application dataset registration is required. [First native SQL query](#native-semantic-sql).
 
-For a new native deployment, use **Python 3.11+** for the setup script and **Docker Compose v2**. If you already have the release checkout, start at the configuration command:
+For the **combined workspace and native deployment**, use the v0.8.0 checkout above and run these commands instead of the default Compose commands:
 
 ```bash
-git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
-cd jev4pg
 python deploy/configure.py --native
 docker compose -f compose.yaml -f compose.native.yaml build
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait
+python deploy/configure.py --show-token
 ```
 
-This builds PostgreSQL 17 with `jev_native`, configures the JEV provider and evidence registry, and starts the workspace with native semantic execution. Supply your provider key during configuration; [custom endpoints](docs/NATIVE_DEPLOYMENT.md#providers-and-credentials) use `.env` settings. The first build compiles Rust. This stack has its own database volume and shares the default ports with the Python stack; choose one stack, or configure separate ports to run both. Keep both `-f` arguments in subsequent Compose commands.
+This builds the extension, configures its provider and evidence registry, and starts the workspace with native semantic reads. The first build compiles Rust. This stack uses its own database volume and the same default ports as the default stack; choose one or configure separate ports. Keep both `-f` arguments in later Compose commands.
 
-**For an existing PostgreSQL 17 server on Linux:** [build and install the extension files](native/README.md#build), configure the provider through `JEV_NATIVE_CONFIG_FILE` in the PostgreSQL server environment, then enable the extension in your target database. For an existing SQL login named `analyst`, an administrator grants:
-
-```sql
-CREATE EXTENSION jev_native;
-GRANT USAGE ON SCHEMA jev_native, business TO analyst;
-GRANT EXECUTE ON FUNCTION jev_native.scan(text,jsonb,jsonb) TO analyst;
-GRANT SELECT ON business.tickets TO analyst;
-```
-
-Replace the login, schema and table with yours. The native Compose migration already enables the extension and grants the application runtime access. Additional SQL logins need their own grants. [Native deployment guide](docs/NATIVE_DEPLOYMENT.md) · [Provider configuration and function grants](native/README.md#configure).
-
-#### 2. Use your PostgreSQL data
-
-Connect through `psql`, your SQL editor or a PostgreSQL driver. Direct native queries read physical tables and views using the caller's privileges; they do not require application dataset registration. Load files with your usual PostgreSQL ingestion tools or `\copy`.
-
-For the optional web workspace, retrieve its token with `python deploy/configure.py --show-token` and open `/ask/en` or `/ask/zh` on port 8000. Import files as in the Python workflow. To expose an existing table there, grant the native stack's runtime login `sdd_app` source access, then register it for the generated `demo` tenant:
-
-```bash
-docker compose -f compose.yaml -f compose.native.yaml exec app jev4pg attach tickets --tenant demo --schema business --table tickets
-```
-
-#### 3. Analyze directly in SQL
-
-For `business.tickets(id, product, body)`, the same unresolved-billing analysis becomes a native function call:
-
-```sql
-SELECT source->>'product' AS product, COUNT(*) AS unresolved_tickets
-FROM jev_native.scan(
-    'SELECT id, product, body FROM business.tickets ORDER BY id',
-    '{"billing":{"type":"noul",
-      "instructions":"The ticket describes an unresolved billing problem.",
-      "subject_column":"body"}}',
-    '{"max_rows":1000,"max_requests":1000,"max_judgments":1000,"concurrency":4}'
-)
-WHERE jev_native.require_bool(decisions, 'billing')
-GROUP BY source->>'product'
-ORDER BY unresolved_tickets DESC;
-```
-
-Put exact filters and projections inside the source SELECT and size the execution limits for your analysis. `require_bool` raises on unresolved or unevaluated decisions so the aggregate cannot silently count only resolved matches. To inspect those cases, select `source, decisions` from the scan before filtering. Provider calls can incur usage in either version.
-
-Use [`scan_many` or `execute_plan`](docs/NATIVE_PLANS.md) for parallel and dependent analyses, and [`embed`](docs/NATIVE_EMBEDDINGS.md) for named-question probability vectors. Native outputs remain PostgreSQL rows, so you can join, aggregate, persist and export them with SQL.
+Native execution covers semantic reads, stage plans and probability embeddings. Use the Python engine for maintained semantic features and semantic write review. The 41-operator HTTP API and asynchronous `jev.*` jobs remain Python-backed in a combined deployment. [Native deployment guide](docs/NATIVE_DEPLOYMENT.md) · [Capability map](docs/CAPABILITIES.md#python-and-native-roles).
 
 ## BIRD Challenging: 100 questions, 11 databases
 
@@ -299,7 +203,7 @@ With concept generation and repair disabled, a request uses one LLM generation; 
 
 `VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay separate from execution failures. A skipped judgment cannot silently become false or produce a misleading zero total. Applications can route uncertainty to review, retain held SQL for correction and preview proposed writes before an explicit commit. [Decision states](docs/JEV_OPERATORS.md).
 
-Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.8.0. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
+Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.8.0. Reusable semantic features and hybrid planning run through the application. See [setup choices](#choose-your-setup) for the released and native interfaces.
 
 ## What you can build
 
@@ -316,24 +220,11 @@ Native stage plans, cross-connection evidence reuse and probability embeddings a
 | Feature                     | Available interface                                                                                                                                |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 41 semantic operators       | Filtering, extraction, ranking, matching, verification and workflow composition through the [operator API](docs/JEV_FUNCTION_REFERENCE.md).        |
-| PostgreSQL integration      | Asynchronous `jev.*` jobs in the release; direct Rust `jev_native.*` execution in the preview. [SQL interfaces](docs/POSTGRESQL_INTERFACE.md).     |
+| PostgreSQL integration | Asynchronous Python-backed `jev.*` jobs or synchronous Rust `jev_native.*` functions. [Interface selection](docs/CAPABILITIES.md#python-and-native-roles). |
 | Workspace and query history | Separate English and Simplified Chinese interfaces, editable interpretations and reviewed data changes. [User guide](docs/USER_GUIDE.md).          |
 | Provider choice             | TypeSafe, compatible hosted HTTP endpoints and local Python adapters through the same typed decision contract. [Configuration](docs/PROVIDERS.md). |
 
 Previously published as JevSDSQL and jevsd-pg; the current project and development package are named jev4pg.
-
-## Choose an installation
-
-| Path                     | Includes                                                                                | Setup                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Application: `v0.8.0` | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs          | [Compose or existing PostgreSQL](docs/INSTALLATION.md)                                |
-| Optional native preview | Rust `jev_native.*`, parallel stage plans, evidence reuse and probability embeddings | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
-
-The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. Use the native Compose overlay to build and enable it; the default Compose stack uses Python. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).
-
-Use a release tag for a fixed deployment and `main` to evaluate ongoing development. See the [changelog](CHANGELOG.md) for changes and the [upgrade guide](docs/INSTALLATION.md#upgrade) for component compatibility.
-
-Follow the [quick start](#quick-start) for a new deployment, or [connect your existing PostgreSQL database](#use-an-existing-postgresql-database). The full [installation guide](docs/INSTALLATION.md) covers process-supervisor deployment, upgrades and backups.
 
 ## From question to SQL
 

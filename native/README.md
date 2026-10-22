@@ -2,6 +2,10 @@
 
 Native preview 0.4.0 of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the application's asynchronous `jev.*` queue interface.
 
+Use this component for SQL-driven applications, bounded semantic scans, parallel stage plans and named-question embeddings. It reads physical PostgreSQL tables under the caller's privileges without application dataset registration. The [Python application](../README.md#python-application) supplies natural-language planning, the workspace, all 41 operators, maintained features and semantic write review. You can use either component independently or [combine the application with native semantic reads](../docs/NATIVE_DEPLOYMENT.md).
+
+This guide describes current development. The v0.8.0 project release includes native preview 0.3.0; use that tag for a fixed installation. Native 0.4.0 adds batch embedding distances and shared executor optimizations.
+
 PostgreSQL filters, projects and joins source data. A cursor supplies bounded batches to Rust. Questions about one context share a request; independent contexts run concurrently. PostgreSQL receives the original projected row and its typed decisions.
 
 For dependent work, `jev_native.execute_plan` runs a typed stage DAG with PostgreSQL intermediates and one shared semantic executor. See [native plans](../docs/NATIVE_PLANS.md) and the [runnable SQL example](../examples/planning/native_plan.sql).

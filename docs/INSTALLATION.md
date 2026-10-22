@@ -1,19 +1,19 @@
 # Installation
 
-In v0.8.0, [guided setup](EASY_SETUP.md) creates an existing-database connection profile and installs the SQL interface without server extension files. The portable interface uses the same SQL worker and operator runtime as the extension installation.
+Start with the [quick start](../README.md#quick-start) for a first query. This guide covers deployment, credentials and upgrades. PostgreSQL owns storage and relational execution in every setup; Python supplies the application, and Rust supplies the optional native semantic engine.
 
-For a short install-and-query walkthrough, start with the [GitHub quick start](../README.md#quick-start), or follow the [existing-server setup and first query](EXTERNAL_POSTGRESQL.md) to use your PostgreSQL database.
+## Choose a deployment
 
-The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available from v0.7.0; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
-
-Choose the application deployment or the native execution preview:
-
-| Path | Requirements | Execution |
+| Use case | Install | Guide |
 | --- | --- | --- |
-| Application, v0.8.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs. |
-| Native extension, 0.4.0 development preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+| Try the workspace, APIs and natural-language queries | Python application with bundled PostgreSQL and workers | [Docker Compose](#docker-compose) |
+| Add the application or queued operators to an existing server | Python package beside PostgreSQL 17; no native server files | [Guided setup](EASY_SETUP.md), or [external Compose](EXTERNAL_POSTGRESQL.md) |
+| Call synchronous semantic functions from SQL | Rust extension on PostgreSQL 17 Linux; no Python service | [Native build and configuration](../native/README.md#build) |
+| Use the workspace with native semantic reads | Python application plus Rust extension | [Native Compose deployment](NATIVE_DEPLOYMENT.md) |
 
-The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
+The default Compose stack uses the Python semantic engine. Native execution is an explicit choice, not a requirement for the application. Maintained semantic features and semantic write review use the Python engine. See the [capability map](CAPABILITIES.md#python-and-native-roles) for interface boundaries and use cases.
+
+The released `v0.8.0` checkout includes native preview 0.3.0; current `main` includes native preview 0.4.0. Use a release tag for a fixed deployment and keep all components on that checkout. See [version compatibility](#upgrade) before changing an existing installation.
 
 ## Docker Compose
 
@@ -57,27 +57,18 @@ python -m pip install --no-deps .
 
 Copy `.env.example` to `.env` and configure the runtime database URL, provider and API token map. For setup, provide `SDD_ADMIN_DATABASE_URL` and `SDD_DB_PASSWORD` or their `_FILE` variants. The administrator must be able to create roles and schema objects. The new runtime password must contain at least 24 characters.
 
-For the SQL interface, export the packaged extension files:
+For a new installation, use the portable queue interface:
 
 ```bash
-jev4pg extension-files ./extension-files
+jev4pg migrate --check --sql-interface portable
+jev4pg migrate --sql-interface portable
 ```
 
-On the PostgreSQL server, copy the resulting `.control` and `.sql` files into the directory printed by `pg_config --sharedir`, under `extension/`. Then run:
+This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and the `jev.*` job queue as ordinary PostgreSQL objects. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. No custom extension files are required.
 
-```bash
-jev4pg migrate --sql-interface
-```
+An existing installation using the `jevsd_pg` queue package should retain that mode: export files with `jev4pg extension-files ./extension-files`, copy them to the server's `pg_config --sharedir` directory under `extension/`, and run `jev4pg migrate --sql-interface extension`. This packages the same Python-backed queue as a PostgreSQL extension. It is separate from the Rust `jev_native` extension.
 
-This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Use `jev4pg migrate --sql-interface portable` to install the same queued SQL API without custom extension files; see [guided setup](EASY_SETUP.md).
-
-Inspect the target before applying changes:
-
-```bash
-jev4pg migrate --check
-```
-
-This read-only command checks installation ownership, supported catalog versions, table contracts, tenant policies and runtime-role memberships. It returns JSON and exits nonzero on a conflict. It neither calls a model nor creates roles. It does not test extension availability, provider connectivity or backup recovery; use the matching installation procedure and readiness checks for those.
+The read-only `migrate --check` command validates installation ownership, supported catalog versions, table contracts, tenant policies and runtime-role memberships. It returns JSON and exits nonzero on a conflict. It neither calls a model nor creates roles. It does not test extension availability, provider connectivity or backup recovery; use the matching installation procedure and readiness checks for those.
 
 The same check runs inside migration before any installation changes. Catalog version 4 keeps metadata, evidence, history and application query jobs in `sdd_catalog`, separate from imported rows in `sdd_data`. Runtime statements name the catalog explicitly; custom search paths and temporary tables cannot redirect them. Installation leaves business tables, functions and the `public` schema's grants unchanged. Source access still requires explicit PostgreSQL grants and attachment registration.
 
@@ -94,7 +85,9 @@ Run these as separate processes. On Windows choose a writable heartbeat path, su
 
 ## Native preview
 
-Use the `v0.8.0` checkout. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
+The [native Compose guide](NATIVE_DEPLOYMENT.md) installs the combined application and native engine. Its release commands use `v0.8.0` with native 0.3.0; use one `main` checkout for all components when evaluating native 0.4.0 development.
+
+For SQL-only use on an existing server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the PostgreSQL server environment and grant SQL callers access. Direct SQL use does not require the Python application, its catalog or its workers.
 
 For application integration, install Python from that same checkout and run:
 
@@ -103,6 +96,8 @@ jev4pg migrate --native-interface
 ```
 
 Set `SDD_SEMANTIC_ENGINE=native` in the application environment and start the service. This enables supported semantic reads through `/ask` and `/data/sql`. It does not switch all operators to Rust. Maintained semantic features and semantic mutation review require the default Python engine. The [roadmap](IMPLEMENTATION_PLAN.md) lists remaining release work; use a separate database for preview evaluation.
+
+The application still handles planning, authentication, dataset registration, history and review. `POST /jev/call` and queued `jev.*` operators still use Python. Choose JEV or hybrid planning separately from the semantic execution engine.
 
 The application and native extension configure providers separately. The Rust executor calls a compatible HTTP endpoint; a local Python adapter needs an HTTP wrapper to serve it. See [providers](PROVIDERS.md) and [native configuration](../native/README.md#configure).
 
@@ -134,6 +129,8 @@ Application, catalog and extension compatibility:
 | Development checkout | 0.8.0 | 4 | 0.4.0 preview |
 
 The Python distribution was renamed from `jevsd-pg` to `jev4pg`. For installations outside Compose, create a fresh virtual environment and install the new wheel or source checkout there; do not install both distributions over one another. They share the `sdd` import namespace. Point the existing service supervisor at the new environment after migration. The `jevsd-pg` and `sdd` command aliases remain available.
+
+The `jev4pg` command is available from v0.7.0; use `jevsd-pg` with the unchanged v0.6.0 package. The Python import namespace `sdd`, queue extension package `jevsd_pg`, configuration keys and Compose identities retain their existing names so upgrades preserve installed databases.
 
 Back up the database and retain its role credentials first. Check out the desired release, then run:
 

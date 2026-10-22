@@ -1,8 +1,8 @@
-# Use your existing PostgreSQL database
+# Python application on existing PostgreSQL
 
-The shortest setup for SQL clients is the portable SQL interface: ordinary PostgreSQL tables and functions, plus a worker beside the database. It requires no extension files on the server, Rust compiler or PostgreSQL restart. Your source tables stay in PostgreSQL.
+Install the Python application beside an existing PostgreSQL server. It supplies the workspace, natural-language planning and operator API. Its portable SQL interface lets SQL clients submit operators to a Python worker using ordinary PostgreSQL tables and functions. No native libraries, Rust compiler or PostgreSQL restart are required.
 
-Available in v0.8.0. The guided setup connects the packaged worker to your existing PostgreSQL 17 database.
+This guide uses v0.8.0 and PostgreSQL 17. Follow all steps for queued operators, or complete the connection profile and migration, then jump to [the workspace](#add-the-workspace). Source tables stay in PostgreSQL. For synchronous SQL execution without a Python service, use the [native Rust extension](../native/README.md).
 
 ## Choose a path
 
@@ -49,7 +49,7 @@ jev4pg --env-file admin.env sql-grant analyst --tenant demo --actor analyst
 
 Replace `analyst` with an existing nonadministrative SQL login. The check is read-only. Migration creates the application catalog and the `jev` queue in one transaction. Repeating it preserves jobs and credentials. An unrelated `jev` schema or an incompatible installation stops setup rather than replacing objects.
 
-The portable and extension installations have identical `jev.*` APIs. Keep the mode originally used for that database. `--sql-interface` without a value retains the existing extension-file installation behavior.
+The portable installation and `jevsd_pg` queue extension package have identical Python-backed `jev.*` APIs. Keep the mode originally used for that database. `--sql-interface` without a value selects the queue extension package; it does not install or enable the Rust `jev_native` engine.
 
 ## 3. Start the worker and try SQL
 

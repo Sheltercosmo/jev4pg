@@ -2,6 +2,41 @@
 
 jev4pg separates language interpretation from data execution. JEV supplies bounded semantic decisions, while SQL and application code handle arithmetic, authorization, storage and workflow state. Use the table below to find the relevant API before consulting its full signature.
 
+## Python and native roles
+
+The Python application and Rust extension serve different jobs. PostgreSQL remains the database in both deployments: it owns storage, indexes, relational SQL and transactions.
+
+| Requirement | Python application | Native Rust extension |
+| --- | --- | --- |
+| Natural-language questions and hybrid planning | Selects context, proposes SQL and retains review decisions. | Executes supported semantic stages from the application's compiled plan. |
+| Workspace, HTTP API, imports and query history | Provides the application and its lifecycle. | Optional execution engine behind the same workspace. |
+| All 41 JEV operators | Available through `POST /jev/call` and queued `jev.*` jobs. | Exposes a focused SQL function set, not the full operator API. |
+| PostgreSQL client access | `jev.*` submits jobs; a Python worker processes them after commit. | `jev_native.*` returns results within the SQL statement. |
+| Parallel semantic scans and stage plans | Coordinates bounded application workflows and provider batches. | Streams source rows in bounded batches; shares an executor across independent stages and contexts. |
+| Repeated values and compatible evidence | Deduplicates operator work and reuses tenant-scoped evidence. | `scan_mapped` builds per-question context dictionaries; the evidence registry supports reuse across connections. |
+| Named-question embeddings and local distance | Can use the native engine through PostgreSQL. | Builds probability matrices and compares compatible stored embeddings without new inference. |
+| Maintained features and semantic write review | Supported with the Python semantic engine. | Use the Python engine for these workflows. |
+| Hosted or local JEV models | Compatible HTTP endpoints or in-process Python adapters. | Compatible HTTP endpoints; local models need an HTTP interface. |
+| Server installation | Runs beside PostgreSQL; portable setup needs schema and role permissions. | Requires native extension files on a supported PostgreSQL 17 Linux server. |
+
+Choose the Python application for analyst tools, document intake, reusable semantic definitions and product APIs. It keeps model adapters and application workflows outside the PostgreSQL process and is the easiest path when you cannot install server libraries.
+
+Choose the native extension for SQL-driven services, semantic scans over existing tables and explainable similarity queries. PostgreSQL reads sources under the caller's privileges; Rust handles bounded semantic work, request packing and reuse. Put exact filters and projections in the source SQL so fewer values need inference. Direct calls do not need a Python service or application dataset registration.
+
+Combine them when users need natural-language planning and your application needs native semantic reads. Set `SDD_SEMANTIC_ENGINE=native` after installing the extension and application integration. This changes supported semantic query execution, not the implementation of every operator. The native Compose deployment configures this combination.
+
+Planning mode is a separate choice: `planner_mode=jev` uses JEV-based planning; `planner_mode=hybrid` adds LLM generation. Neither mode selects Rust execution. Both still rely on PostgreSQL for relational calculations. See the [quick start](../README.md#quick-start) for setup choices.
+
+### SQL interface names
+
+| Name | Meaning | Required process |
+| --- | --- | --- |
+| `SEMANTIC(...)` | Application query syntax, compiled by the workspace or `/data/sql`. | Python API; optional native execution engine. |
+| `jev.submit`, `jev.result` | Asynchronous operator queue, installed as ordinary objects or the `jevsd_pg` SQL extension package. | Python SQL worker. |
+| `jev_native.scan`, `jev_native.execute_plan` | Synchronous functions supplied by the Rust extension. | PostgreSQL with `jev_native` installed. |
+
+The `jevsd_pg` queue package and the `jev_native` Rust extension are different components. Installing the former does not enable native execution. Queue calls become visible to workers after commit; native calls perform semantic work during the calling statement.
+
 ## Query and data workflows
 
 | Objective | Interface | Result |
@@ -22,6 +57,7 @@ The development Rust extension runs directly in PostgreSQL. It does not require 
 | Objective | Function | Guide |
 | --- | --- | --- |
 | Evaluate typed questions over a SQL source | `jev_native.scan` | [Native execution](../native/README.md#query) |
+| Evaluate distinct contexts and map results back to rows | `jev_native.scan_mapped` | [Semantic dictionaries](NATIVE_RECORD_MAP.md) |
 | Share scheduling across independent sources | `jev_native.scan_many` | [Independent sources](../native/README.md#independent-sources) |
 | Compose SQL, semantic and conditional stages | `jev_native.execute_plan` | [Native plans](NATIVE_PLANS.md) |
 | Apply policy to a saved observation | `jev_native.decide` | [Evidence and policy](../native/README.md#save-and-reconsider-evidence) |
@@ -29,6 +65,7 @@ The development Rust extension runs directly in PostgreSQL. It does not require 
 | Build a question-by-answer probability matrix | `jev_native.embed` | [Embeddings](NATIVE_EMBEDDINGS.md) |
 | Project saved decisions without inference | `jev_native.answer_matrix` | [Decision reuse](NATIVE_EMBEDDINGS.md#reuse-existing-decisions-and-stage-graphs) |
 | Compare complete compatible embeddings locally | `jev_native.embedding_distance` | [Similarity queries](NATIVE_EMBEDDINGS.md#store-and-search) |
+| Compare one embedding with a bounded candidate batch | `jev_native.embedding_distances` | [Batch distance, native 0.4.0 development](NATIVE_OPTIMIZATION.md#exact-local-comparison) |
 
 The application can compile supported semantic reads, including derived relations and CASE, into native plans with `SDD_SEMANTIC_ENGINE=native`. Maintained features and semantic mutation review still require Python. See [installation](INSTALLATION.md#native-preview) and the [roadmap](IMPLEMENTATION_PLAN.md).
 
