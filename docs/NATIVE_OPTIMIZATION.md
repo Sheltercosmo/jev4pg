@@ -2,6 +2,8 @@
 
 Native preview 0.4.0 reduces repeated computation across the SQL functions. Independent work keeps the shared stage DAG and concurrency limit. The source SELECT, questions, provider requests and complete probability distributions retain their meaning.
 
+The [performance record](benchmarks/NATIVE_OPTIMIZATION.md) reports paired timings, request counts and correctness checks against v0.8.0.
+
 ## What each function reuses
 
 | Function | Optimization |
