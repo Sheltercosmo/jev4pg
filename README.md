@@ -39,6 +39,37 @@ jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for 
 
 See it in action at [jev4pg.com](https://jev4pg.com), then build with the workspace, HTTP API or PostgreSQL interfaces.
 
+## Why choose jev4pg
+
+Bring semantic analysis to your PostgreSQL workflows, reuse prior computation and keep decisions inspectable.
+
+| Benefit | How jev4pg delivers it |
+| --- | --- |
+| Fewer model judgments | Filter and project with SQL first. Native `scan_mapped` evaluates distinct contexts per question, then maps decisions back to every source row. Three and two distinct inputs need five judgments, even across thousands of rows. [Context dictionaries](docs/NATIVE_RECORD_MAP.md). |
+| Parallel work without repeated stages | Independent records and branches share a bounded scheduler. Shared SQL stages materialize once; dependent work starts when its inputs are ready. [Stage plans](docs/NATIVE_PLANS.md). |
+| Reuse across queries and policy changes | Keep raw probabilities separate from decision thresholds. Replay compatible evidence without inference; source, question and evaluator identities control reuse. Bulk cache reads and bounded native retention reduce lookup work. [Evidence reuse](docs/NATIVE_EVIDENCE.md). |
+| Similarity you can explain | Define dimensions with questions such as “Requests a refund?” and “Issue resolved?” Inspect the answer probabilities, then compare compatible stored embeddings locally. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md). |
+| Business definitions your team can reuse | Turn a reviewed concept such as `needs_action` into a semantic feature for queues, reports and natural-language questions. Version definitions and retain corrections against their sources. [Semantic features](docs/SEMANTIC_FEATURES.md). |
+| Decisions users can inspect and correct | Keep `VALUE`, `UNKNOWN` and `NOT_EVALUATED` distinct from failures. Retain held SQL for revision and preview proposed writes before approval. [Query review](docs/USER_GUIDE.md#inspect-and-correct-a-plan). |
+
+### Give the LLM a focused job
+
+JEV selects relevant schema and evidence before an LLM proposes SQL, then reviews independent operations and missing context in parallel. With concept generation and repair disabled, hybrid planning uses one LLM generation call. [Hybrid planning](docs/HYBRID_QUERY.md).
+
+<a id="bird-challenging-100-questions-11-databases"></a>
+
+In the historical **BIRD Challenging evaluation of 100 questions across 11 databases**, JEV used zero LLM generation calls and **88.1% lower estimated token cost** than GPT-5.6 Terra. Hybrid used **20.8% fewer LLM input tokens**.
+
+| Planner | SQL answer matches | Estimated cost / 100 attempts |
+| --- | ---: | ---: |
+| JEV | 20/99 | $0.389 |
+| GPT-5.6 Terra | 39/99 | $3.262 |
+| JEV + GPT-5.6 Terra | 34/99 | $2.839 |
+
+Measured on the frozen Python planner on 23 September 2026; held proposals were included and 99 references were scorable. These historical savings came with fewer correct answers than the LLM baseline. [Timing, accounting and full methodology](docs/benchmarks/BIRD_CHALLENGING_100.md).
+
+The Python application supplies planning, maintained features and review. The optional Rust preview supplies native stage execution and embeddings. [Choose your setup](#choose-your-setup).
+
 ## Performance highlights
 
 ### Faster operator execution
@@ -159,86 +190,21 @@ This builds the extension, configures its provider and evidence registry, and st
 
 Native execution covers semantic reads, stage plans and probability embeddings. Use the Python engine for maintained semantic features and semantic write review. The 41-operator HTTP API and asynchronous `jev.*` jobs remain Python-backed in a combined deployment. [Native deployment guide](docs/NATIVE_DEPLOYMENT.md) · [Capability map](docs/CAPABILITIES.md#python-and-native-roles).
 
-## BIRD Challenging: 100 questions, 11 databases
-
-The project's historical evaluation tackles the hardest difficulty category in [BIRD's cleaned development benchmark](https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106). Across 100 questions, JEV planned with **zero LLM generation calls** at 88.1% lower estimated token cost than the LLM baseline. Hybrid selected context with JEV and used **20.8% fewer LLM input tokens**.
-
-| Method | SQL answer matches | Median time | Estimated cost / 100 attempts |
-| --- | ---: | ---: | ---: |
-| JEV 1.13.0 | 20/99 (20.2%) | 8.55 s | $0.389 |
-| GPT-5.6 Terra | 39/99 (39.4%) | 8.68 s | $3.262 |
-| JEV + GPT-5.6 Terra | 34/99 (34.3%) | 14.23 s | $2.839 |
-
-These are efficiency tradeoffs: the LLM baseline matched more answers, and hybrid took longer. All held proposals were scored; one unavailable reference leaves 99 scorable questions. Medians cover 94 cases with up to three cases in flight. Costs use frozen accounting rates; one hybrid request has unreported usage.
-
-Measured on the frozen Python planner on 23 September 2026. This is a local historical comparison, not an official leaderboard score or a measurement of v0.8.0 or the Rust preview. [Methodology and archived metrics](docs/benchmarks/BIRD_CHALLENGING_100.md).
-
-## Why choose jev4pg
-
-### Define once, reuse across queries
-
-Give an interpretation a name, type and reviewed definition. A feature such as `needs_action` becomes a virtual column for filtering, grouping and reporting. Your team can inspect its definition, version a change and correct a judgment against its source.
-
-After defining and activating `needs_action`, use it through the application SQL interface:
-
-```sql
-SELECT id
-FROM documents
-WHERE SEMANTIC_FEATURE(body, 'needs_action');
-```
-
-The same feature can serve a work queue, a report and a natural-language question. One reviewed definition keeps those workflows consistent. [Create a semantic feature](docs/SEMANTIC_FEATURES.md).
-
-### Reuse judgments when policies change
-
-Raw answer probabilities are stored separately from acceptance thresholds. Tighten a threshold and replay compatible evidence with zero new inference. Corrections retain their source dependencies; changed inputs require fresh evidence.
-
-The native evidence registry extends compatible reuse across PostgreSQL connections, matching the projected context, typed questions and evaluator revision. This avoids paying for the same eligible judgment again. [Evidence reuse](docs/NATIVE_EVIDENCE.md).
-
-### Run independent judgments in parallel
-
-Questions sharing a context can share one request. Independent records and semantic branches can run concurrently within their budgets. In native stage plans, shared SQL stages materialize once and dependent work starts when its own inputs are ready.
-
-Put exact filters and only required columns inside the source SQL to reduce data sent for inference. Batching and parallel scheduling then reduce repeated context and unnecessary waiting, while PostgreSQL computes the joins, aggregates and windows. [Parallel stage plans](docs/NATIVE_PLANS.md).
-
-For repeated values, [`scan_mapped`](docs/NATIVE_RECORD_MAP.md) forms a separate context dictionary for each question. Three and two distinct inputs need five judgments, even when they occur across thousands of rows. Missing judgments run together; cached probabilities map back to every original row. This opt-in layout is available in native preview 0.3.0.
-
-### Search with dimensions you can explain
-
-Choose questions such as “Requests a refund?” and “Issue resolved?” Native JEV embeddings represent each record as an answer-probability matrix and vector with named dimensions. Reviewers can inspect which criteria make two records similar.
-
-Project existing decisions into a matrix or compare compatible stored vectors locally, with no additional model call. You control the question basis that defines similarity. [Probability embeddings](docs/NATIVE_EMBEDDINGS.md).
-
-### Give the LLM a focused job
-
-Hybrid planning selects relevant schema and evidence with JEV before asking an LLM to propose SQL. JEV then reviews operations, populations, formulas and missing context in parallel. This focuses generation on a smaller context while keeping the proposal open to independent checks.
-
-With concept generation and repair disabled, a request uses one LLM generation; JEV selection and review are accounted for separately. Users can inspect and correct the retained proposal. [Hybrid planning](docs/HYBRID_QUERY.md).
-
-### Keep uncertain decisions reviewable
-
-`VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay separate from execution failures. A skipped judgment cannot silently become false or produce a misleading zero total. Applications can route uncertainty to review, retain held SQL for correction and preview proposed writes before an explicit commit. [Decision states](docs/JEV_OPERATORS.md).
-
-Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.8.0. Reusable semantic features and hybrid planning run through the application. See [setup choices](#choose-your-setup) for the released and native interfaces.
-
 ## What you can build
 
-| Application                                     | What users can do                                                                       | Why jev4pg fits                                                                                                                                                                                  |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Support and operations queues                   | Find unresolved requests, connect them to account data and prioritize follow-up.        | The queue and its reports share one reviewed definition; uncertain cases remain visible.                                                                                                         |
-| Document intake                                 | Extract typed fields from incoming text, inspect source passages and approve an import. | Field descriptions drive extraction, reducing manual entry while preserving a transactional review step. [Guide](docs/TEXT_IMPORT.md).                                                           |
-| An analyst workspace in your product            | Ask in English or Simplified Chinese, inspect SQL and revise a saved interpretation.    | The HTTP API exposes context selection, generation and review as a reusable workflow. [Tutorial](examples/nl2sql/README.md).                                                                     |
-| Search by business criteria                     | Find records similar in urgency, intent or resolution status.                           | Named probability dimensions make the comparison inspectable; stored compatible vectors can be compared without model calls. Native preview. [Example](examples/operators/native_embedding.sql). |
-| Semantic analysis over existing PostgreSQL data | Add meaning-based queries to authorized tables and views in place.                      | Read-only attachments preserve source types and access controls without requiring a full data copy. [Setup](docs/EXISTING_DATA.md).                                         |
+| Application | Build with jev4pg |
+| --- | --- |
+| Support and operations queues | Classify unresolved requests, join account data and share reviewed priority definitions with reporting. |
+| Document intake | Extract typed fields with exact source passages, review the proposed records and approve an import. [Guide](docs/TEXT_IMPORT.md). |
+| An analyst workspace in your product | Ask in English or Simplified Chinese, inspect generated SQL and refine saved queries through the API. [Tutorial](examples/nl2sql/README.md). |
+| Search by business criteria | Rank similarity by named dimensions such as urgency or intent, using stored probability embeddings. [Native SQL example](examples/operators/native_embedding.sql). |
+| Analysis over existing tables | Register authorized PostgreSQL tables and views, then query them in place with source permissions and types preserved. [Setup](docs/EXISTING_DATA.md). |
 
 ## Fit into your existing stack
 
-| Feature                     | Available interface                                                                                                                                |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 41 semantic operators       | Filtering, extraction, ranking, matching, verification and workflow composition through the [operator API](docs/JEV_FUNCTION_REFERENCE.md).        |
-| PostgreSQL integration | Asynchronous Python-backed `jev.*` jobs or synchronous Rust `jev_native.*` functions. [Interface selection](docs/CAPABILITIES.md#python-and-native-roles). |
-| Workspace and query history | Separate English and Simplified Chinese interfaces, editable interpretations and reviewed data changes. [User guide](docs/USER_GUIDE.md).          |
-| Provider choice             | TypeSafe, compatible hosted HTTP endpoints and local Python adapters through the same typed decision contract. [Configuration](docs/PROVIDERS.md). |
+Call the [41-operator HTTP API](docs/JEV_FUNCTION_REFERENCE.md), submit asynchronous `jev.*` jobs or use synchronous `jev_native.*` SQL functions. The [capability map](docs/CAPABILITIES.md#python-and-native-roles) shows which component serves each workflow.
+
+Connect TypeSafe, a compatible hosted endpoint or a local model through the same typed decision contract. The Python application supports in-process adapters; the native engine uses HTTP providers. [Provider configuration](docs/PROVIDERS.md).
 
 Previously published as JevSDSQL and jevsd-pg; the current project and development package are named jev4pg.
 
@@ -284,17 +250,15 @@ FROM jev_native.scan(
 );
 ```
 
-Put exact filters and required columns inside the source SELECT. Questions sharing context can share a request; independent contexts run concurrently within the budget. Use `scan_many` for independent populations or `execute_plan` for a [typed stage DAG](docs/NATIVE_PLANS.md). Dependencies wait for their inputs while unrelated work continues.
-
-Results preserve `VALUE`, `UNKNOWN` and `NOT_EVALUATED` separately from operational status. A skipped branch does not become false. Exact calculations that require missing semantic decisions are held for review.
+Put exact filters and required columns inside the source SELECT to reduce semantic work. Use `scan_many` for independent populations or `execute_plan` for a [typed stage DAG](docs/NATIVE_PLANS.md). Inspect decision states before aggregation; `require_bool` rejects unresolved membership rather than silently excluding it.
 
 ## Embeddings with named dimensions
 
 Define questions such as “Does this message request action?” and “Is the issue resolved?” Then `jev_native.embed` returns every answer probability as a matrix and flattened vector. Noul questions have false/true dimensions; Choice and Score retain all declared answers.
 
-Use `jev_native.answer_matrix` to project existing decisions and `jev_native.embedding_distance` to compare complete, compatible embeddings. Both run locally without model calls. Stored vectors retain their question basis and evaluator identity, so incompatible revisions cannot silently mix.
+Use `jev_native.answer_matrix` to project existing decisions and `jev_native.embedding_distance` to compare complete, compatible embeddings locally. Native 0.4.0 development adds `embedding_distances`, preparing one query for a bounded candidate batch. These operations need no new model calls and validate the question basis and evaluator identity.
 
-See the [embedding guide](docs/NATIVE_EMBEDDINGS.md) and [runnable SQL example](examples/operators/native_embedding.sql). Retrieval quality depends on the basis and provider; current execution tests do not establish a retrieval-quality or speed advantage.
+See the [embedding guide](docs/NATIVE_EMBEDDINGS.md), [runnable SQL example](examples/operators/native_embedding.sql) and [batch comparison](docs/NATIVE_OPTIMIZATION.md#exact-local-comparison). The question basis and provider determine retrieval quality; the reported projection speedup measures computation.
 
 ## Documentation and contributions
 
