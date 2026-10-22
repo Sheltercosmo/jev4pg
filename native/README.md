@@ -8,6 +8,8 @@ For dependent work, `jev_native.execute_plan` runs a typed stage DAG with Postgr
 
 For reusable probability features, `jev_native.embed` batches a fixed basis of questions and returns an answer probability matrix and vector per row. [Native embeddings](../docs/NATIVE_EMBEDDINGS.md) covers projection, states, evidence reuse and local similarity queries.
 
+For repeated values, use development `jev_native.scan_mapped` to judge [distinct required contexts](../docs/NATIVE_RECORD_MAP.md), pack independent operations and reuse evidence across cursor windows. It returns bounded row windows with shared observations and receipts. Existing `scan` retains its original request layout.
+
 ## Build
 
 For a complete container installation, use the [native Compose stack](../docs/NATIVE_DEPLOYMENT.md). The following commands install the extension on an existing server.

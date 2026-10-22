@@ -73,3 +73,19 @@ The application submits all independent source populations to one native invocat
 Before consuming incomplete evidence, the compiler proves a row-local partial-read fragment. Direct semantic projections preserve NULLs; Boolean predicates use SQL's three-valued logic without converting an unresolved value to a match. Population-dependent and NULL-consuming expressions wait for complete evidence. This is a consumer dependency, not a reason to serialize independent evaluation.
 
 When configured, the native registry owns cross-query claims and provider admission. Lookup is batched before dispatch; independent missing contexts still use the shared asynchronous scheduler. Each claim commits its token, daily charge and provider slot before HTTP. A short local admission lock covers the claim and query counters, then releases before inference. Declined claims leave allowance available to other rows. Per-scan concurrency also respects the configured provider capacity. Cancellation leaves a durable attempt. Expired dispatches become uncertain and require reconciliation before another charge. A known semantic value survives publication failure with an unconfirmed receipt. The [registry decision](adr/0002-durable-native-evidence.md) explains source snapshots, evidence age and trust.
+
+## Mapped SQL execution
+
+
+The development SQL `scan_mapped` interface and Rust [record-map session](NATIVE_RECORD_MAP.md) adds an alternative execution layout for a ready, independent frontier. Existing `scan` calls and the application planner retain their current layout.
+
+| Step | Dependency | Parallel placement and reason |
+| --- | --- | --- |
+| Exact source filtering | Authorized SQL source and snapshot | PostgreSQL applies exact predicates before semantic work; no JEV call is needed for arithmetic or known membership. |
+| Per-question projection and identity | Declared required fields and available input values | Independent questions form separate dictionaries. This avoids evaluating a Cartesian product of unrelated fields. A dependent question waits for its predecessor. |
+| Continuous cache lookup | Exact context, question definition and evaluator identity | All ready identities can be checked locally. TTL and scope determine reuse before admission; policy changes reinterpret the same probabilities. |
+| Pack missing judgments | Missing identities from the ready frontier | Up to 32 question-local records share a request. The existing bounded executor overlaps requests; a request pack is not a new DAG dependency. |
+| Validate and retain evidence | Complete typed provider response | Independent responses resolve independently. Whole request observations retain authentic provenance; bindings map each answer to its original row/question. Failed work is not cached. |
+| Map and aggregate | Decisions and original row identities | Local mapping restores duplicates and input order. SQL aggregates the original population after required decisions resolve. UNKNOWN and unexecuted work remain explicit. |
+
+Cache lookup does not authorize omission of a required field. Candidate extraction can precede a Choice when exact code can enumerate a sufficiently complete candidate set; no-match remains an explicit outcome. Stored compatible probability matrices can rank candidates locally, but similarity is not a proof that two records have the same answer. These local operations introduce no serial JEV barrier. Conditional branches must still follow their declared eligibility rules.

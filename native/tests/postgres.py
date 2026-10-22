@@ -45,6 +45,12 @@ class Model(BaseHTTPRequestHandler):
             if isinstance(probability, Decimal):
                 probability = float(probability)
             answers = {name: {"type": "noul", "noul": probability} for name in payload["questions"]}
+            for name, question in payload["questions"].items():
+                instructions = question.get("instructions")
+                if isinstance(instructions, dict) and "record" in instructions and "question" in instructions:
+                    record = instructions["record"]
+                    p = record.get("p", 0.95)
+                    answers[name] = {"type": "noul", "noul": float(p) if isinstance(p, Decimal) else p}
             answers.update(payload["state"].get("fixture_answers", {}))
             body = json.dumps({"model": "fixture-v1", "answers": answers}, default=float).encode()
             self.send_response(200)
@@ -150,6 +156,10 @@ def verify(connection, config):
     from policy import verify_policy
 
     checks.extend(verify_policy(connection, observations))
+
+    from record_map import verify_record_maps
+
+    checks.extend(verify_record_maps(connection, observations, must_fail))
 
     from plans import verify_plans
 

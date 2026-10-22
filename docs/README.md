@@ -28,6 +28,7 @@ Start with [installation](INSTALLATION.md) for the released application or [nati
 | [Native plans](NATIVE_PLANS.md) | Shared stages, typed inputs, conditional branches and SQL compilation. |
 | [Native embeddings](NATIVE_EMBEDDINGS.md) | Question bases, probability matrices, vectors and distance. |
 | [Native evidence](NATIVE_EVIDENCE.md) | Persistent observations, reuse and admission across connections. |
+| [Semantic dictionaries](NATIVE_RECORD_MAP.md) | Mapped SQL windows, independent batching and continuous input caching. |
 | [Runnable examples](../examples/operators/README.md) | HTTP clients and native SQL scripts. |
 
 ## Configure and develop

@@ -22,6 +22,7 @@ def verify_upgrade(admin):
             "(gen_random_uuid(),'upgrade','stored', '{\"marker\":\"保留原始证据\"}')"
         )
         connection.execute("SELECT setval('jev_native.evidence_sequence_seq',100)")
+        connection.execute("ALTER EXTENSION jev_native UPDATE TO '0.2.0'")
         connection.execute("CREATE ROLE native_upgrade_reader")
         connection.execute("GRANT USAGE ON SCHEMA jev_native TO native_upgrade_reader")
         connection.execute(
@@ -39,7 +40,17 @@ def verify_upgrade(admin):
         version, relations = connection.execute(
             "SELECT extversion, cardinality(extconfig) FROM pg_extension WHERE extname='jev_native'"
         ).fetchone()
-        assert version == "0.2.0" and relations == 6
+        assert version == "0.3.0" and relations == 6
+        assert connection.execute(
+            "SELECT to_regprocedure('jev_native.scan_mapped(text,jsonb,jsonb,jsonb)') IS NOT NULL"
+        ).fetchone()[0]
+        assert not connection.execute(
+            "SELECT has_function_privilege('native_upgrade_reader','jev_native.scan_mapped(text,jsonb,jsonb,jsonb)','EXECUTE')"
+        ).fetchone()[0]
+        window = connection.execute(
+            "SELECT rows FROM jev_native.scan_mapped('SELECT ''done'' AS note', '{\"q\":{\"type\":\"noul\",\"instructions\":\"Complete?\"}}', '{}', '{\"max_requests\":0}')"
+        ).fetchone()[0]
+        assert window[0]["decisions"]["q"]["operation_state"] == "BLOCKED_BY_BUDGET"
         assert (
             connection.execute("SELECT observation->>'marker' FROM jev_native.evidence").fetchone()[
                 0
@@ -58,5 +69,5 @@ def verify_upgrade(admin):
         admin.execute("DROP DATABASE native_upgrade WITH (FORCE)")
         admin.execute("DROP ROLE IF EXISTS native_upgrade_reader,native_upgrade_app")
     return [
-        "Published native 0.1.0 schema upgrades to 0.2.0 without losing evidence, sequence state or client grants"
+        "Published native 0.1.0 and 0.2.0 schemas upgrade to 0.3.0 with mapped SQL, retained evidence and explicit new grants"
     ]

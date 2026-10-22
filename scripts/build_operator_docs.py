@@ -38,6 +38,7 @@ These development functions run in the Rust extension through SQL. They are sepa
 | Function | Purpose |
 | --- | --- |
 | `jev_native.scan(source_sql, questions, options)` | Evaluate typed questions over one SQL source. |
+| `jev_native.scan_mapped(source_sql, questions, context_columns, options)` | Evaluate distinct per-question contexts with cross-record packing and bounded row/evidence windows. See [semantic dictionaries](NATIVE_RECORD_MAP.md). |
 | `jev_native.scan_many(sources, options)` | Schedule independent sources with shared limits and reuse. |
 | `jev_native.execute_plan(plan, options)` | Execute a shared DAG of SQL, semantic and conditional stages. |
 | `jev_native.decide(source, observation, policy)` | Apply a decision policy to compatible saved evidence without inference. |

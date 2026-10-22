@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Native preview 0.3.0 adds `scan_mapped`: per-question context dictionaries, independent request packing, bounded cache reuse across cursor windows and shared evidence with operational receipts. PostgreSQL 0.1.0 and 0.2.0 extension schemas have an upgrade path. Existing scan and application-planner layouts are unchanged. See [usage](docs/NATIVE_RECORD_MAP.md).
+
 ## 0.7.0
 
 This release brings jev4pg closer to everyday PostgreSQL work: browse existing tables, run queries in the background, review changes and recover saved work. The application uses Python by default. The optional Rust extension remains a preview.
