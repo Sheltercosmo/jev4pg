@@ -14,7 +14,7 @@ For repeated values, use `jev_native.scan_mapped` to judge [distinct required co
 
 For a complete container installation, use the [native Compose stack](../docs/NATIVE_DEPLOYMENT.md). The following commands install the extension on an existing server.
 
-Build from the repository's `v0.7.0` tag for native preview 0.2.0, or `main` for ongoing development. The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed. The default Compose image does not include this extension. From the repository root:
+Build from the repository's `v0.8.0` tag for native preview 0.3.0, or `main` for ongoing development. The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed. The default Compose image does not include this extension. From the repository root:
 
 ```sh
 cargo install --locked cargo-pgrx --version 0.19.2

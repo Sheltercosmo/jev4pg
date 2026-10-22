@@ -5,7 +5,7 @@ Evaluate distinct semantic inputs, then map their decisions back to the original
 Two interfaces are available:
 
 * Existing native SQL can evaluate a distinct projected relation and join its results back. The [SQL example](../examples/operators/native_dictionary.sql) uses `jev_native.scan`.
-* Native preview 0.3.0 adds `jev_native.scan_mapped`, using the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. Build from `main`; the application tag v0.7.0 includes native preview 0.2.0.
+* Native preview 0.3.0 adds `jev_native.scan_mapped`, using the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. Install from the application tag `v0.8.0`, which includes native preview 0.3.0.
 
 ## Direct PostgreSQL usage
 

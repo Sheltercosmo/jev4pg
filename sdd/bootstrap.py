@@ -83,6 +83,10 @@ def migrate(
             from .migration_preflight import InstallationConflict, inspect_installation
 
             installation = inspect_installation(connection, runtime_role, SCHEMA_VERSION)
+            if sql_interface:
+                from .sql_install import install as install_sql
+
+                install_sql(connection, sql_interface, check=True)
             ensure_login(connection, runtime_role, runtime_password)
             role = identifier(connection, runtime_role)
             from .generic import schema as generic_schema  # noqa: F401
@@ -133,8 +137,10 @@ def migrate(
                     f"REVOKE ALL ON FUNCTION sdd_catalog.{name}() FROM PUBLIC"
                 )
             if sql_interface:
-                connection.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS jevsd_pg")
+                install_sql(connection, sql_interface)
                 grant_worker(connection, runtime_role)
+                if sql_interface == "portable":
+                    connection.exec_driver_sql(f"GRANT SELECT ON jev.installation TO {role}")
             if native_interface:
                 connection.exec_driver_sql(
                     f"CREATE EXTENSION IF NOT EXISTS jev_native VERSION '{NATIVE_EXTENSION_VERSION}'"
@@ -176,7 +182,9 @@ def migrate(
                 {"version": SCHEMA_VERSION},
             )
             connection.exec_driver_sql(f"GRANT SELECT ON sdd_catalog.sdd_schema_version TO {role}")
-        result = {"schema_version": SCHEMA_VERSION, "sql_interface": sql_interface}
+        result = {"schema_version": SCHEMA_VERSION, "sql_interface": bool(sql_interface)}
+        if sql_interface:
+            result["sql_installation"] = "extension" if sql_interface is True else sql_interface
         if native_interface:
             result["native_interface"] = True
         if native_registry:
@@ -186,7 +194,7 @@ def migrate(
         db.engine.dispose()
 
 
-def check_migration(admin_url, runtime_role="sdd_app"):
+def check_migration(admin_url, runtime_role="sdd_app", sql_interface=False):
     from .migration_preflight import inspect_installation
 
     db = Database(admin_url)
@@ -196,7 +204,12 @@ def check_migration(admin_url, runtime_role="sdd_app"):
         with db.engine.begin() as connection:
             connection.exec_driver_sql("SET TRANSACTION READ ONLY")
             connection.exec_driver_sql("SET LOCAL search_path=pg_catalog,public,pg_temp")
-            return inspect_installation(connection, runtime_role, SCHEMA_VERSION)
+            result = inspect_installation(connection, runtime_role, SCHEMA_VERSION)
+            if sql_interface:
+                from .sql_install import install as install_sql
+
+                result["sql_interface"] = install_sql(connection, sql_interface, check=True)
+            return result
     finally:
         db.engine.dispose()
 

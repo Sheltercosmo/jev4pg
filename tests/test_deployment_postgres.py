@@ -22,8 +22,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
-def installation():
+@pytest.fixture(scope="module", params=["extension", "portable"])
+def installation(request):
     base = make_url(os.environ["SDD_TEST_ADMIN_URL"])
     suffix = uuid.uuid4().hex[:12]
     database = "jev_install_" + suffix
@@ -36,8 +36,8 @@ def installation():
     url = base.set(database=database)
     owner = Database(url)
     try:
-        migrate(url, roles[0], password, sql_interface=True)
-        migrate(url, roles[0], sql_interface=True)
+        migrate(url, roles[0], password, sql_interface=request.param)
+        migrate(url, roles[0], sql_interface=request.param)
         with owner.engine.begin() as connection:
             for role in roles[1:]:
                 ensure_login(connection, role, password)
@@ -51,6 +51,7 @@ def installation():
             "bob": databases[2],
             "roles": roles,
             "url": url,
+            "sql_mode": request.param,
         }
     finally:
         for db in databases + [owner]:

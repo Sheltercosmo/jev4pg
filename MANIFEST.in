@@ -2,6 +2,8 @@ include README.md CHANGELOG.md CONTRIBUTING.md CONTEXT.md AGENTS.md
 include requirements.lock.txt Dockerfile .dockerignore .env.example
 include compose*.yaml
 recursive-include docs *.md *.png *.gif *.svg
+include docs/benchmarks/semantic-filtering-*.csv docs/benchmarks/semantic-filtering-*.json
+recursive-include benchmarks/semantic_filtering *.py *.md
 recursive-include deploy *.py *.yaml *.example *.sql *.sh *.Dockerfile
 recursive-include examples *.py *.md *.sql *.json *.html *.css *.js *.csv
 recursive-include scripts *.py

@@ -1,6 +1,6 @@
 # Queued PostgreSQL interface
 
-This guide covers the `jevsd_pg` extension and asynchronous `jev.*` functions. For direct Rust execution, use the separate [native extension](../native/README.md), with `jev_native.scan`, stage plans and embeddings.
+This guide covers asynchronous `jev.*` functions, installed through the `jevsd_pg` extension or the [portable SQL setup](EASY_SETUP.md). Both use the same operator implementation and worker. For synchronous Rust execution, use the separate [native extension](../native/README.md), with `jev_native.scan`, stage plans and embeddings.
 
 Run JEV operators from `psql` or any PostgreSQL driver. `jev.submit` queues an operator, `jev.result` reads its result, and `jev.cancel` cancels a queued request. The Python worker executes the same operator implementation used by the HTTP API.
 

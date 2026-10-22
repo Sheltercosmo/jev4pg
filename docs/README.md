@@ -1,6 +1,6 @@
 # Documentation
 
-Start with [installation](INSTALLATION.md) for the released application or [native Compose](NATIVE_DEPLOYMENT.md) for the Rust preview. For direct SQL use on an existing server, follow the [native build guide](../native/README.md). The default Compose stack uses the Python runtime.
+Start with [installation](INSTALLATION.md) for the released application or [native Compose](NATIVE_DEPLOYMENT.md) for the Rust preview. Start with [guided setup and portable SQL](EASY_SETUP.md) for an existing PostgreSQL server. Synchronous native SQL uses the [native build guide](../native/README.md). The default Compose stack uses the Python runtime.
 
 ## Use the database
 

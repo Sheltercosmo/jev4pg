@@ -10,7 +10,16 @@ from . import __version__
 def main():
     parser = argparse.ArgumentParser(description="jev4pg database workspace")
     parser.add_argument("--version", action="version", version=f"jev4pg {__version__}")
+    parser.add_argument(
+        "--env-file", help="Load a configuration file; existing environment values win"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
+    setup = sub.add_parser(
+        "setup", help="Create a guided connection profile for existing PostgreSQL"
+    )
+    setup.add_argument(
+        "--directory", default="jev4pg-local", help="New directory for the local profile"
+    )
     sub.add_parser("init")
     sub.add_parser("demo")
     serve = sub.add_parser("serve")
@@ -19,7 +28,13 @@ def main():
     migration = sub.add_parser(
         "migrate", help="Install schema and tenant policies as an administrator"
     )
-    migration.add_argument("--sql-interface", action="store_true")
+    migration.add_argument(
+        "--sql-interface",
+        nargs="?",
+        const="extension",
+        choices=("extension", "portable"),
+        help="Install SQL jobs: portable needs no server files; extension retains the existing installation",
+    )
     migration.add_argument(
         "--check",
         action="store_true",
@@ -104,6 +119,25 @@ def main():
     live.add_argument("--model", required=True)
     live.add_argument("--output", default="artifacts/live-test.json")
     args = parser.parse_args()
+    if args.env_file:
+        from .config import load_env
+
+        if not Path(args.env_file).is_file():
+            parser.error("Configuration file does not exist")
+        load_env(args.env_file)
+    if args.command == "setup":
+        from .setup import interactive_setup
+
+        try:
+            interactive_setup(args.directory)
+        except ValueError as exc:
+            parser.exit(1, f"Setup failed: {exc}\n")
+        except (OSError, EOFError) as exc:
+            parser.exit(
+                1,
+                f"Setup failed ({type(exc).__name__}); check the inputs and use a new profile directory.\n",
+            )
+        return
     if args.command == "serve":
         import uvicorn
 
@@ -121,12 +155,15 @@ def main():
         from .config import load_env, database_url, secret
         from .bootstrap import migrate, check_migration, grant_client, extension_files
         from .migration_preflight import InstallationConflict
+        from .sql_install import SQLInstallationError
 
         load_env()
         try:
             if args.command == "migrate" and args.check:
                 result = check_migration(
-                    database_url(admin=True), os.getenv("SDD_DB_USER", "sdd_app")
+                    database_url(admin=True),
+                    os.getenv("SDD_DB_USER", "sdd_app"),
+                    args.sql_interface,
                 )
             elif args.command == "migrate":
                 result = migrate(
@@ -216,6 +253,8 @@ def main():
                 finally:
                     db.engine.dispose()
         except Exception as exc:
+            if isinstance(exc, SQLInstallationError):
+                parser.exit(1, f"{args.command} failed: {exc}\n")
             if isinstance(exc, InstallationConflict):
                 print(
                     json.dumps(

@@ -2,21 +2,21 @@
 
 The native stack builds an optimized Rust extension into PostgreSQL 17 and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
 
-This deployment uses application 0.7.0, catalog schema 4 and native extension 0.2.0. It is a development preview and does not enable native maintained-feature refresh or semantic write review.
+This deployment uses application 0.8.0, catalog schema 4 and native extension 0.3.0. It is a development preview and does not enable native maintained-feature refresh or semantic write review.
 
 ## Start
 
 Use Docker Compose v2 and Python 3.11+. Clone the tagged source, then configure and start it:
 
 ```bash
-git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py --native
 docker compose -f compose.yaml -f compose.native.yaml build
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait
 ```
 
-For an existing checkout, run the configuration and Compose commands from its root. The first build compiles Rust and pgrx. Later builds can reuse Docker's build cache. The runtime PostgreSQL image contains native extension 0.2.0 and its SQL files; it does not contain the Rust toolchain.
+For an existing checkout, run the configuration and Compose commands from its root. The first build compiles Rust and pgrx. Later builds can reuse Docker's build cache. The runtime PostgreSQL image contains native extension 0.3.0 and its SQL files; it does not contain the Rust toolchain.
 
 The native Compose project is named `jevsd-pg-native`, with a separate database volume from the default stack. Both use the same default host ports. Set `SDD_HTTP_PORT` and `SDD_POSTGRES_PORT` in `.env` when running them together. Use the same two Compose files for later commands.
 
@@ -52,7 +52,7 @@ docker compose -f compose.yaml -f compose.native.yaml run --rm migrate
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait
 ```
 
-Migration upgrades an installed native extension from 0.1.0 to 0.2.0 transactionally and preserves stored data and grants. It rejects other mismatched versions. Restart PostgreSQL when replacing the shared library so existing backends cannot retain an older binary. Native extension updates need installation files and the matching library on the server.
+Migration upgrades an installed native extension from 0.1.0 or 0.2.0 to 0.3.0 transactionally and preserves stored data and grants. It rejects other mismatched versions. Restart PostgreSQL when replacing the shared library so existing backends cannot retain an older binary. Native extension updates need installation files and the matching library on the server.
 
 Use the [backup commands](INSTALLATION.md#backup-and-restore) with `-f compose.yaml -f compose.native.yaml` added after `docker compose`. Restore into an empty database on a server with the matching extension files and original roles. Save role credentials and secret files separately. Restored vectors can be compared locally; registry evidence remains historical data. A new database or cluster identity prevents it from being silently reused as a new source's observation.
 

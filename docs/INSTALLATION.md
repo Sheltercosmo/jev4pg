@@ -1,5 +1,7 @@
 # Installation
 
+In v0.8.0, [guided setup](EASY_SETUP.md) creates an existing-database connection profile and installs the SQL interface without server extension files. The portable interface uses the same SQL worker and operator runtime as the extension installation.
+
 For a short install-and-query walkthrough, start with the [GitHub quick start](../README.md#quick-start), or follow the [existing-server setup and first query](EXTERNAL_POSTGRESQL.md) to use your PostgreSQL database.
 
 The project and current Python distribution are named **jev4pg**. The `jev4pg` command is available from v0.7.0; the `jevsd-pg` alias remains supported. When using the unchanged `v0.6.0` release, use `jevsd-pg` in place of `jev4pg`. The Python import namespace `sdd`, PostgreSQL extension `jevsd_pg`, configuration keys, and Compose project/volume identities retain their existing names so upgrades preserve installed databases.
@@ -8,14 +10,14 @@ Choose the application deployment or the native execution preview:
 
 | Path | Requirements | Execution |
 | --- | --- | --- |
-| Application, v0.7.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs. |
-| Native extension, 0.2.0 preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+| Application, v0.8.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs. |
+| Native extension, 0.3.0 preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
 
 The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
 ## Docker Compose
 
-Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.7.0` tag for the released deployment, or `main` to develop the application. From that checkout:
+Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.8.0` tag for the released deployment, or `main` to develop the application. From that checkout:
 
 ```bash
 python deploy/configure.py
@@ -67,7 +69,7 @@ On the PostgreSQL server, copy the resulting `.control` and `.sql` files into th
 jev4pg migrate --sql-interface
 ```
 
-This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Managed PostgreSQL services that disallow custom extension files can use `jev4pg migrate` for the HTTP interface; the SQL interface requires extension installation access.
+This creates the restricted runtime login, application tables, tenant policies, immutable evidence guards and `CREATE EXTENSION jevsd_pg`. It runs in one transaction and can be repeated. Existing runtime passwords are preserved. Use `jev4pg migrate --sql-interface portable` to install the same queued SQL API without custom extension files; see [guided setup](EASY_SETUP.md).
 
 Inspect the target before applying changes:
 
@@ -92,7 +94,7 @@ Run these as separate processes. On Windows choose a writable heartbeat path, su
 
 ## Native preview
 
-Use the `v0.7.0` checkout. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
+Use the `v0.8.0` checkout. The [native Compose guide](NATIVE_DEPLOYMENT.md) builds the extension and configures its evidence registry with mounted credentials. For an existing PostgreSQL server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the server environment and grant SQL callers access. Direct SQL use does not require the Python application.
 
 For application integration, install Python from that same checkout and run:
 
@@ -128,6 +130,7 @@ Application, catalog and extension compatibility:
 | --- | --- | --- | --- |
 | Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
 | Released `v0.7.0` tag | 0.7.0 | 4 | 0.2.0 preview |
+| Released `v0.8.0` tag | 0.8.0 | 4 | 0.3.0 preview |
 
 The Python distribution was renamed from `jevsd-pg` to `jev4pg`. For installations outside Compose, create a fresh virtual environment and install the new wheel or source checkout there; do not install both distributions over one another. They share the `sdd` import namespace. Point the existing service supervisor at the new environment after migration. The `jevsd-pg` and `sdd` command aliases remain available.
 

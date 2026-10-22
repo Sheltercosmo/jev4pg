@@ -22,6 +22,10 @@ def main():
         assert package.joinpath("web", asset).is_file(), asset
     for name in ("manifest.json", "examples.json"):
         assert json.loads(package.joinpath("operators", name).read_text(encoding="utf-8"))
+    from sdd.sql_install import portable_script
+
+    assert "CREATE FUNCTION jev.submit" in portable_script()
+    assert "pg_extension_config_dump" not in portable_script()
     commands = {
         entry.name for entry in distribution.entry_points if entry.group == "console_scripts"
     }
@@ -30,6 +34,10 @@ def main():
         args = [sys.executable, "-I", "-m", "sdd.cli"]
         version = subprocess.check_output([*args, "--version"], cwd=directory, text=True)
         assert version.strip() == "jev4pg " + distribution.version
+        setup_help = subprocess.check_output([*args, "setup", "--help"], cwd=directory, text=True)
+        assert "--directory" in setup_help
+        migration_help = subprocess.check_output([*args, "migrate", "--help"], cwd=directory, text=True)
+        assert "portable" in migration_help
         subprocess.run([*args, "extension-files", directory], cwd=directory, check=True)
         assert (Path(directory) / "jevsd_pg.control").is_file()
         assert (Path(directory) / "jevsd_pg--0.1.0.sql").is_file()

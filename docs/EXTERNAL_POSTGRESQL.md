@@ -2,12 +2,12 @@
 
 The application can run separately from PostgreSQL 17. This path starts no database container and creates no database volume. Your PostgreSQL administrator retains responsibility for backups, server upgrades, availability and source permissions. Use a dedicated database for the initial deployment.
 
-The HTTP workspace requires the Python application and application catalog. The asynchronous SQL interface additionally needs the `jevsd_pg` extension files on the server. Managed services that cannot install custom extension files can use the HTTP path. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
+The HTTP workspace requires the Python application and application catalog. The [guided portable setup](EASY_SETUP.md) adds asynchronous SQL jobs without installing extension files on the server. Both installation modes use the same SQL worker. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
 
 Use the [README quick start](../README.md#quick-start) for a new bundled database. To connect an existing server, start from the released source:
 
 ```bash
-git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 ```
 

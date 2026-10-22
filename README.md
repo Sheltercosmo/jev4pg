@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.7.0"><img src="https://img.shields.io/badge/release-0.7.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.7.0" /></a>
+  <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.8.0"><img src="https://img.shields.io/badge/release-0.8.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.8.0" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
 
@@ -18,7 +18,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#use-an-existing-postgresql-database">Existing PostgreSQL</a> ·
   <a href="#why-choose-jev4pg">Advantages</a> ·
-  <a href="#semantic-filtering-fewer-calls-more-accurate-results">Semantic benchmark</a> ·
+  <a href="#benchmark-leading-semantic-filtering">Semantic benchmark</a> ·
   <a href="#bird-challenging-100-questions-11-databases">NL2SQL benchmark</a> ·
   <a href="#what-you-can-build">What you can build</a> ·
   <a href="https://jev4pg.com/guide/">Project guide</a> ·
@@ -29,7 +29,9 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg is a carefully designed JEV harness, brings semantic intelligence to PostgreSQL with a comprehensive toolkit of **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
+jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
+
+**Higher accuracy, lower latency.** In our paired semantic-filtering benchmark, jev4pg outperformed pg-jev's request path on real reviews: **98% accuracy versus 92%, with 36% lower median latency**. Parallel request packing also cut three-predicate requests from 60 to 38. [Explore the results](#benchmark-leading-semantic-filtering).
 
 **Explainable embeddings** represent data through named questions and answer probabilities, making similarity inspectable. The native preview combines these with **parallel execution and input deduplication**: independent work runs concurrently, while repeated values with the same context and questions share judgments, preserving every source row.
 
@@ -41,18 +43,58 @@ See it in action at [jev4pg.com](https://jev4pg.com), then build with the worksp
   <img src="docs/assets/product-tour.gif?v=b87ec970" width="800" alt="Animated product tour: natural-language SQL, semantic filtering, text extraction, parallel JEV stages and probability embeddings." />
 </p>
 
+## Benchmark-leading semantic filtering
+
+Native preview 0.3.0 packs independent judgments into parallel requests and reuses exact evidence as new records arrive. In a frozen, paired executor test, it was faster on seven of eight workloads against the pinned pg-jev 0.2.1 request path.
+
+| Task, 400 records | jev4pg | pg-jev request path |
+| --- | --- | --- |
+| Real reviews | **98.0% accuracy**, 469 ms | 92.0%, 732 ms |
+| Three independent predicates | **100% accuracy**, 1,498 ms | 99.33%, 1,983 ms |
+
+The three-predicate case used **38 requests instead of 60**. With identical required-column projections on both sides, jev4pg used **36.2% fewer input tokens**. Warm passes made no provider calls on either side.
+
+Measured with JEV 1.13, concurrency 16 and three repeats across 132 runs. Timings cover executor and HTTP paths. The full report includes every workload, token usage and held-answer scoring. [Full comparison and reproduction](docs/benchmarks/SEMANTIC_FILTERING.md) · [Use mapped SQL](docs/NATIVE_RECORD_MAP.md).
+
 ## Quick start
 
-Choose the version that fits how you work. Both live in this repository: the `v0.7.0` release includes the Python application and native extension `0.2.0` preview.
+### Use JEV with your PostgreSQL database
 
-| Version | Use it for | Where queries run |
+Install the **v0.8.0** package with Python 3.11+, create a connection profile, and start a SQL worker beside your PostgreSQL 17 server:
+
+```bash
+python -m pip install https://github.com/Sheltercosmo/jev4pg/releases/download/v0.8.0/jev4pg-0.8.0-py3-none-any.whl
+jev4pg setup
+cd jev4pg-local
+jev4pg --env-file admin.env migrate --sql-interface portable
+jev4pg --env-file admin.env sql-grant analyst --tenant demo --actor analyst
+jev4pg sql-worker --heartbeat-file sql-worker.heartbeat
+```
+
+The wizard creates separate installation and runtime credentials. Use an owner with migration permissions and replace `analyst` with your existing SQL login. The portable interface installs ordinary PostgreSQL tables and functions: **no server extension files, Rust compilation or database restart**.
+
+Connect as `analyst` in psql and submit your first semantic judgment:
+
+```sql
+SELECT jev.submit(
+    'JEV.NOUL',
+    '{"state":"The refund has not arrived.",
+      "proposition":"The customer needs follow-up."}'
+) AS job_id \gset
+
+SELECT jsonb_pretty(jev.result(:'job_id'));
+```
+
+Commit the submission, then poll for the worker's result. In another terminal, run `jev4pg serve` from the profile directory to open the web workspace. [Connection setup, access grants and first query](docs/EASY_SETUP.md).
+
+### Choose your execution path
+
+| Path | Best for | Execution |
 | --- | --- | --- |
-| [Python application · v0.7.0](#python-application) | Web workspace, file imports, NL2SQL, query history, background jobs and reviewed semantic features | Python plans and coordinates JEV work; PostgreSQL executes relational SQL. Use the workspace, HTTP API or asynchronous `jev.*` jobs. |
-| [Native PostgreSQL extension · 0.2.0 preview](#native-postgresql-extension) | Semantic analysis from SQL clients, parallel stage plans and explainable embeddings | Rust executes `jev_native.*` functions inside PostgreSQL and calls the JEV provider. Direct SQL use needs no Python service. |
+| [Application · v0.8.0](#python-application) | Workspace, NL2SQL, imports, history and asynchronous `jev.*` jobs | Python coordinates; PostgreSQL executes relational SQL. |
+| [Native · 0.3.0 preview](#native-postgresql-extension) | Synchronous semantic SQL, parallel stage plans and explainable embeddings | Rust executes `jev_native.*` inside PostgreSQL. Direct SQL use needs no Python service. |
 
-The native Compose deployment includes the Python workspace with native semantic reads enabled. Native maintained-feature refresh and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md); use the Python engine for those workflows.
-
-Development on `main` adds native preview **0.3.0** with [`scan_mapped`](docs/NATIVE_RECORD_MAP.md): exact context dictionaries, parallel request packing and continuous input caching. Build from `main` to use it; the fixed release commands below install v0.7.0.
+Native 0.3.0 adds [`scan_mapped`](docs/NATIVE_RECORD_MAP.md): per-question context dictionaries, parallel request packing and continuous input caching. The native Compose stack also includes the workspace. Use the Python engine for maintained-feature refresh and semantic write review.
 
 ### Python application
 
@@ -61,7 +103,7 @@ Development on `main` adds native preview **0.3.0** with [`scan_mapped`](docs/NA
 Requires **Python 3.11+** and **Docker with Compose v2**. The following installs a PostgreSQL database, the analysis workspace and its workers. To use a database you already operate, follow [existing PostgreSQL setup](#use-an-existing-postgresql-database) instead of starting the bundled stack.
 
 ```bash
-git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py
 docker compose build
@@ -134,7 +176,7 @@ docker compose --env-file deployment.env -f compose.external.yaml exec app jev4p
 
 Retrieve your workspace token with `python deploy/configure.py --show-token`, open the workspace and select the attached datasets. Continue with the analysis workflow above, adapting queries to your source columns. [Attach more tables and views](docs/EXISTING_DATA.md) or use a [source manifest](docs/SOURCE_MANIFESTS.md) to register multiple relations.
 
-For asynchronous `jev.*` jobs from a PostgreSQL client, install the separate `jevsd_pg` SQL interface and start its worker using the [SQL interface guide](docs/POSTGRESQL_INTERFACE.md). For synchronous native SQL, follow the native version below.
+For asynchronous `jev.*` jobs from a PostgreSQL client, use the [portable SQL setup](docs/EASY_SETUP.md) and its worker. For synchronous native SQL, follow the native version below.
 
 </details>
 
@@ -145,7 +187,7 @@ For asynchronous `jev.*` jobs from a PostgreSQL client, install the separate `je
 For a new native deployment, use **Python 3.11+** for the setup script and **Docker Compose v2**. If you already have the release checkout, start at the configuration command:
 
 ```bash
-git clone --branch v0.7.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py --native
 docker compose -f compose.yaml -f compose.native.yaml build
@@ -197,19 +239,6 @@ Put exact filters and projections inside the source SELECT and size the executio
 
 Use [`scan_many` or `execute_plan`](docs/NATIVE_PLANS.md) for parallel and dependent analyses, and [`embed`](docs/NATIVE_EMBEDDINGS.md) for named-question probability vectors. Native outputs remain PostgreSQL rows, so you can join, aggregate, persist and export them with SQL.
 
-## Semantic filtering: fewer calls, more accurate results
-
-Native preview 0.3.0 packs independent judgments into parallel requests and reuses exact evidence as new records arrive. In a frozen, paired executor test, it was faster on seven of eight workloads against the pinned pg-jev 0.2.1 request path.
-
-| Task, 400 records | jev4pg | pg-jev request path |
-| --- | --- | --- |
-| Real reviews | **98.0% accuracy**, 469 ms | 92.0%, 732 ms |
-| Three independent predicates | **100% accuracy**, 1,498 ms | 99.33%, 1,983 ms |
-
-The three-predicate case used **38 requests instead of 60**. With identical required-column projections on both sides, jev4pg used **36.2% fewer input tokens**. Warm passes made no provider calls on either side.
-
-Same JEV model, concurrency 16, three repeats; held answers are scored. These measurements cover executor and HTTP paths, excluding PostgreSQL scans and indexes. The single-predicate case was slower, and reviews used 9.7% more tokens. [Full comparison and reproduction](docs/benchmarks/SEMANTIC_FILTERING.md) · [Use mapped SQL](docs/NATIVE_RECORD_MAP.md).
-
 ## BIRD Challenging: 100 questions, 11 databases
 
 The project's historical evaluation tackles the hardest difficulty category in [BIRD's cleaned development benchmark](https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106). Across 100 questions, JEV planned with **zero LLM generation calls** at 88.1% lower estimated token cost than the LLM baseline. Hybrid selected context with JEV and used **20.8% fewer LLM input tokens**.
@@ -222,7 +251,7 @@ The project's historical evaluation tackles the hardest difficulty category in [
 
 These are efficiency tradeoffs: the LLM baseline matched more answers, and hybrid took longer. All held proposals were scored; one unavailable reference leaves 99 scorable questions. Medians cover 94 cases with up to three cases in flight. Costs use frozen accounting rates; one hybrid request has unreported usage.
 
-Measured on the frozen Python planner on 23 September 2026. This is a local historical comparison, not an official leaderboard score or a measurement of v0.7.0 or the Rust preview. [Methodology and archived metrics](docs/benchmarks/BIRD_CHALLENGING_100.md).
+Measured on the frozen Python planner on 23 September 2026. This is a local historical comparison, not an official leaderboard score or a measurement of v0.8.0 or the Rust preview. [Methodology and archived metrics](docs/benchmarks/BIRD_CHALLENGING_100.md).
 
 ## Why choose jev4pg
 
@@ -252,7 +281,7 @@ Questions sharing a context can share one request. Independent records and seman
 
 Put exact filters and only required columns inside the source SQL to reduce data sent for inference. Batching and parallel scheduling then reduce repeated context and unnecessary waiting, while PostgreSQL computes the joins, aggregates and windows. [Parallel stage plans](docs/NATIVE_PLANS.md).
 
-For repeated values, [`scan_mapped`](docs/NATIVE_RECORD_MAP.md) forms a separate context dictionary for each question. Three and two distinct inputs need five judgments, even when they occur across thousands of rows. Missing judgments run together; cached probabilities map back to every original row. This opt-in layout is available in native preview 0.3.0 on `main`.
+For repeated values, [`scan_mapped`](docs/NATIVE_RECORD_MAP.md) forms a separate context dictionary for each question. Three and two distinct inputs need five judgments, even when they occur across thousands of rows. Missing judgments run together; cached probabilities map back to every original row. This opt-in layout is available in native preview 0.3.0.
 
 ### Search with dimensions you can explain
 
@@ -270,7 +299,7 @@ With concept generation and repair disabled, a request uses one LLM generation; 
 
 `VALUE`, `UNKNOWN` and `NOT_EVALUATED` stay separate from execution failures. A skipped judgment cannot silently become false or produce a misleading zero total. Applications can route uncertainty to review, retain held SQL for correction and preview proposed writes before an explicit commit. [Decision states](docs/JEV_OPERATORS.md).
 
-Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.7.0. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
+Native stage plans, cross-connection evidence reuse and probability embeddings are optional preview features in v0.8.0. Reusable semantic features and hybrid planning run through the application. See [installation options](#choose-an-installation) for the released and native interfaces.
 
 ## What you can build
 
@@ -297,7 +326,7 @@ Previously published as JevSDSQL and jevsd-pg; the current project and developme
 
 | Path                     | Includes                                                                                | Setup                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Application: `v0.7.0` | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs          | [Compose or existing PostgreSQL](docs/INSTALLATION.md)                                |
+| Application: `v0.8.0` | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs          | [Compose or existing PostgreSQL](docs/INSTALLATION.md)                                |
 | Optional native preview | Rust `jev_native.*`, parallel stage plans, evidence reuse and probability embeddings | [Native Compose stack](docs/NATIVE_DEPLOYMENT.md) or [source build](native/README.md) |
 
 The native extension is a development preview for PostgreSQL 17 on Linux. It can run directly from SQL without Python. Use the native Compose overlay to build and enable it; the default Compose stack uses Python. Native maintained features and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md).

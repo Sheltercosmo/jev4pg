@@ -2,6 +2,8 @@
 
 The existing [hybrid planning DAG](ARCHITECTURE.md#hybrid-stage-placement) remains in place. This document records the native execution stages and why they wait or run concurrently.
 
+Portable SQL installation creates the same queue functions as the extension package. It changes deployment only: committed jobs enter the existing worker and shared JEV execution DAG. Profile generation and installation run before query processing and introduce no model call, semantic dependency or scheduler barrier.
+
 Durable application jobs wrap the existing execution DAG. Short queue transactions claim ownership and publish the final outcome; SQL and JEV work run between those transactions without holding queue locks. Each worker monitors cancellation through a separate connection pool and renews ownership while admitted calls settle. Independent queries and JEV branches remain concurrent. Publication requires the original live lease, and an accepted cancellation or source redaction prevents publication. See [query jobs](QUERY_JOBS.md).
 
 Workspace submission persists a request key before dispatch. Retrying a lost receipt reuses that request; polling and reopening only read the saved job. Browser visibility controls status polling, not server scheduling. Draft edits and result display add no dependencies between worker queries or JEV branches.

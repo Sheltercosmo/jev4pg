@@ -41,11 +41,9 @@ def check_database(db, sql_interface=None):
             sql_interface if sql_interface is not None else os.getenv("SDD_SQL_INTERFACE") == "1"
         )
         if required:
-            extension = connection.execute(
-                text("SELECT extversion FROM pg_extension WHERE extname='jevsd_pg'")
-            ).scalar()
-            if extension != "0.1.0":
-                raise ValueError("Install the matching jevsd_pg SQL extension")
+            from .sql_install import check_runtime
+
+            check_runtime(connection)
         if os.getenv("SDD_SEMANTIC_ENGINE") == "native":
             native = connection.execute(
                 text("SELECT extversion FROM pg_extension WHERE extname='jev_native'")

@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 · 22 October 2026
 
 * Native preview 0.3.0 adds `scan_mapped`: per-question context dictionaries, independent request packing, bounded cache reuse across cursor windows and shared evidence with operational receipts. PostgreSQL 0.1.0 and 0.2.0 extension schemas have an upgrade path. Existing scan and application-planner layouts are unchanged. See [usage](docs/NATIVE_RECORD_MAP.md).
+* Guided `jev4pg setup` creates a private existing-database connection profile, with separate administrator and runtime settings. `--env-file` selects configuration explicitly.
+* `migrate --sql-interface portable` installs asynchronous `jev.*` jobs without extension files on the PostgreSQL host. Existing extension installations remain supported. See [easy setup](docs/EASY_SETUP.md).
+
+* Paired semantic-filtering results: 98% review accuracy versus 92% for the pg-jev request path; 36% lower median review latency. Three-predicate requests fall from 60 to 38. [Protocol and results](docs/benchmarks/SEMANTIC_FILTERING.md).
+
+Application 0.8.0 uses catalog schema 4, SQL queue interface 0.1.0 and optional native extension 0.3.0 preview. Existing portable or extension installations retain their mode. Native 0.1.0 and 0.2.0 installations upgrade to 0.3.0 through the matching migration.
 
 ## 0.7.0
 
