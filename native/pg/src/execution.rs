@@ -428,7 +428,14 @@ impl SemanticScan {
         }
     }
 
-    fn read_batch(&mut self) -> Vec<SourceRow> {
+    pub(super) fn read_mapped_window(&mut self, limit: usize) -> Vec<(i64, Value)> {
+        self.read_batch(limit)
+            .into_iter()
+            .map(|row| (row.ordinal, row.source))
+            .collect()
+    }
+
+    fn read_batch(&mut self, limit: usize) -> Vec<SourceRow> {
         let mut active = self
             .sources
             .iter()
@@ -439,14 +446,14 @@ impl SemanticScan {
         let mut bytes = 0;
         let start = self.next_source;
         for offset in 0..self.sources.len() {
-            if count == self.executor.limits.batch_rows || active == 0 {
+            if count == limit || active == 0 {
                 break;
             }
             let index = (start + offset) % self.sources.len();
             if self.sources[index].cursor.is_none() {
                 continue;
             }
-            let quota = (self.executor.limits.batch_rows - count).div_ceil(active);
+            let quota = (limit - count).div_ceil(active);
             active -= 1;
             let rows = self.sources[index].fetch(quota, &mut bytes);
             count += rows.len();
@@ -485,7 +492,7 @@ impl Iterator for SemanticScan {
             return Some(row);
         }
         pgrx::check_for_interrupts!();
-        let rows = self.read_batch();
+        let rows = self.read_batch(self.executor.limits.batch_rows);
         if rows.is_empty() {
             return None;
         }

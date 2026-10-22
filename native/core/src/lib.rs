@@ -4,6 +4,7 @@ pub mod conditional;
 pub mod embedding;
 pub mod evidence;
 pub mod plan;
+pub mod record_map;
 pub mod registry;
 pub mod source;
 
@@ -236,6 +237,11 @@ pub struct Executor {
 }
 
 impl Executor {
+    pub fn clear_memory_cache(&mut self) {
+        self.cache.clear();
+        self.cache_bytes = 0;
+    }
+
     pub fn evaluator(&self) -> evidence::EvaluatorIdentity {
         (&self.provider).into()
     }
@@ -306,12 +312,24 @@ impl Executor {
     pub fn evaluate_many(
         &mut self,
         inputs: &[EvaluationInput<'_>],
-        mut check_interrupt: impl FnMut(),
+        check_interrupt: impl FnMut(),
     ) -> Result<Vec<Evaluation>, &'static str> {
         if inputs.len() > self.limits.batch_rows {
             return Err("Source batch exceeds batch_rows");
         }
+        self.evaluate_frontier(inputs, check_interrupt)
+    }
+
+    pub(crate) fn evaluate_frontier(
+        &mut self,
+        inputs: &[EvaluationInput<'_>],
+        mut check_interrupt: impl FnMut(),
+    ) -> Result<Vec<Evaluation>, &'static str> {
+        if inputs.len() > 512 {
+            return Err("Independent frontier exceeds 512 requests");
+        }
         for input in inputs {
+            check_interrupt();
             validate_questions(input.questions)?;
         }
         let mut identities = HashMap::new();

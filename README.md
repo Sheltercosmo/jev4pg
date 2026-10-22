@@ -18,7 +18,8 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#use-an-existing-postgresql-database">Existing PostgreSQL</a> ·
   <a href="#why-choose-jev4pg">Advantages</a> ·
-  <a href="#bird-challenging-100-questions-11-databases">Benchmark</a> ·
+  <a href="#semantic-filtering-fewer-calls-more-accurate-results">Semantic benchmark</a> ·
+  <a href="#bird-challenging-100-questions-11-databases">NL2SQL benchmark</a> ·
   <a href="#what-you-can-build">What you can build</a> ·
   <a href="https://jev4pg.com/guide/">Project guide</a> ·
   <a href="docs/INSTALLATION.md">Installation</a> ·
@@ -50,6 +51,8 @@ Choose the version that fits how you work. Both live in this repository: the `v0
 | [Native PostgreSQL extension · 0.2.0 preview](#native-postgresql-extension) | Semantic analysis from SQL clients, parallel stage plans and explainable embeddings | Rust executes `jev_native.*` functions inside PostgreSQL and calls the JEV provider. Direct SQL use needs no Python service. |
 
 The native Compose deployment includes the Python workspace with native semantic reads enabled. Native maintained-feature refresh and semantic write review remain on the [roadmap](docs/IMPLEMENTATION_PLAN.md); use the Python engine for those workflows.
+
+Development on `main` adds native preview **0.3.0** with [`scan_mapped`](docs/NATIVE_RECORD_MAP.md): exact context dictionaries, parallel request packing and continuous input caching. Build from `main` to use it; the fixed release commands below install v0.7.0.
 
 ### Python application
 
@@ -194,6 +197,19 @@ Put exact filters and projections inside the source SELECT and size the executio
 
 Use [`scan_many` or `execute_plan`](docs/NATIVE_PLANS.md) for parallel and dependent analyses, and [`embed`](docs/NATIVE_EMBEDDINGS.md) for named-question probability vectors. Native outputs remain PostgreSQL rows, so you can join, aggregate, persist and export them with SQL.
 
+## Semantic filtering: fewer calls, more accurate results
+
+Native preview 0.3.0 packs independent judgments into parallel requests and reuses exact evidence as new records arrive. In a frozen, paired executor test, it was faster on seven of eight workloads against the pinned pg-jev 0.2.1 request path.
+
+| Task, 400 records | jev4pg | pg-jev request path |
+| --- | --- | --- |
+| Real reviews | **98.0% accuracy**, 469 ms | 92.0%, 732 ms |
+| Three independent predicates | **100% accuracy**, 1,498 ms | 99.33%, 1,983 ms |
+
+The three-predicate case used **38 requests instead of 60**. With identical required-column projections on both sides, jev4pg used **36.2% fewer input tokens**. Warm passes made no provider calls on either side.
+
+Same JEV model, concurrency 16, three repeats; held answers are scored. These measurements cover executor and HTTP paths, excluding PostgreSQL scans and indexes. The single-predicate case was slower, and reviews used 9.7% more tokens. [Full comparison and reproduction](docs/benchmarks/SEMANTIC_FILTERING.md) · [Use mapped SQL](docs/NATIVE_RECORD_MAP.md).
+
 ## BIRD Challenging: 100 questions, 11 databases
 
 The project's historical evaluation tackles the hardest difficulty category in [BIRD's cleaned development benchmark](https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106). Across 100 questions, JEV planned with **zero LLM generation calls** at 88.1% lower estimated token cost than the LLM baseline. Hybrid selected context with JEV and used **20.8% fewer LLM input tokens**.
@@ -235,6 +251,8 @@ The native evidence registry extends compatible reuse across PostgreSQL connecti
 Questions sharing a context can share one request. Independent records and semantic branches can run concurrently within their budgets. In native stage plans, shared SQL stages materialize once and dependent work starts when its own inputs are ready.
 
 Put exact filters and only required columns inside the source SQL to reduce data sent for inference. Batching and parallel scheduling then reduce repeated context and unnecessary waiting, while PostgreSQL computes the joins, aggregates and windows. [Parallel stage plans](docs/NATIVE_PLANS.md).
+
+For repeated values, [`scan_mapped`](docs/NATIVE_RECORD_MAP.md) forms a separate context dictionary for each question. Three and two distinct inputs need five judgments, even when they occur across thousands of rows. Missing judgments run together; cached probabilities map back to every original row. This opt-in layout is available in native preview 0.3.0 on `main`.
 
 ### Search with dimensions you can explain
 

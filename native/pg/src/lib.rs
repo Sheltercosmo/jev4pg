@@ -1,4 +1,5 @@
 mod execution;
+mod mapped;
 mod plan;
 
 use execution::{SemanticScan, SourceSpec};
@@ -9,6 +10,36 @@ use pgrx::JsonB;
 use pgrx::prelude::*;
 
 pgrx::pg_module_magic!(name, version);
+
+#[pg_extern]
+fn scan_mapped(
+    source_sql: Option<&str>,
+    questions: Option<JsonB>,
+    context_columns: default!(Option<JsonB>, "'{}'::jsonb"),
+    options: default!(Option<JsonB>, "'{}'::jsonb"),
+    fcinfo: pg_sys::FunctionCallInfo,
+) -> TableIterator<
+    'static,
+    (
+        name!(window_ordinal, i64),
+        name!(rows, JsonB),
+        name!(evidence, JsonB),
+        name!(usage, JsonB),
+        name!(policy, JsonB),
+    ),
+> {
+    let source_sql = source_sql.unwrap_or_else(|| error!("Source SELECT is required"));
+    let questions = questions.unwrap_or_else(|| error!("Typed questions are required"));
+    let columns = context_columns.unwrap_or_else(|| error!("Context projection is required"));
+    let options = options.unwrap_or_else(|| error!("Execution options are required"));
+    TableIterator::new(mapped::MappedScan::new(
+        source_sql,
+        questions.0,
+        columns.0,
+        options.0,
+        fcinfo,
+    ))
+}
 
 #[pg_extern]
 fn execute_plan(plan: Option<JsonB>, options: default!(Option<JsonB>, "'{}'::jsonb")) -> JsonB {
@@ -218,11 +249,14 @@ fn require_bool(decisions: Option<JsonB>, question_id: Option<&str>) -> bool {
 extension_sql!(
     r#"
 REVOKE ALL ON FUNCTION jev_native.scan(text,jsonb,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION jev_native.scan_mapped(text,jsonb,jsonb,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION jev_native.scan_many(jsonb,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION jev_native.execute_plan(jsonb,jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION jev_native.embed(text,jsonb,jsonb) FROM PUBLIC;
 COMMENT ON FUNCTION jev_native.scan(text,jsonb,jsonb) IS
 'Invoker-rights, bounded semantic evaluation over an explicit source SELECT. External model usage does not roll back with SQL.';
+COMMENT ON FUNCTION jev_native.scan_mapped(text,jsonb,jsonb,jsonb) IS
+'Invoker-rights semantic dictionaries with independent request packing and cross-window reuse. Returns bounded row windows with shared observations, per-question bindings and operational receipts.';
 COMMENT ON FUNCTION jev_native.scan_many(jsonb,jsonb) IS
 'One bounded native scheduler for independent source populations, with shared request admission and source-local result identity.';
 COMMENT ON FUNCTION jev_native.execute_plan(jsonb,jsonb) IS
@@ -241,6 +275,7 @@ COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS
     name = "native_permissions",
     requires = [
         scan,
+        scan_mapped,
         scan_many,
         require_bool,
         decide,

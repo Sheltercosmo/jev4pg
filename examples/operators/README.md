@@ -47,6 +47,7 @@ Build and configure the [Rust extension](../../native/README.md) first. These sc
 | Example | Purpose |
 | --- | --- |
 | [native_embedding.sql](native_embedding.sql) | Define a question basis, store answer probabilities and rank messages against one search input. |
+| [native_dictionary.sql](native_dictionary.sql) | Judge distinct required values, join back to original rows and preserve NULL states and duplicate counts. |
 | [native_plan.sql](../planning/native_plan.sql) | Compose SQL and semantic stages under a shared scheduler. |
 | [conditional_plan.sql](../planning/conditional_plan.sql) | Route rows to selected questions and merge decisions without treating skipped work as false. |
 

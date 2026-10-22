@@ -52,6 +52,9 @@ def verify_registry_runtime(connection, observations, gates, config_path):
         from policy import verify_registry_policy
 
         checks.extend(verify_registry_policy(connection, observations))
+        from record_map import verify_mapped_registry
+
+        checks.extend(verify_mapped_registry(connection, observations))
         from plans import verify_plan_replay
 
         checks.extend(verify_plan_replay(connection, observations))
