@@ -1,6 +1,7 @@
 """Bounded application connections, view guards and verified TLS."""
 
 import os
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -84,14 +85,18 @@ def test_guard_capacity_does_not_consume_main_slots_and_is_reused(bounded, insta
             ).one()
             assert identity in {row[0] for row in identities} and tenant == "reused"
     db.engine.dispose()
-    with installation["owner"].engine.connect() as owner:
-        assert (
-            owner.execute(
+    with installation["owner"].engine.connect().execution_options(isolation_level="AUTOCOMMIT") as owner:
+        # Closing client sockets precedes PostgreSQL removing their backend entries.
+        deadline = time.monotonic() + 5
+        while True:
+            remaining = owner.execute(
                 text("SELECT count(*) FROM pg_stat_activity WHERE application_name=:name"),
                 {"name": name},
             ).scalar_one()
-            == 0
-        )
+            if remaining == 0 or time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+        assert remaining == 0
 
 
 def test_main_checkout_timeout_releases_view_guard_and_locks(source, bounded):

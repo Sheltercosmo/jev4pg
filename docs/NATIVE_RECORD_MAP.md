@@ -5,11 +5,11 @@ Evaluate distinct semantic inputs, then map their decisions back to the original
 Two interfaces are available:
 
 * Existing native SQL can evaluate a distinct projected relation and join its results back. The [SQL example](../examples/operators/native_dictionary.sql) uses `jev_native.scan`.
-* The development SQL function `jev_native.scan_mapped` uses the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. This function is newer than native preview 0.2.0.
+* Native preview 0.3.0 adds `jev_native.scan_mapped`, using the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. Build from `main`; the application tag v0.7.0 includes native preview 0.2.0.
 
 ## Direct PostgreSQL usage
 
-After installing the current development extension, grant access explicitly:
+After [building and installing](../native/README.md#build) the current extension, run `CREATE EXTENSION jev_native` for a new installation. Existing 0.1.0 or 0.2.0 installations can use `ALTER EXTENSION jev_native UPDATE TO '0.3.0'`. Grant the new function explicitly:
 
 ```sql
 GRANT EXECUTE ON FUNCTION jev_native.scan_mapped(text,jsonb,jsonb,jsonb) TO analyst;
@@ -89,7 +89,7 @@ Each question carries its own structured record. This avoids resolving row posit
 
 The default cache allows 8 MB of accounted serialized evidence and identity metadata, with a five-minute TTL. This is an accounting bound, not an exact process-memory limit. `Session::new(bytes, Duration)` accepts up to 8 MB and one day; zero capacity or age disables retention. Least recently used request batches are evicted as needed. A batch is the eviction unit because its questions share one authentic provider observation.
 
-Identity includes the projected values, question instructions, type, candidates or rubric, endpoint identity and pinned model revision. JSON key order and equivalent decimal spellings do not change identity; strings, booleans and different exact integers remain distinct. Adding an independent question does not invalidate existing judgments. Changing thresholds reinterprets saved probabilities without another request.
+Identity includes the projected values, question instructions, type, candidates or rubric, endpoint identity and pinned model revision. JSON key order and equivalent decimal spellings do not change identity; strings, booleans and different exact integers remain distinct. Adding an independent question does not invalidate existing judgments. Changing thresholds reinterprets saved probabilities without another request. Each retained response is validated once per input window under the current policy, then its decisions are mapped to all matching rows.
 
 `decisions` preserves input order and multiplicity. `bindings` connects each row/question to a provider question in `observations`. These are the actual complete request observations, not fabricated per-row responses. `unique_judgments` counts missing identities, including work subsequently blocked by admission; `reused_judgments` counts rows served from retained evidence. Provider usage remains on the executor.
 

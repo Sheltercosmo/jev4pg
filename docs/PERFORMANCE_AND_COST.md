@@ -1,6 +1,10 @@
 # Performance and cost
 
-The native preview changes where semantic work runs and how it is shared. It has deterministic Rust and PostgreSQL integration tests, but no published end-to-end speed, cost or retrieval-quality comparison for this native version. The earlier tutorial results do not measure the native executor.
+Native preview 0.3.0 has a [paired semantic filtering comparison](benchmarks/SEMANTIC_FILTERING.md) against the pg-jev 0.2.1 request path. It measures language accuracy, executor latency, provider calls, tokens and continuous reuse. PostgreSQL scans and indexes are excluded; end-to-end database throughput and embedding retrieval quality still need separate measurements.
+
+## Semantic filtering comparison
+
+On the frozen 400-review holdout, mapped execution reached 98.0% accuracy versus 92.0%, at median latency of 469 versus 732 ms. Three independent predicates required 38 rather than 60 requests. With the same declared-column projections, input tokens fell from 1,495 to 954. The complete-record review case used 9.7% more input tokens, and the single-predicate case was slower. See [all workloads, limits and reproduction](benchmarks/SEMANTIC_FILTERING.md).
 
 ## BIRD Challenging comparison
 
@@ -12,6 +16,7 @@ The [archived 100-question BIRD evaluation](benchmarks/BIRD_CHALLENGING_100.md) 
 | --- | --- |
 | Exact SQL filtering, joins and arithmetic | None. PostgreSQL performs the calculation. |
 | Native scan or embedding | Missing questions sharing one context are batched in a request. Independent contexts run concurrently within configured limits. |
+| Native `scan_mapped` | Missing exact question/context pairs are packed together. Per-question dictionaries and a bounded invocation cache reduce repeated inference across windows. |
 | Compatible observation reuse | No new inference for the reused observation. Persistent reuse requires the evidence registry. |
 | `decide`, `answer_matrix`, `embedding_distance` | None. These apply policy, project distributions or compare stored matrices locally. |
 | Hybrid planning | One SQL generation by default; a supported repair can add one. JEV context selection and review have separate usage. |
@@ -22,6 +27,8 @@ Sharing context reduces repeated input; concurrency overlaps independent request
 
 Native results include `usage`, `receipt` and `policy`. Usage records cumulative admitted requests, judgments, input bytes and reused rows for the invocation. Take the maximum counters over the complete result; do not sum repeated row counters. Admission is not provider billing: a request can fail after admission.
 
+`scan_mapped` returns cumulative counters in `usage.executor` and per-window counters in `usage.window`. Shared provider observations, row bindings and available registry receipts are in `evidence`. [Mapped result contract](NATIVE_RECORD_MAP.md#direct-postgresql-usage).
+
 For API operators and hybrid queries, inspect returned usage and plan details. Separate LLM generation, JEV selection and review, and data execution. Record missing or failed work even when a proposal remains available for review.
 
 Dollar cost depends on the configured service or local hardware. `SDD_JEV_INPUT_USD_PER_MILLION` controls the application's input-token estimate; its default `0.042` is an accounting assumption, not a provider quote. Include output charges and local compute separately. Native byte counters are not token counts or a billing estimate.
@@ -31,6 +38,8 @@ Dollar cost depends on the configured service or local hardware. `SDD_JEV_INPUT_
 Put exact filters and only required fields inside native source SQL. An outer LIMIT does not promise to reduce provider work. Use a compact question basis for embeddings, preserve its identity, embed each search input once and compare stored vectors locally.
 
 Use `scan_many` or a shared stage plan for independent populations. Configure the [evidence registry](NATIVE_EVIDENCE.md) for reuse across connections. Changing source content, questions or evaluator revision can require new observations.
+
+Use [`scan_mapped`](NATIVE_RECORD_MAP.md) for many small independent judgments or repeated values. Declare every required context field per question; the executor can then evaluate distinct inputs and restore row multiplicity locally. Cache capacity and age are bounded, and the in-process session belongs to one SQL invocation.
 
 Native `concurrency` defaults to 4 and is limited to 16 per invocation. `max_requests`, `max_judgments`, `max_rows` and `max_input_bytes` bound different resources. The registry adds shared admission across sessions. Synchronous native calls hold a PostgreSQL backend during inference; size connection pools accordingly. Attached view sources need an additional guard connection.
 

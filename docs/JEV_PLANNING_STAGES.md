@@ -76,8 +76,7 @@ When configured, the native registry owns cross-query claims and provider admiss
 
 ## Mapped SQL execution
 
-
-The development SQL `scan_mapped` interface and Rust [record-map session](NATIVE_RECORD_MAP.md) adds an alternative execution layout for a ready, independent frontier. Existing `scan` calls and the application planner retain their current layout.
+The development SQL `scan_mapped` interface and Rust [record-map session](NATIVE_RECORD_MAP.md) add an alternative execution layout for a ready, independent frontier. Existing `scan` calls and the application planner retain their current layout.
 
 | Step | Dependency | Parallel placement and reason |
 | --- | --- | --- |

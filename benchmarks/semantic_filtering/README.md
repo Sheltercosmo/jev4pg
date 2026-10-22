@@ -1,6 +1,6 @@
 # Semantic filtering benchmark
 
-Compare the production Rust executor, the development record-map API, and the request builder from [pg-jev](https://github.com/realZachi/pg-jev), pinned to commit `e3450d44f7f6745aa2d728c9289b9ca4a6feda9a` (0.2.1).
+Compare the native Rust executor and mapped execution in preview 0.3.0 with the request builder from [pg-jev](https://github.com/realZachi/pg-jev), pinned to commit `e3450d44f7f6745aa2d728c9289b9ca4a6feda9a` (0.2.1). See the [published comparison](../../docs/benchmarks/SEMANTIC_FILTERING.md).
 
 This measures executor and HTTP request paths. It does not compare full PostgreSQL scans, indexes, read-ahead, LIMIT behavior, durable registries or end-to-end SQL throughput. The extracted upstream functions remain unchanged; the harness supplies scheduling and exact deduplication. No upstream benchmark score is presented as our measurement.
 
@@ -13,11 +13,13 @@ git clone https://github.com/realZachi/pg-jev .runtime/pg-jev-reference
 git -C .runtime/pg-jev-reference checkout e3450d44f7f6745aa2d728c9289b9ca4a6feda9a
 cargo build --release --locked --manifest-path native/Cargo.toml -p jev-executor --example measure
 python benchmarks/semantic_filtering/prepare_reviews.py --output .runtime/semantic-filtering/reviews.json
-python benchmarks/semantic_filtering/run.py --split development --live \
+python benchmarks/semantic_filtering/run.py --split development_v2 --live \
   --reviews .runtime/semantic-filtering/reviews.json \
   --workloads single,three_predicates,paraphrased,chinese,renamed,repeated_contexts,wide,reviews \
-  --methods native,native_map,pgjev_request_path,native_dictionary,pgjev_dictionary \
+  --methods native_map,pgjev_request_path,native_dictionary,pgjev_dictionary \
   --output reports/semantic-filtering/development.json
+python benchmarks/semantic_filtering/summarize.py reports/semantic-filtering/development.json \
+  --output reports/semantic-filtering/development.csv
 ```
 
 Set `TYPESAFE_API_KEY` or `SDD_JEV_API_KEY` locally. `--env-file` reads a private configuration file; `--proxy` configures the common forwarding connection. `--native` selects a target-specific binary, including `.exe` on Windows. `httpx` is the only third-party Python dependency. Omitting `--live` uses a transport fixture and reports no language-accuracy score.
@@ -38,7 +40,7 @@ Runs alternate method order, repeat three times by default, and start with fresh
 
 ## Splits and scoring
 
-Development, validation and test contain 40, 80 and 400 rows per ordinary workload. Duplicate workloads contain five times as many rows. Controlled roles, countries and phrase predicates follow the categories in pg-jev's published filtering example. Paraphrases, Simplified Chinese, renamed Chinese fields and wider records check representation changes. Their categories overlap between splits; they are not unseen concepts or independent generalization tasks.
+The current splits are `development_v2`, `validation_v2` and `test_v2`, with 400 rows per ordinary workload. Duplicate workloads contain five times as many rows. Earlier split aliases remain available for reproduction; the current comparison uses the v2 holdout. Controlled roles, countries and phrase predicates follow the categories in pg-jev's published filtering example. Paraphrases, Simplified Chinese, renamed Chinese fields and wider records check representation changes. Their categories overlap between splits; they are not unseen concepts or independent generalization tasks.
 
 Real reviews come from the [UCI Sentiment Labelled Sentences dataset](https://archive.ics.uci.edu/dataset/331/sentiment+labelled+sentences), Kotzias (2015), DOI `10.24432/C57604`, CC BY 4.0. The preparation script rejects conflicting duplicate labels and creates deterministic, text-disjoint splits by content hash. The archive hash is recorded. Data remains local; the repository contains no downloaded corpus.
 
