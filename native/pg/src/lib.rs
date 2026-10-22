@@ -307,7 +307,8 @@ COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS
         execute_plan,
         embed,
         answer_matrix,
-        embedding_distance
+        embedding_distance,
+        embedding_distances
     ]
 );
 
