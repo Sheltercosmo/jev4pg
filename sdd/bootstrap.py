@@ -9,7 +9,7 @@ from .postgres_security import secure
 from .schema import CATALOG_SCHEMA, metadata
 
 SCHEMA_VERSION = 4
-NATIVE_EXTENSION_VERSION = "0.3.0"
+NATIVE_EXTENSION_VERSION = "0.4.0"
 IMMUTABLE_TABLES = {
     "source_versions",
     "evaluator_revisions",
@@ -148,7 +148,7 @@ def migrate(
                 installed = connection.execute(
                     text("SELECT extversion FROM pg_extension WHERE extname='jev_native'")
                 ).scalar_one()
-                if installed in {"0.1.0", "0.2.0"}:
+                if installed in {"0.1.0", "0.2.0", "0.3.0"}:
                     connection.exec_driver_sql(
                         f"ALTER EXTENSION jev_native UPDATE TO '{NATIVE_EXTENSION_VERSION}'"
                     )

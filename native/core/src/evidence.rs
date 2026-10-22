@@ -1,6 +1,6 @@
 //! Portable observations and local decision policies. No provider I/O occurs on replay.
 
-use crate::{Decisions, Provider, Questions, resolve, validate_questions};
+use crate::{Decisions, Provider, Questions, resolve, resolve_validated, validate_questions};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -90,9 +90,19 @@ impl Observation {
         provider: &Provider,
         response: Value,
     ) -> Result<Self, &'static str> {
-        validate_questions(questions)?;
-        resolve(&response, questions, &provider.model, &Policy::default())?;
-        Ok(Self {
+        Self::capture_with_policy(source, questions, provider, response, &Policy::default())
+            .map(|(observation, _)| observation)
+    }
+
+    pub fn capture_with_policy(
+        source: &Value,
+        questions: &Questions,
+        provider: &Provider,
+        response: Value,
+        policy: &Policy,
+    ) -> Result<(Self, Decisions), &'static str> {
+        let decisions = resolve(&response, questions, &provider.model, policy)?;
+        let observation = Self {
             format_version: 1,
             context_sha256: context_identity(source)?,
             evaluator: provider.into(),
@@ -102,7 +112,8 @@ impl Observation {
                 .duration_since(UNIX_EPOCH)
                 .map_err(|_| "System clock precedes the Unix epoch")?
                 .as_millis() as u64,
-        })
+        };
+        Ok((observation, decisions))
     }
 
     pub fn decide(&self, source: &Value, policy: Policy) -> Result<Decisions, &'static str> {
@@ -110,8 +121,7 @@ impl Observation {
         if self.context_sha256 != context_identity(source)? {
             return Err("Observation context does not match the supplied source");
         }
-        policy.validate()?;
-        resolve(
+        resolve_validated(
             &self.response,
             &self.questions,
             &self.evaluator.model,
@@ -126,12 +136,23 @@ impl Observation {
         provider: &Provider,
         policy: Policy,
     ) -> Result<Decisions, &'static str> {
-        if self.identity()? != request_identity(source, questions, provider)? {
+        self.validate_envelope()?;
+        let context = context_identity(source)?;
+        if self.context_sha256 != context
+            || self.evaluator != EvaluatorIdentity::from(provider)
+            || evidence_identity(&context, &self.questions, &self.evaluator)?
+                != evidence_identity(&context, questions, &self.evaluator)?
+        {
             return Err(
                 "Observation does not match the requested context, questions and evaluator",
             );
         }
-        self.decide(source, policy)
+        resolve_validated(
+            &self.response,
+            &self.questions,
+            &self.evaluator.model,
+            &policy,
+        )
     }
 
     pub fn identity(&self) -> Result<String, &'static str> {

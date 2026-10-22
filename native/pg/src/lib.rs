@@ -3,9 +3,9 @@ mod mapped;
 mod plan;
 
 use execution::{SemanticScan, SourceSpec};
+use jev_executor::Decisions;
 use jev_executor::embedding::{AnswerMatrix, Basis};
 use jev_executor::evidence::{EvaluatorIdentity, Observation, Policy};
-use jev_executor::{Decision, Decisions};
 use pgrx::JsonB;
 use pgrx::prelude::*;
 
@@ -209,6 +209,35 @@ fn embedding_distance(left: Option<JsonB>, right: Option<JsonB>) -> f64 {
 }
 
 #[pg_extern(immutable, parallel_safe)]
+fn embedding_distances(
+    query: Option<JsonB>,
+    candidates: Option<JsonB>,
+) -> TableIterator<'static, (name!(ordinal, i64), name!(distance, f64))> {
+    let query = query.unwrap_or_else(|| error!("Query embedding is required"));
+    let candidates = candidates.unwrap_or_else(|| error!("Candidate embeddings are required"));
+    if serde_json::to_vec(&query.0).expect("JSON serializes").len() > 2_000_000
+        || serde_json::to_vec(&candidates.0)
+            .expect("JSON serializes")
+            .len()
+            > 8_000_000
+    {
+        error!("Query embedding exceeds 2 MB or candidate batch exceeds 8 MB");
+    }
+    let query: AnswerMatrix =
+        serde_json::from_value(query.0).unwrap_or_else(|_| error!("Invalid query matrix"));
+    let candidates: Vec<AnswerMatrix> = serde_json::from_value(candidates.0)
+        .unwrap_or_else(|_| error!("Supply an array of candidate matrices"));
+    let distances = jev_executor::embedding::distances(&query, &candidates)
+        .unwrap_or_else(|message| error!("{}", message));
+    TableIterator::new(
+        distances
+            .into_iter()
+            .enumerate()
+            .map(|(index, distance)| ((index + 1) as i64, distance)),
+    )
+}
+
+#[pg_extern(immutable, parallel_safe)]
 fn decide(
     source: Option<JsonB>,
     observation: Option<JsonB>,
@@ -233,17 +262,11 @@ fn require_bool(decisions: Option<JsonB>, question_id: Option<&str>) -> bool {
     let decisions = decisions
         .unwrap_or_else(|| error!("Semantic decisions are required; SQL NULL is unresolved"));
     let question_id = question_id.unwrap_or_else(|| error!("Question identity is required"));
-    let decision: Decision = serde_json::from_value(
-        decisions
-            .0
-            .get(question_id)
-            .cloned()
-            .unwrap_or_else(|| error!("Question is absent from the semantic result")),
-    )
-    .unwrap_or_else(|_| error!("Invalid semantic decision"));
-    decision
-        .require_bool()
-        .unwrap_or_else(|message| error!("{}", message))
+    let decision = decisions
+        .0
+        .get(question_id)
+        .unwrap_or_else(|| error!("Question is absent from the semantic result"));
+    jev_executor::require_bool_value(decision).unwrap_or_else(|message| error!("{}", message))
 }
 
 extension_sql!(
@@ -267,6 +290,8 @@ COMMENT ON FUNCTION jev_native.answer_matrix(jsonb,jsonb,jsonb) IS
 'Project supplied typed decisions onto a fixed question basis without model I/O. Missing answers retain NULL cells and explicit operational states.';
 COMMENT ON FUNCTION jev_native.embedding_distance(jsonb,jsonb) IS
 'Root mean squared Hellinger distance across questions, requiring complete probability matrices with the same basis and evaluator revision.';
+COMMENT ON FUNCTION jev_native.embedding_distances(jsonb,jsonb) IS
+'Compare one query with up to 512 candidate matrices locally, preparing the query once. Ordinals are one-based and preserve candidate order.';
 COMMENT ON FUNCTION jev_native.require_bool(jsonb,text) IS
 'Require a resolved Boolean value; UNKNOWN and NOT_EVALUATED cannot silently become false.';
 COMMENT ON FUNCTION jev_native.decide(jsonb,jsonb,jsonb) IS

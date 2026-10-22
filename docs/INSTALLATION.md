@@ -11,7 +11,7 @@ Choose the application deployment or the native execution preview:
 | Path | Requirements | Execution |
 | --- | --- | --- |
 | Application, v0.8.0 | Python 3.11+, PostgreSQL 17 or Docker Compose v2 | Workspace, HTTP API, background queries, source attachments and asynchronous `jev.*` SQL jobs. |
-| Native extension, 0.3.0 preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
+| Native extension, 0.4.0 development preview | Docker Compose, or PostgreSQL 17 on Linux with Rust 1.96, pgrx 0.19.2 and build headers | Synchronous `jev_native.*` functions inside PostgreSQL; optional application integration. |
 
 The default Compose stack does not include the Rust extension. PostgreSQL performs storage, joins, arithmetic and transactions in both paths.
 
@@ -131,6 +131,7 @@ Application, catalog and extension compatibility:
 | Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
 | Released `v0.7.0` tag | 0.7.0 | 4 | 0.2.0 preview |
 | Released `v0.8.0` tag | 0.8.0 | 4 | 0.3.0 preview |
+| Development checkout | 0.8.0 | 4 | 0.4.0 preview |
 
 The Python distribution was renamed from `jevsd-pg` to `jev4pg`. For installations outside Compose, create a fresh virtual environment and install the new wheel or source checkout there; do not install both distributions over one another. They share the `sdd` import namespace. Point the existing service supervisor at the new environment after migration. The `jevsd-pg` and `sdd` command aliases remain available.
 

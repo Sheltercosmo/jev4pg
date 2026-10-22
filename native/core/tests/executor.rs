@@ -78,6 +78,18 @@ fn parallel_batches_reuse_context_and_enforce_one_query_budget() {
     assert_eq!(executor.usage.judgments, 6);
     assert_eq!(executor.evaluate(&rows, &questions, || {}).unwrap(), first);
     assert_eq!(executor.usage.requests, 3);
+    executor.limits.accept = 0.99;
+    let reinterpreted = executor.evaluate(&rows, &questions, || {}).unwrap();
+    assert!(
+        reinterpreted
+            .iter()
+            .all(|row| matches!(row.decisions["en"], Decision::Unknown { .. }))
+    );
+    assert_eq!(executor.usage.requests, 3);
+    assert_eq!(reinterpreted[0].observation, first[0].observation);
+    executor.limits.accept = 0.1;
+    assert!(executor.evaluate(&rows, &questions, || {}).is_err());
+    executor.limits.accept = 0.8;
     let held = executor
         .evaluate(&[json!({"text":"New"})], &questions, || {})
         .unwrap();

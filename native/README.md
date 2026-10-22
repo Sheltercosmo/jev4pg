@@ -1,6 +1,6 @@
 # Native semantic execution
 
-Native preview 0.3.0 of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the application's asynchronous `jev.*` queue interface.
+Native preview 0.4.0 of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the application's asynchronous `jev.*` queue interface.
 
 PostgreSQL filters, projects and joins source data. A cursor supplies bounded batches to Rust. Questions about one context share a request; independent contexts run concurrently. PostgreSQL receives the original projected row and its typed decisions.
 
@@ -9,6 +9,8 @@ For dependent work, `jev_native.execute_plan` runs a typed stage DAG with Postgr
 For reusable probability features, `jev_native.embed` batches a fixed basis of questions and returns an answer probability matrix and vector per row. [Native embeddings](../docs/NATIVE_EMBEDDINGS.md) covers projection, states, evidence reuse and local similarity queries.
 
 For repeated values, use `jev_native.scan_mapped` to judge [distinct required contexts](../docs/NATIVE_RECORD_MAP.md), pack independent operations and reuse evidence across cursor windows. It returns bounded row windows with shared observations and receipts. Existing `scan` retains its original request layout. See the [semantic filtering comparison](../docs/benchmarks/SEMANTIC_FILTERING.md).
+
+See [execution optimization](../docs/NATIVE_OPTIMIZATION.md) for shared caching, fewer request preparations and batch embedding comparison.
 
 ## Build
 

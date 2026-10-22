@@ -1,5 +1,7 @@
 # Documentation
 
+[Native optimization](NATIVE_OPTIMIZATION.md) covers shared caching, request preparation and batch embedding comparisons in native 0.4.0 development.
+
 Start with [installation](INSTALLATION.md) for the released application or [native Compose](NATIVE_DEPLOYMENT.md) for the Rust preview. Start with [guided setup and portable SQL](EASY_SETUP.md) for an existing PostgreSQL server. Synchronous native SQL uses the [native build guide](../native/README.md). The default Compose stack uses the Python runtime.
 
 ## Use the database

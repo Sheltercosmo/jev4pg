@@ -129,3 +129,23 @@ fn failed_state_cannot_authorize_membership() {
     .unwrap();
     assert!(malformed.require_bool().is_err());
 }
+#[test]
+fn borrowed_membership_guard_keeps_typed_failure_behavior() {
+    use jev_executor::{Decision, require_bool_value};
+    use serde_json::json;
+    for value in [
+        json!({"output_state":"VALUE","operation_state":"SUCCEEDED","value":false,"raw":{}}),
+        json!({"output_state":"VALUE","operation_state":"SUCCEEDED","value":true,"raw":null}),
+        json!({"output_state":"VALUE","operation_state":"FAILED","value":true,"raw":{}}),
+        json!({"output_state":"VALUE","operation_state":"SUCCEEDED","value":"true","raw":{}}),
+        json!({"output_state":"VALUE","operation_state":"SUCCEEDED","value":true}),
+        json!({"output_state":"UNKNOWN","operation_state":"SUCCEEDED","raw":{}}),
+        json!({"output_state":"NOT_EVALUATED","operation_state":"SKIPPED","reason":"not selected"}),
+        json!(null),
+    ] {
+        let old = serde_json::from_value::<Decision>(value.clone())
+            .ok()
+            .and_then(|decision| decision.require_bool().ok());
+        assert_eq!(require_bool_value(&value).ok(), old);
+    }
+}

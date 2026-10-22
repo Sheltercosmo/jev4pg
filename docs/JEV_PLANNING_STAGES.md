@@ -90,3 +90,13 @@ The development SQL `scan_mapped` interface and Rust [record-map session](NATIVE
 | Map and aggregate | Decisions and original row identities | Local mapping restores duplicates and input order. SQL aggregates the original population after required decisions resolve. UNKNOWN and unexecuted work remain explicit. |
 
 Cache lookup does not authorize omission of a required field. Candidate extraction can precede a Choice when exact code can enumerate a sufficiently complete candidate set; no-match remains an explicit outcome. Stored compatible probability matrices can rank candidates locally, but similarity is not a proof that two records have the same answer. These local operations introduce no serial JEV barrier. Conditional branches must still follow their declared eligibility rules.
+
+## Native computation and cache placement
+
+Native 0.4 reuses exact invocation-local evidence before durable lookup and request admission. A warm frontier skips the asynchronous scheduler; missing identities still share the same bounded concurrent executor. Registry scope changes clear local evidence. LRU eviction removes only enough old entries to respect the serialized allowance.
+
+Fresh response validation produces both raw observations and current-policy decisions in one pass. A changed policy reinterprets the saved probabilities locally. Neither path adds a dependency between independent questions or turns unexecuted work into a negative result. Mapped questions sharing declared fields reuse context hashing before packing; this requires equal projected context, not semantic similarity.
+
+Probability projection follows validated typed answers. Batch distance prepares the query once, then compares independent candidates locally; Rust callers can also retain prepared candidates. These SQL functions are parallel-safe and make no provider request. Every candidate must have complete probabilities and matching basis/evaluator identity before the batch returns.
+
+The HTTP runtime performs bounded bulk evidence lookup before packing, then rechecks evidence under its existing in-process request lock. Only missing work reaches admission. Exact incremental UTF-8 sizing changes preparation cost without changing context, batch boundaries or stage dependencies. Source freshness and cancellation are checked again before publishing observations.

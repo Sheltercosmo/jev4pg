@@ -21,6 +21,49 @@ fn evaluator() -> Option<EvaluatorIdentity> {
     })
 }
 
+#[test]
+fn prepared_and_batch_distances_match_scalar_math_and_reject_partial_inputs() {
+    use jev_executor::embedding::{PreparedMatrix, distances};
+    let basis = Basis::parse(basis()).unwrap();
+    let matrices: Vec<_> = [0.0, 0.11, 0.5, 0.93, 1.0]
+        .iter()
+        .map(|p| {
+            let decisions = resolve(
+                &answers(*p, json!({"a":p,"b":1.0-p,"c":0.0})),
+                &basis.questions,
+                "model",
+                &Policy::default(),
+            )
+            .unwrap();
+            basis.project(&decisions, evaluator()).unwrap()
+        })
+        .collect();
+    for query in &matrices {
+        let batch = distances(query, &matrices).unwrap();
+        let prepared = PreparedMatrix::new(query).unwrap();
+        for (candidate, actual) in matrices.iter().zip(batch) {
+            let expected = distance(query, candidate).unwrap();
+            assert!((expected - actual).abs() < 1e-12);
+            assert!(
+                (prepared
+                    .distance(&PreparedMatrix::new(candidate).unwrap())
+                    .unwrap()
+                    - expected)
+                    .abs()
+                    < 1e-12
+            );
+        }
+    }
+    assert!(distances(&matrices[0], &[]).unwrap().is_empty());
+    assert!(distances(&matrices[0], &vec![matrices[0].clone(); 513]).is_err());
+    let mut broken = matrices[0].clone();
+    broken.vector[0] = Some(0.123);
+    assert!(distances(&matrices[1], &[broken]).is_err());
+    let mut incomplete = matrices[0].clone();
+    incomplete.complete = false;
+    assert!(distances(&incomplete, &[]).is_err());
+}
+
 fn answers(p: f64, distribution: Value) -> Value {
     json!({"model":"model","answers":{
         "action":{"type":"noul","noul":p},

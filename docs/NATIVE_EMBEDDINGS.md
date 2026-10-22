@@ -88,6 +88,8 @@ LIMIT 10;
 
 Embed the search input once using the stored basis before running this query. Distance comparisons perform no model calls. This query performs exact comparisons over the selected stored rows. Retrieval quality depends on the question basis and provider; the deterministic integration tests establish execution behavior, not retrieval accuracy.
 
+Native 0.4.0 also provides `embedding_distances(query, candidates)`: supply up to 512 matrices in a JSON array and receive their one-based ordinals and exact distances. Query preparation happens once per batch. See [batch SQL usage and computation reuse](NATIVE_OPTIMIZATION.md#exact-local-comparison).
+
 ## Reuse existing decisions and stage graphs
 
 `jev_native.answer_matrix(basis, decisions, evaluator DEFAULT NULL)` projects existing typed decisions without provider I/O. It reads the questions named by the basis, so a subset can reuse a larger shared batch. Missing questions retain null cells. Pass the evaluator identity from their observation when the result will be compared with another embedding:

@@ -46,6 +46,7 @@ These development functions run in the Rust extension through SQL. They are sepa
 | `jev_native.embed(source_sql, basis, options)` | Evaluate a shared question basis and return a probability matrix and vector for each source row. |
 | `jev_native.answer_matrix(basis, decisions, evaluator)` | Project existing typed decisions into the same representation without model calls. |
 | `jev_native.embedding_distance(left, right)` | Compare complete matrices with matching basis and evaluator identities locally. |
+| `jev_native.embedding_distances(query, candidates)` | Compare one query with up to 512 matrices, preparing the query once. Returns one-based ordinals and exact distances. See [native optimization](NATIVE_OPTIMIZATION.md). |
 
 ## HTTP operators
 

@@ -1,5 +1,6 @@
 //! Typed semantic evaluation. PostgreSQL owns source selection and arithmetic.
 
+mod cache;
 pub mod conditional;
 pub mod embedding;
 pub mod evidence;
@@ -107,6 +108,18 @@ impl Decision {
             _ => Err("An unresolved semantic decision cannot determine exact membership"),
         }
     }
+}
+
+pub fn require_bool_value(decision: &Value) -> Result<bool, &'static str> {
+    if decision["output_state"] != "VALUE" || decision["operation_state"] != "SUCCEEDED" {
+        return Err("An unresolved semantic decision cannot determine exact membership");
+    }
+    if decision.get("raw").is_none() {
+        return Err("Invalid semantic decision");
+    }
+    decision["value"]
+        .as_bool()
+        .ok_or("The decision is not Boolean")
 }
 
 #[derive(Clone, Deserialize)]
@@ -230,8 +243,7 @@ pub struct Executor {
     pub limits: Limits,
     client: reqwest::Client,
     runtime: tokio::runtime::Runtime,
-    cache: HashMap<String, Evaluation>,
-    cache_bytes: usize,
+    cache: cache::EvaluationCache,
     pub usage: Usage,
     registry: Option<Registry>,
 }
@@ -239,7 +251,6 @@ pub struct Executor {
 impl Executor {
     pub fn clear_memory_cache(&mut self) {
         self.cache.clear();
-        self.cache_bytes = 0;
     }
 
     pub fn evaluator(&self) -> evidence::EvaluatorIdentity {
@@ -276,8 +287,7 @@ impl Executor {
             limits,
             client,
             runtime,
-            cache: HashMap::new(),
-            cache_bytes: 0,
+            cache: cache::EvaluationCache::new(8_000_000),
             usage: Usage::default(),
             registry: None,
         })
@@ -290,7 +300,9 @@ impl Executor {
     ) -> Result<(), &'static str> {
         let identity = evidence::EvaluatorIdentity::from(&self.provider);
         let capacity = config.max_active as usize;
-        self.registry = Some(Registry::new(config, scope, identity.endpoint_sha256)?);
+        let registry = Registry::new(config, scope, identity.endpoint_sha256)?;
+        self.clear_memory_cache();
+        self.registry = Some(registry);
         self.limits.concurrency = self.limits.concurrency.min(capacity);
         Ok(())
     }
@@ -325,132 +337,119 @@ impl Executor {
         inputs: &[EvaluationInput<'_>],
         mut check_interrupt: impl FnMut(),
     ) -> Result<Vec<Evaluation>, &'static str> {
+        self.limits.validate()?;
         if inputs.len() > 512 {
             return Err("Independent frontier exceeds 512 requests");
         }
-        for input in inputs {
+        let policy = self.limits.policy();
+        let mut validated = std::collections::HashSet::new();
+        let mut results: Vec<Option<Evaluation>> = vec![None; inputs.len()];
+        let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut prepared = Vec::new();
+        let mut output_bytes = 0;
+        for (index, input) in inputs.iter().enumerate() {
             check_interrupt();
-            validate_questions(input.questions)?;
-        }
-        let mut identities = HashMap::new();
-        if self.registry.is_some() {
-            for (index, input) in inputs.iter().enumerate() {
-                let (active, _) = applicable_questions(input.source, input.questions)?;
-                if !active.is_empty() {
-                    identities.insert(
-                        index,
-                        request_identity(input.source, &active, &self.provider)?,
-                    );
+            if validated.insert(input.questions as *const Questions) {
+                validate_questions(input.questions)?;
+            }
+            let key = serde_json::to_string(&(input.source, input.questions))
+                .map_err(|_| "Invalid semantic input")?;
+            if let Some((cached, bytes)) = self.cache.get(&key, &policy)? {
+                output_bytes += bytes;
+                results[index] = Some(cached);
+                self.usage.reused_rows += 1;
+            } else if let Some(indices) = aliases.get_mut(&key) {
+                indices.push(index);
+                self.usage.reused_rows += 1;
+            } else {
+                let (active, skipped) = applicable_questions(input.source, input.questions)?;
+                if active.is_empty() {
+                    let result = Evaluation {
+                        decisions: skipped,
+                        observation: None,
+                        receipt: None,
+                    };
+                    output_bytes += serde_json::to_vec(&result)
+                        .map_err(|_| "Invalid result")?
+                        .len();
+                    results[index] = Some(result);
+                    continue;
                 }
+                aliases.insert(key.clone(), vec![index]);
+                let identity = self
+                    .registry
+                    .as_ref()
+                    .map(|_| request_identity(input.source, &active, &self.provider))
+                    .transpose()?;
+                prepared.push((key, input.source, active, skipped, identity));
             }
         }
+        if output_bytes > 8_000_000 {
+            return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
+        }
         let durable = if let Some(registry) = &mut self.registry {
-            let mut keys: Vec<_> = identities.values().cloned().collect();
+            let mut keys: Vec<_> = prepared
+                .iter()
+                .filter_map(|(_, _, _, _, id)| id.clone())
+                .collect();
             keys.sort_unstable();
             keys.dedup();
-            block_on_checked(&self.runtime, registry.lookup(&keys), &mut check_interrupt)
+            if keys.is_empty() {
+                Ok(HashMap::new())
+            } else {
+                block_on_checked(&self.runtime, registry.lookup(&keys), &mut check_interrupt)
+            }
         } else {
             Ok(HashMap::new())
         };
-        let mut results: Vec<Option<Evaluation>> = vec![None; inputs.len()];
-        let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
         let mut requests = Vec::new();
-        let mut output_bytes = 0;
-        for (index, input) in inputs.iter().enumerate() {
-            let row = input.source;
-            let questions = input.questions;
-            let (active, skipped) = applicable_questions(row, questions)?;
-            if active.is_empty() {
-                results[index] = Some(Evaluation {
-                    decisions: skipped,
-                    observation: None,
-                    receipt: None,
-                });
-                continue;
-            }
-            let key =
-                serde_json::to_string(&(row, questions)).map_err(|_| "Invalid semantic input")?;
-            if let Some(cached) = self.cache.get(&key) {
-                output_bytes += serde_json::to_vec(cached)
-                    .map_err(|_| "Invalid cached result")?
+        for (key, row, active, skipped, identity) in prepared {
+            check_interrupt();
+            let stored = match (&durable, identity.as_ref()) {
+                (Ok(saved), Some(id)) => saved
+                    .get(id)
+                    .map(|saved| replay(saved, row, &active, &self.provider, &self.limits)),
+                (Err(reason), Some(_)) => Some(Evaluation::unexecuted(
+                    &active,
+                    "COORDINATION_UNAVAILABLE",
+                    reason,
+                )),
+                _ => None,
+            };
+            if let Some(mut evaluation) = stored {
+                evaluation.decisions.extend(skipped);
+                let bytes = serde_json::to_vec(&evaluation)
+                    .map_err(|_| "Invalid stored result")?
                     .len();
+                output_bytes += bytes * aliases[&key].len();
                 if output_bytes > 8_000_000 {
                     return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
                 }
-                results[index] = Some(cached.clone());
-                self.usage.reused_rows += 1;
-                continue;
-            }
-            if let Some(indices) = aliases.get_mut(&key) {
-                if let Some(result) = &results[indices[0]] {
-                    output_bytes += serde_json::to_vec(result)
-                        .map_err(|_| "Invalid reused result")?
-                        .len();
-                    if output_bytes > 8_000_000 {
-                        return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
-                    }
+                if evaluation.observation.is_some() {
+                    self.usage.reused_rows += 1;
+                    self.cache.insert(key.clone(), &evaluation, &policy, bytes);
                 }
-                indices.push(index);
-                self.usage.reused_rows += 1;
-                continue;
-            }
-            aliases.insert(key.clone(), vec![index]);
-            if self.registry.is_some() {
-                match &durable {
-                    Ok(saved) => {
-                        if let Some(observation) = saved.get(&identities[&index]) {
-                            let mut evaluation =
-                                replay(observation, row, &active, &self.provider, &self.limits);
-                            evaluation.decisions.extend(skipped);
-                            output_bytes += serde_json::to_vec(&evaluation)
-                                .map_err(|_| "Invalid stored result")?
-                                .len();
-                            if output_bytes > 8_000_000 {
-                                return Err(
-                                    "Semantic result batch exceeds 8 MB; reduce batch_rows",
-                                );
-                            }
-                            results[index] = Some(evaluation);
-                            self.usage.reused_rows += 1;
-                            continue;
-                        }
-                    }
-                    Err(reason) => {
-                        let mut evaluation =
-                            Evaluation::unexecuted(&active, "COORDINATION_UNAVAILABLE", reason);
-                        evaluation.decisions.extend(skipped);
-                        results[index] = Some(evaluation);
-                        continue;
-                    }
+                for index in &aliases[&key] {
+                    results[*index] = Some(evaluation.clone());
                 }
+                continue;
             }
             let mut provider_questions =
                 serde_json::to_value(&active).map_err(|_| "Invalid questions")?;
             for question in provider_questions.as_object_mut().unwrap().values_mut() {
                 question.as_object_mut().unwrap().remove("subject_column");
             }
-            let payload = json!({"model": self.provider.model, "state": row, "questions": provider_questions});
-            let bytes = serde_json::to_vec(&payload)
-                .map_err(|_| "Invalid semantic input")?
-                .len();
-            if bytes > 1_000_000 {
+            let payload = serde_json::to_vec(&json!({"model": self.provider.model, "state": row, "questions": provider_questions}))
+                .map_err(|_| "Invalid semantic input")?;
+            if payload.len() > 1_000_000 {
                 return Err("One semantic input exceeds the 1 MB context limit");
             }
-            requests.push((
-                key,
-                payload,
-                row,
-                active,
-                skipped,
-                identities.get(&index).cloned(),
-                bytes,
-            ));
+            requests.push((key, payload, row, active, skipped, identity));
         }
         let provider = &self.provider;
         let client = &self.client;
         let limits = &self.limits;
         let cache = &mut self.cache;
-        let cache_bytes = &mut self.cache_bytes;
         let registry = self.registry.as_ref();
         let usage = &mut self.usage;
         let budget = tokio::sync::Mutex::new(RequestBudget {
@@ -465,70 +464,55 @@ impl Executor {
             registry,
             budget: &budget,
         };
-        self.runtime.block_on(async {
-            let pending = stream::iter(requests.into_iter().map(
-                |(key, payload, row, active, skipped, identity, bytes)| async move {
-                    let mut evaluation = context
-                        .evaluate(identity.as_deref(), row, &active, payload, bytes)
-                        .await;
-                    evaluation.decisions.extend(skipped);
-                    (key, evaluation)
-                },
-            ))
-            .buffer_unordered(limits.concurrency);
-            futures_util::pin_mut!(pending);
-            let mut tick = tokio::time::interval(Duration::from_millis(25));
-            loop {
-                let item = tokio::select! {
-                    item = pending.next() => item,
-                    _ = tick.tick() => {
-                        check_interrupt();
-                        continue;
+        let execution = if requests.is_empty() {
+            Ok(())
+        } else {
+            self.runtime.block_on(async {
+                let pending = stream::iter(requests.into_iter().map(
+                    |(key, payload, row, active, skipped, identity)| async move {
+                        let mut evaluation = context
+                            .evaluate(identity.as_deref(), row, &active, payload)
+                            .await;
+                        evaluation.decisions.extend(skipped);
+                        (key, evaluation)
                     },
-                };
-                let Some((key, evaluation)) = item else { break };
-                if let Some(receipt) = &evaluation.receipt {
-                    match receipt.storage_state.as_str() {
-                        "STORED" => usage.stored_observations += 1,
-                        "REUSED" => usage.reused_rows += 1,
-                        _ => {}
+                ))
+                .buffer_unordered(limits.concurrency);
+                futures_util::pin_mut!(pending);
+                let mut tick = tokio::time::interval(Duration::from_millis(25));
+                loop {
+                    let item = tokio::select! {
+                        item = pending.next() => item,
+                        _ = tick.tick() => { check_interrupt(); continue; },
+                    };
+                    let Some((key, evaluation)) = item else { break };
+                    if let Some(receipt) = &evaluation.receipt {
+                        match receipt.storage_state.as_str() {
+                            "STORED" => usage.stored_observations += 1,
+                            "REUSED" => usage.reused_rows += 1,
+                            _ => {}
+                        }
+                    }
+                    let bytes = serde_json::to_vec(&evaluation)
+                        .map_err(|_| "Invalid result")?
+                        .len();
+                    output_bytes += bytes * aliases[&key].len();
+                    if output_bytes > 8_000_000 {
+                        return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
+                    }
+                    cache.insert(key.clone(), &evaluation, &policy, bytes);
+                    for index in &aliases[&key] {
+                        results[*index] = Some(evaluation.clone());
                     }
                 }
-                let bytes = serde_json::to_vec(&evaluation)
-                    .map_err(|_| "Invalid result")?
-                    .len();
-                output_bytes += bytes * aliases[&key].len();
-                if output_bytes > 8_000_000 {
-                    return Err("Semantic result batch exceeds 8 MB; reduce batch_rows");
-                }
-                if evaluation.observation.is_some() {
-                    let entry_bytes = key.len() + bytes;
-                    if *cache_bytes + entry_bytes > 8_000_000 {
-                        cache.clear();
-                        *cache_bytes = 0;
-                    }
-                    if entry_bytes <= 8_000_000 {
-                        cache.insert(key.clone(), evaluation.clone());
-                        *cache_bytes += entry_bytes;
-                    }
-                }
-                for index in &aliases[&key] {
-                    results[*index] = Some(evaluation.clone());
-                }
-            }
-            Ok::<_, &'static str>(())
-        })?;
+                Ok::<_, &'static str>(())
+            })
+        };
         let budget = budget.into_inner();
         self.usage.requests = budget.requests;
         self.usage.judgments = budget.judgments;
         self.usage.input_bytes = budget.input_bytes;
-        for indices in aliases.values() {
-            if let Some(result) = results[indices[0]].clone() {
-                for index in indices {
-                    results[*index].get_or_insert_with(|| result.clone());
-                }
-            }
-        }
+        execution?;
         self.usage.durable_reused_rows += results
             .iter()
             .flatten()
@@ -615,9 +599,9 @@ impl RequestContext<'_> {
         identity: Option<&str>,
         row: &Value,
         questions: &Questions,
-        payload: Value,
-        input_bytes: usize,
+        payload: Vec<u8>,
     ) -> Evaluation {
+        let input_bytes = payload.len();
         // Serialize admission only; provider requests remain concurrent.
         let mut budget = self.budget.lock().await;
         if budget.requests + 1 > self.limits.max_requests
@@ -700,9 +684,13 @@ impl RequestContext<'_> {
         let response = send(self.client, self.provider, payload).await;
         let transport_failed = response.is_err();
         let evaluated = response.and_then(|value| {
-            let observation = Observation::capture(row, questions, self.provider, value)?;
-            let decisions =
-                observation.decide_for(row, questions, self.provider, self.limits.policy())?;
+            let (observation, decisions) = Observation::capture_with_policy(
+                row,
+                questions,
+                self.provider,
+                value,
+                &self.limits.policy(),
+            )?;
             Ok(Evaluation {
                 decisions,
                 observation: Some(observation),
@@ -776,9 +764,12 @@ fn unexecuted(questions: &Questions, state: &str, reason: &str) -> Decisions {
 async fn send(
     client: &reqwest::Client,
     provider: &Provider,
-    payload: Value,
+    payload: Vec<u8>,
 ) -> Result<Value, &'static str> {
-    let mut request = client.post(&provider.endpoint).json(&payload);
+    let mut request = client
+        .post(&provider.endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(payload);
     if !provider.api_key.is_empty() {
         request = request.bearer_auth(&provider.api_key);
     }
@@ -810,14 +801,116 @@ fn probability(value: &Value) -> Result<f64, &'static str> {
         .ok_or("Invalid probability")
 }
 
+pub(crate) fn answer_value(
+    q: &Question,
+    raw: &Value,
+    policy: &Policy,
+) -> Result<Option<Value>, &'static str> {
+    if raw["type"] != q.kind {
+        return Err("Response primitive does not match");
+    }
+    if let Some(confidence) = raw.get("confidence") {
+        probability(confidence)?;
+    }
+    let value = match q.kind.as_str() {
+        "noul" => {
+            let p = probability(&raw["noul"])?;
+            if p >= policy.accept {
+                Some(json!(true))
+            } else if p <= policy.reject {
+                Some(json!(false))
+            } else {
+                None
+            }
+        }
+        "choice" | "score" => {
+            let expected: Vec<String> = if q.kind == "choice" {
+                q.criteria
+                    .as_ref()
+                    .and_then(Value::as_object)
+                    .ok_or("Invalid choice options")?
+                    .keys()
+                    .cloned()
+                    .collect()
+            } else {
+                (0..q
+                    .criteria
+                    .as_ref()
+                    .and_then(Value::as_array)
+                    .ok_or("Invalid score levels")?
+                    .len())
+                    .map(|i| i.to_string())
+                    .collect()
+            };
+            let ps = raw["probabilities"]
+                .as_object()
+                .ok_or("Missing probabilities")?;
+            if ps.len() != expected.len() || expected.iter().any(|key| !ps.contains_key(key)) {
+                return Err("Probability options do not match");
+            }
+            let sum = ps
+                .values()
+                .try_fold(0.0, |sum, p| probability(p).map(|p| sum + p))?;
+            if (sum - 1.0).abs() > 0.03 {
+                return Err("Probabilities do not sum to one");
+            }
+            if q.kind == "choice" {
+                let selected = raw["choice"].as_str().ok_or("Missing selected option")?;
+                if !ps.contains_key(selected) {
+                    return Err("Selected option is outside criteria");
+                }
+                if policy.unknown_options.iter().any(|id| id == selected)
+                    || probability(&ps[selected])? < policy.choice_min
+                {
+                    None
+                } else {
+                    Some(json!(selected))
+                }
+            } else {
+                let score = raw["score"]
+                    .as_f64()
+                    .filter(|v| v.is_finite() && *v >= 0.0 && *v <= (expected.len() - 1) as f64)
+                    .ok_or("Invalid score")?;
+                let levels = q.criteria.as_ref().unwrap().as_array().unwrap();
+                let legend = raw["legend"].as_object().ok_or("Missing score legend")?;
+                if legend.len() != levels.len()
+                    || expected
+                        .iter()
+                        .enumerate()
+                        .any(|(i, key)| legend.get(key) != Some(&levels[i]))
+                {
+                    return Err("Score legend changed");
+                }
+                let confidence = raw
+                    .get("confidence")
+                    .map(probability)
+                    .transpose()?
+                    .unwrap_or(0.0);
+                (confidence >= policy.score_confidence_min).then(|| json!(score))
+            }
+        }
+        _ => return Err("Unsupported primitive"),
+    };
+    Ok(value)
+}
+
 pub fn resolve(
     response: &Value,
     questions: &Questions,
     model: &str,
     policy: &Policy,
 ) -> Result<Decisions, &'static str> {
-    policy.validate()?;
     validate_questions(questions)?;
+    resolve_validated(response, questions, model, policy)
+}
+
+pub(crate) fn resolve_validated(
+    response: &Value,
+    questions: &Questions,
+    model: &str,
+    policy: &Policy,
+) -> Result<Decisions, &'static str> {
+    policy.validate()?;
     if response["model"] != model {
         return Err("Response model does not match");
     }
@@ -836,98 +929,7 @@ pub fn resolve(
         .iter()
         .map(|(id, q)| {
             let raw = &answers[id];
-            if raw["type"] != q.kind {
-                return Err("Response primitive does not match");
-            }
-            if let Some(confidence) = raw.get("confidence") {
-                probability(confidence)?;
-            }
-            let value = match q.kind.as_str() {
-                "noul" => {
-                    let p = probability(&raw["noul"])?;
-                    if p >= policy.accept {
-                        Some(json!(true))
-                    } else if p <= policy.reject {
-                        Some(json!(false))
-                    } else {
-                        None
-                    }
-                }
-                "choice" | "score" => {
-                    let expected: Vec<String> = if q.kind == "choice" {
-                        q.criteria
-                            .as_ref()
-                            .and_then(Value::as_object)
-                            .ok_or("Invalid choice options")?
-                            .keys()
-                            .cloned()
-                            .collect()
-                    } else {
-                        (0..q
-                            .criteria
-                            .as_ref()
-                            .and_then(Value::as_array)
-                            .ok_or("Invalid score levels")?
-                            .len())
-                            .map(|i| i.to_string())
-                            .collect()
-                    };
-                    let ps = raw["probabilities"]
-                        .as_object()
-                        .ok_or("Missing probabilities")?;
-                    if ps.len() != expected.len()
-                        || expected.iter().any(|key| !ps.contains_key(key))
-                    {
-                        return Err("Probability options do not match");
-                    }
-                    let sum: f64 = ps
-                        .values()
-                        .map(probability)
-                        .collect::<Result<Vec<_>, _>>()?
-                        .iter()
-                        .sum();
-                    if (sum - 1.0).abs() > 0.03 {
-                        return Err("Probabilities do not sum to one");
-                    }
-                    if q.kind == "choice" {
-                        let selected = raw["choice"].as_str().ok_or("Missing selected option")?;
-                        if !ps.contains_key(selected) {
-                            return Err("Selected option is outside criteria");
-                        }
-                        if policy.unknown_options.iter().any(|id| id == selected)
-                            || probability(&ps[selected])? < policy.choice_min
-                        {
-                            None
-                        } else {
-                            Some(json!(selected))
-                        }
-                    } else {
-                        let score = raw["score"]
-                            .as_f64()
-                            .filter(|v| {
-                                v.is_finite() && *v >= 0.0 && *v <= (expected.len() - 1) as f64
-                            })
-                            .ok_or("Invalid score")?;
-                        let levels = q.criteria.as_ref().unwrap().as_array().unwrap();
-                        let legend = raw["legend"].as_object().ok_or("Missing score legend")?;
-                        if legend.len() != levels.len()
-                            || expected
-                                .iter()
-                                .enumerate()
-                                .any(|(i, key)| legend.get(key) != Some(&levels[i]))
-                        {
-                            return Err("Score legend changed");
-                        }
-                        let confidence = raw
-                            .get("confidence")
-                            .map(probability)
-                            .transpose()?
-                            .unwrap_or(0.0);
-                        (confidence >= policy.score_confidence_min).then(|| json!(score))
-                    }
-                }
-                _ => return Err("Unsupported primitive"),
-            };
+            let value = answer_value(q, raw, policy)?;
             let decision = match value {
                 Some(value) => Decision::Value {
                     value,

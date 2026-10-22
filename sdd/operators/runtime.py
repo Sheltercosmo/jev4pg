@@ -95,15 +95,22 @@ class Runtime:
         )
 
     def cached(self, item):
-        row = self.store.cached(self.key(item))
-        if row:
-            return self.policy.resolve(
-                row["answer"],
-                observation_id=row["id"],
+        return self.cached_many([item])[0]
+
+    def cached_many(self, items):
+        keys = [self.key(item) for item in items]
+        rows = self.store.cached_many(keys)
+        return [
+            self.policy.resolve(
+                rows[key]["answer"],
+                observation_id=rows[key]["id"],
                 cached=True,
                 dependencies=item.source_revisions,
             )
-        return None
+            if key in rows
+            else None
+            for item, key in zip(items, keys)
+        ]
 
     def cancelled(self):
         return self.store.cancelled(self.run_id)
@@ -145,8 +152,7 @@ class Runtime:
 
     def _cached_items(self, items):
         results, missing, aliases = {}, {}, defaultdict(list)
-        for item in items:
-            cached = self.cached(item)
+        for item, cached in zip(items, self.cached_many(items)):
             if cached is not None:
                 results[item.id] = cached
             else:
@@ -162,13 +168,13 @@ class Runtime:
         batches = []
         for group in groups.values():
             current = []
+            state = self.state(group[0])
+            envelope = token_bound({"model": self.model, "state": state, "questions": {}})
+            single = token_bound({"state": state, "question": None}) - 4
+            total = envelope
             for item in group:
-                candidate = [*current, item]
-                questions = {"q" + str(i): w.question for i, w in enumerate(candidate)}
-                one = token_bound({"state": self.state(item), "question": item.question})
-                total = token_bound(
-                    {"model": self.model, "state": self.state(item), "questions": questions}
-                )
+                question_bytes = token_bound(item.question) - 32
+                one = single + question_bytes
                 if one > 32000:
                     for identity in aliases[self.key(item)]:
                         results[identity] = Decision.unexecuted(
@@ -176,15 +182,23 @@ class Runtime:
                             Op.BLOCKED_BY_POLICY,
                         )
                     continue
-                if current and (len(candidate) > self.budget.limits.batch_size or total > 64000):
+                added = len(f'"q{len(current)}":') + question_bytes + bool(current)
+                if current and (
+                    len(current) >= self.budget.limits.batch_size or total + added > 64000
+                ):
                     batches.append(current)
                     current = []
+                    total = envelope
+                    added = len('"q0":') + question_bytes
                 current.append(item)
+                total += added
             if current:
                 batches.append(current)
         return batches
 
     def _execute_batches(self, batches, aliases, results):
+        if not batches:
+            return
         iterator = iter(batches)
         with ThreadPoolExecutor(max_workers=self.budget.limits.concurrency) as pool:
             pending = {}
@@ -230,7 +244,7 @@ class Runtime:
             _cache_locks
         )
         with _cache_locks[stripe]:
-            cached = [self.cached(item) for item in batch]
+            cached = self.cached_many(batch)
             pending = [item for item, found in zip(batch, cached) if found is None]
             if not pending:
                 return cached

@@ -1,7 +1,7 @@
 //! Interpretable embeddings from a fixed basis of independent typed questions.
 
 use crate::evidence::{EvaluatorIdentity, Policy, context_identity};
-use crate::{Decision, Decisions, Questions, probability, resolve, validate_questions};
+use crate::{Decision, Decisions, Questions, answer_value, probability, validate_questions};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -140,14 +140,16 @@ impl Basis {
         decisions: &Decisions,
         evaluator: Option<EvaluatorIdentity>,
     ) -> Result<AnswerMatrix, &'static str> {
+        validate_questions(&self.questions)?;
         if evaluator
             .as_ref()
             .is_some_and(|identity| !valid_evaluator(identity))
         {
             return Err("Invalid embedding evaluator identity");
         }
-        let mut active = Questions::new();
-        let mut answers = serde_json::Map::new();
+        let mut active = 0;
+        let mut answers = std::collections::BTreeMap::new();
+        let policy = Policy::default();
         let mut states = Vec::new();
         for (id, question) in &self.questions {
             let (state, operation, reason, raw) = match decisions.get(id) {
@@ -180,8 +182,9 @@ impl Basis {
                 if operation != "SUCCEEDED" {
                     return Err("Only successful observations can supply probabilities");
                 }
-                active.insert(id.clone(), question.clone());
-                answers.insert(id.clone(), raw.clone());
+                answer_value(question, raw, &policy)?;
+                active += 1;
+                answers.insert(id.as_str(), raw);
             }
             states.push(QuestionState {
                 output_state: if raw.is_some() {
@@ -195,19 +198,11 @@ impl Basis {
                 reason,
             });
         }
-        if !active.is_empty() {
-            resolve(
-                &json!({"model":"probability-projection","answers":answers}),
-                &active,
-                "probability-projection",
-                &Policy::default(),
-            )?;
-        }
         let probabilities = self
             .axes
             .iter()
             .map(|axis| {
-                let Some(raw) = answers.get(&axis.question_id) else {
+                let Some(raw) = answers.get(axis.question_id.as_str()) else {
                     return Ok(vec![None; axis.answers.len()]);
                 };
                 if axis.kind == "noul" {
@@ -221,7 +216,7 @@ impl Basis {
                 }
             })
             .collect::<Result<Vec<Vec<_>>, &'static str>>()?;
-        let complete = active.len() == self.questions.len();
+        let complete = active == self.questions.len();
         Ok(AnswerMatrix {
             format_version: 1,
             basis_id: self.id.clone(),
@@ -300,14 +295,7 @@ impl AnswerMatrix {
                 return Err("Invalid probability distribution");
             }
         }
-        if self.vector
-            != self
-                .probabilities
-                .iter()
-                .flatten()
-                .copied()
-                .collect::<Vec<_>>()
-        {
+        if !self.vector.iter().eq(self.probabilities.iter().flatten()) {
             return Err("Embedding vector does not match its probability matrix");
         }
         Ok(())
@@ -339,4 +327,63 @@ pub fn distance(left: &AnswerMatrix, right: &AnswerMatrix) -> Result<f64, &'stat
         })
         .sum();
     Ok((squared / left.axes.len() as f64).sqrt())
+}
+
+/// Validated square-root probabilities for repeated local comparisons.
+pub struct PreparedMatrix<'a> {
+    matrix: &'a AnswerMatrix,
+    roots: Vec<Vec<f64>>,
+}
+
+impl<'a> PreparedMatrix<'a> {
+    pub fn new(matrix: &'a AnswerMatrix) -> Result<Self, &'static str> {
+        matrix.validate_complete()?;
+        let roots = matrix
+            .probabilities
+            .iter()
+            .map(|row| {
+                let total: f64 = row.iter().map(|p| p.unwrap()).sum();
+                row.iter().map(|p| (p.unwrap() / total).sqrt()).collect()
+            })
+            .collect();
+        Ok(Self { matrix, roots })
+    }
+
+    pub fn distance(&self, other: &Self) -> Result<f64, &'static str> {
+        if self.matrix.basis_id != other.matrix.basis_id
+            || self.matrix.axes != other.matrix.axes
+            || self.matrix.evaluator != other.matrix.evaluator
+        {
+            return Err("Embedding distance requires the same basis and evaluator revision");
+        }
+        let squared: f64 = self
+            .roots
+            .iter()
+            .zip(&other.roots)
+            .map(|(left, right)| {
+                (left
+                    .iter()
+                    .zip(right)
+                    .map(|(x, y)| (x - y).powi(2))
+                    .sum::<f64>()
+                    / 2.0)
+                    .clamp(0.0, 1.0)
+            })
+            .sum();
+        Ok((squared / self.roots.len() as f64).sqrt())
+    }
+}
+
+pub fn distances(
+    query: &AnswerMatrix,
+    candidates: &[AnswerMatrix],
+) -> Result<Vec<f64>, &'static str> {
+    if candidates.len() > 512 {
+        return Err("Compare at most 512 candidate matrices per batch");
+    }
+    let query = PreparedMatrix::new(query)?;
+    candidates
+        .iter()
+        .map(|candidate| query.distance(&PreparedMatrix::new(candidate)?))
+        .collect()
 }

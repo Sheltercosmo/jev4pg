@@ -30,6 +30,7 @@ struct Work {
     question: Question,
     targets: Vec<(usize, String)>,
     identity: String,
+    bytes: usize,
 }
 
 struct Replayed {
@@ -144,6 +145,7 @@ impl Session {
         let mut unique = HashMap::new();
         let mut replayed: HashMap<String, Replayed> = HashMap::new();
         let mut prepared_bytes = 0;
+        let policy = executor.limits.policy();
         let definitions: BTreeMap<_, _> = questions
             .iter()
             .map(|(id, question)| {
@@ -161,9 +163,17 @@ impl Session {
             check_interrupt();
             let (active, skipped) = applicable_questions(row, questions)?;
             output.decisions.push(skipped);
+            let mut contexts = HashMap::new();
             for (id, question) in active {
-                let context = project(row, projections.get(&id))?;
-                let identity = format!("{}:{}", definitions[&id], context_identity(&context)?);
+                let context = match contexts.entry(projections.get(&id)) {
+                    std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        let context = project(row, projections.get(&id))?;
+                        let identity = context_identity(&context)?;
+                        entry.insert((context, identity))
+                    }
+                };
+                let identity = format!("{}:{}", definitions[&id], context.1);
                 if let Some(saved) = replayed.get(&identity) {
                     if let Some(receipt) = &saved.receipt {
                         output.receipts.push(MappedReceipt {
@@ -194,7 +204,7 @@ impl Session {
                             &cached.observation.response,
                             &cached.observation.questions,
                             &cached.observation.evaluator.model,
-                            &executor.limits.policy(),
+                            &policy,
                         )?),
                     };
                     let decision = decisions
@@ -236,13 +246,14 @@ impl Session {
                     work.targets.push((ordinal, id));
                 } else {
                     let question = Question {
-                        instructions: json!({"record": context, "question": question.instructions}),
+                        instructions: json!({"record": context.0, "question": question.instructions}),
                         subject_column: None,
                         ..question
                     };
-                    prepared_bytes += serde_json::to_vec(&question)
+                    let bytes = serde_json::to_vec(&question)
                         .map_err(|_| "Invalid mapped question")?
                         .len();
+                    prepared_bytes += bytes;
                     if prepared_bytes > 8_000_000 {
                         return Err("Prepared map window exceeds 8 MB; reduce the source window");
                     }
@@ -251,6 +262,7 @@ impl Session {
                         question,
                         targets: vec![(ordinal, id)],
                         identity,
+                        bytes,
                     });
                 }
             }
@@ -261,9 +273,7 @@ impl Session {
         let mut members = Vec::new();
         let mut packed_bytes = 2;
         for work in missing {
-            let question_bytes = serde_json::to_vec(&work.question)
-                .map_err(|_| "Invalid map question")?
-                .len();
+            let question_bytes = work.bytes;
             if question_bytes > 31_000 {
                 return Err("One mapped question exceeds the context limit");
             }

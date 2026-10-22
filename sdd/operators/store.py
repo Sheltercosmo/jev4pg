@@ -1,4 +1,4 @@
-from sqlalchemy import case, exists, insert, select, update
+from sqlalchemy import case, exists, func, insert, select, update
 
 from ..ledger import Ledger, digest, now, uid
 from . import schema
@@ -22,13 +22,31 @@ class Store:
         return self.ledger.get(self.tenant, table, identity)
 
     def cached(self, key):
+        return self.cached_many([key]).get(key)
+
+    def cached_many(self, keys):
+        keys = list(dict.fromkeys(keys))
+        if not keys:
+            return {}
+        found = {}
         with self.db.transaction(self.tenant) as connection:
-            row = (
-                connection.execute(
-                    select(schema.observations)
+            for start in range(0, len(keys), 256):
+                ranked = (
+                    select(
+                        schema.observations,
+                        func.row_number()
+                        .over(
+                            partition_by=schema.observations.c.cache_key,
+                            order_by=(
+                                schema.observations.c.created_at.desc(),
+                                schema.observations.c.id.desc(),
+                            ),
+                        )
+                        .label("recency"),
+                    )
                     .where(
                         schema.observations.c.tenant == self.tenant,
-                        schema.observations.c.cache_key == key,
+                        schema.observations.c.cache_key.in_(keys[start : start + 256]),
                         ~exists(
                             select(schema.invalidations.c.id).where(
                                 schema.invalidations.c.tenant == self.tenant,
@@ -36,15 +54,15 @@ class Store:
                             )
                         ),
                     )
-                    .order_by(
-                        schema.observations.c.created_at.desc(), schema.observations.c.id.desc()
-                    )
-                    .limit(1)
+                    .subquery()
                 )
-                .mappings()
-                .first()
-            )
-        return dict(row) if row else None
+                rows = connection.execute(
+                    select(*(ranked.c[c.name] for c in schema.observations.columns)).where(
+                        ranked.c.recency == 1
+                    )
+                ).mappings()
+                found.update((row["cache_key"], dict(row)) for row in rows)
+        return found
 
     def start(self, operator, request):
         return self.add(

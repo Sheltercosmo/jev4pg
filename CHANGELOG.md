@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* Batch evidence reads and linear payload sizing across the shared HTTP operator runtime.
+
+* Native 0.4.0 improves shared scan, plan and embedding execution with bounded least-recently-used caching, policy-aware replay, one-pass response validation and one-time request serialization. Cached frontiers bypass the scheduler and registry lookups.
+* Probability projection borrows typed answer distributions. `embedding_distances` prepares one query for up to 512 local comparisons. The extension upgrade preserves evidence and existing grants. See [usage and function coverage](docs/NATIVE_OPTIMIZATION.md).
+
 ## 0.8.0 · 22 October 2026
 
 * Native preview 0.3.0 adds `scan_mapped`: per-question context dictionaries, independent request packing, bounded cache reuse across cursor windows and shared evidence with operational receipts. PostgreSQL 0.1.0 and 0.2.0 extension schemas have an upgrade path. Existing scan and application-planner layouts are unchanged. See [usage](docs/NATIVE_RECORD_MAP.md).

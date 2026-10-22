@@ -142,10 +142,28 @@ def verify_embeddings(connection, observations, gates, must_fail):
     )
     assert len(observations) == start
     changed = deepcopy(rows[-1][2])
+    batch = connection.execute(
+        "SELECT * FROM jev_native.embedding_distances(%s,%s) ORDER BY ordinal",
+        (Jsonb(rows[-1][2]), Jsonb([row[2] for row in rows])),
+    ).fetchall()
+    assert [item[0] for item in batch] == [1, 2, 3]
+    expected = dict(ranked)
+    assert all(abs(value - expected[ordinal]) < 1e-12 for ordinal, value in batch)
+    assert connection.execute(
+        "SELECT * FROM jev_native.embedding_distances(%s,'[]')", (Jsonb(rows[-1][2]),)
+    ).fetchall() == []
+    assert len(observations) == start
     changed["evaluator"]["revision"] = "other-revision"
     must_fail(
         lambda: connection.execute(
             "SELECT jev_native.embedding_distance(%s,%s)", (Jsonb(rows[0][2]), Jsonb(changed))
+        ),
+        "same basis",
+    )
+    must_fail(
+        lambda: connection.execute(
+            "SELECT * FROM jev_native.embedding_distances(%s,%s)",
+            (Jsonb(rows[0][2]), Jsonb([rows[1][2], changed])),
         ),
         "same basis",
     )
