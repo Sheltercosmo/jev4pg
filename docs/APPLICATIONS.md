@@ -64,7 +64,7 @@ The Python semantic path has a shared 50,000-source-row limit, including semanti
 
 ## Reproduce application validation
 
-Set `SDD_TEST_ADMIN_URL` to a dedicated disposable PostgreSQL 17 server and run:
+On current `main`, set `SDD_TEST_ADMIN_URL` to a dedicated disposable PostgreSQL 14–17 server and run:
 
 ```sh
 python -m pytest tests/test_application_scale_postgres.py -q -s
