@@ -7,13 +7,41 @@ Start with the [quick start](../README.md#quick-start) for a first query. This g
 | Use case | Install | Guide |
 | --- | --- | --- |
 | Try the workspace, APIs and natural-language queries | Python application with bundled PostgreSQL and workers | [Docker Compose](#docker-compose) |
-| Add the application or queued operators to an existing server | Python package beside PostgreSQL 17; no native server files | [Guided setup](EASY_SETUP.md), or [external Compose](EXTERNAL_POSTGRESQL.md) |
-| Call synchronous semantic functions from SQL | Rust extension on PostgreSQL 17 Linux; no Python service | [Native build and configuration](../native/README.md#build) |
+| Add the application or queued operators to an existing server | Python package beside PostgreSQL 14–17; no native server files | [Guided setup](EASY_SETUP.md), or [external Compose](EXTERNAL_POSTGRESQL.md) |
+| Call synchronous semantic functions from SQL | Rust extension on PostgreSQL 14–17 Linux; no Python service | [Native build and configuration](../native/README.md#build) |
 | Use the workspace with native semantic reads | Python application plus Rust extension | [Native Compose deployment](NATIVE_DEPLOYMENT.md) |
 
 The default Compose stack uses the Python semantic engine. Native execution is an explicit choice, not a requirement for the application. Maintained semantic features and semantic write review use the Python engine. See the [capability map](CAPABILITIES.md#python-and-native-roles) for interface boundaries and use cases.
 
 The released `v0.8.0` checkout includes native preview 0.3.0; current `main` includes native preview 0.4.0. Use a release tag for a fixed deployment and keep all components on that checkout. See [version compatibility](#upgrade) before changing an existing installation.
+
+## PostgreSQL versions
+
+Current `main` supports PostgreSQL 14, 15, 16 and 17 for the Python application, queued SQL interface and native Rust extension. The published v0.8.0 deployment remains configured for PostgreSQL 17. Use `main` for the version selector and older-major native builds.
+
+| Capability | PostgreSQL 14 | PostgreSQL 15–17 |
+| --- | --- | --- |
+| Application, operators and queued SQL | Supported | Supported |
+| Native scans, stage plans and embeddings | Supported on Linux | Supported on Linux |
+| Table and partitioned-table attachments, including row security | Supported | Supported |
+| Ordinary view attachments | Attach the underlying tables instead | Require `security_invoker=true` throughout the view chain |
+| Materialized-view attachments | Read the stored snapshot | Read the stored snapshot |
+
+The experimental remote-source protocol remains qualified on PostgreSQL 17 only. It validates stored PostgreSQL expression layouts and is separate from local source attachments.
+
+For a new PostgreSQL 14 deployment, clone current development:
+
+```bash
+git clone --branch main https://github.com/Sheltercosmo/jev4pg.git
+cd jev4pg
+python deploy/configure.py
+```
+
+Add `SDD_POSTGRES_MAJOR=14` to the checkout's `.env`, then run `docker compose build` and `docker compose up -d --wait`. Choose 14, 15, 16 or 17; the default is 17. For native execution, configure with `--native` and use both Compose files as in the [combined deployment guide](NATIVE_DEPLOYMENT.md). The same selector controls headers, library paths and the Rust feature for that major.
+
+For an existing PostgreSQL 14–17 server, install the application from this checkout (`python -m pip install .`), then follow [guided setup](EASY_SETUP.md) starting at `jev4pg setup`. No server version selector is needed for an external connection.
+
+Changing `SDD_POSTGRES_MAJOR` does not upgrade a database volume. Keep it fixed for an existing deployment. To change majors, use PostgreSQL's `pg_upgrade` or a dump/restore into a new volume, install the matching extension binary and validate the application before switching traffic. Never mount an old-major data directory under a different major's image.
 
 ## Docker Compose
 
@@ -45,7 +73,7 @@ Use `docker compose ps` to inspect health. `/health` is process liveness; `/read
 
 For an application-only deployment with verified TLS and explicit migration control, follow [external PostgreSQL deployment](EXTERNAL_POSTGRESQL.md). It includes connection sizing and an optional SQL worker. The process-supervisor installation below remains available.
 
-Use PostgreSQL 17 and a dedicated database. Install the Python package:
+Use PostgreSQL 14–17 with current development and a dedicated database. Install the Python package:
 
 ```bash
 python -m venv .venv
@@ -185,4 +213,4 @@ On a new server, install the extension files and recreate the original roles fir
 
 The [deployment workflow](../.github/workflows/deployment.yml) builds the images and checks fresh installation, SQL authorization, worker recovery, HTTP and `psql` calls, batching, repeat migration, restart persistence and backup restoration. Its explicit synthetic provider tests integration, not language accuracy. The default stack never enables this fixture.
 
-The [native workflow](../.github/workflows/native.yml) also installs the published v0.6.0 package into an isolated environment, creates a populated database and upgrades it on PostgreSQL 17. It checks migration rollback and repeatability, unchanged data and passwords, reviewed features, evidence reuse, query history, job states and tenant isolation. Native reads and source attachments are exercised after migration. This covers the application upgrade on one PostgreSQL version; it does not establish a PostgreSQL major-version or cross-host migration procedure.
+The deployment and [native workflows](../.github/workflows/native.yml) run a PostgreSQL 14–17 matrix. Native verification installs the published v0.6.0 application in isolation, creates a populated database and upgrades it on each major. Checks cover rollback, repeatability, data and password preservation, reviewed features, evidence reuse, query history, job states and tenant isolation. These are application and extension upgrades within each PostgreSQL major; PostgreSQL major-version migration remains a separate procedure.

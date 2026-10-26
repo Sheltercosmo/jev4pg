@@ -111,7 +111,7 @@ PostgreSQL stores your data and executes relational SQL in every setup. jev4pg a
 | Component | Use it for | Where it runs |
 | --- | --- | --- |
 | **Python application** | Natural-language queries, the web workspace, HTTP APIs, all 41 operators, reviewed features and query history | Beside PostgreSQL; no custom server extension required. |
-| **Native Rust extension** | Synchronous semantic SQL, parallel stage plans, repeated-context reuse and explainable embeddings | Inside PostgreSQL 17 on Linux; works directly from SQL without Python. |
+| **Native Rust extension** | Synchronous semantic SQL, parallel stage plans, repeated-context reuse and explainable embeddings | Inside PostgreSQL 14–17 on Linux; works directly from SQL without Python. |
 | **Combined deployment** | The workspace and natural-language planning with native semantic reads | Python plans and manages the workflow; Rust executes supported semantic stages in PostgreSQL. |
 
 Use Python when you want a complete application or need to integrate with an existing server without installing native libraries. Use native execution when your application already speaks SQL and needs bounded semantic scans over PostgreSQL data. It keeps source reads and relational stages in the database and shares scheduling and evidence across semantic work. Both call your configured JEV provider.
@@ -119,6 +119,8 @@ Use Python when you want a complete application or need to integrate with an exi
 `JEV` and `Hybrid` are **planning modes** in the application, independent of the execution engine. Hybrid adds LLM generation. The native extension consumes explicit SQL and typed questions; natural-language planning comes from the application.
 
 The commands below use the **v0.8.0 release**, which includes native preview 0.3.0. Current `main` includes native preview 0.4.0. See [component compatibility](docs/INSTALLATION.md#upgrade) before upgrading.
+
+**PostgreSQL 14–17:** use current `main` and select your major with `SDD_POSTGRES_MAJOR`. The release commands below retain PostgreSQL 17. Tables and row-level security work across all four majors; workspace view attachments require PostgreSQL 15+. [Version setup](docs/INSTALLATION.md#postgresql-versions).
 
 ### Python application
 
@@ -174,7 +176,7 @@ For asynchronous operators from psql or DBeaver, [grant a SQL login and start `j
 
 ### Native PostgreSQL extension
 
-For a SQL-only application, [build and configure `jev_native`](native/README.md#build) on your PostgreSQL 17 Linux server, then enable it with `CREATE EXTENSION jev_native` and grant function and source access. Call it from psql, a SQL editor or any PostgreSQL driver. No Python service or application dataset registration is required. [First native SQL query](#native-semantic-sql).
+For a SQL-only application, [build and configure `jev_native`](native/README.md#build) on your PostgreSQL 14–17 Linux server, then enable it with `CREATE EXTENSION jev_native` and grant function and source access. Call it from psql, a SQL editor or any PostgreSQL driver. No Python service or application dataset registration is required. [First native SQL query](#native-semantic-sql).
 
 For the **combined workspace and native deployment**, use the v0.8.0 checkout above and run these commands instead of the default Compose commands:
 

@@ -199,9 +199,21 @@ def verify_registry_runtime(connection, observations, gates, config_path):
                         break
                     time.sleep(0.02)
                 assert active == 0, "Cancelled scans leaked a control connection"
+                cancelled_attempts = []
+                for attempt, scope in connection.execute(
+                    "SELECT id,scope FROM jev_native.request_attempts"
+                ):
+                    try:
+                        scope = json.loads(scope)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(scope, dict) and scope.get("scope") == "cancel":
+                        cancelled_attempts.append(attempt)
+                assert len(cancelled_attempts) == 1
                 connection.execute(
                     "UPDATE jev_native.request_attempts SET deadline=clock_timestamp()-interval '1 second' "
-                    "WHERE CASE WHEN scope IS JSON OBJECT THEN scope::jsonb->>'scope' END='cancel'"
+                    "WHERE id=%s",
+                    (cancelled_attempts[0],),
                 )
                 held = run(cancelled_source, "cancel")[0]
                 assert held[1]["q"]["operation_state"] == "UNCERTAIN"

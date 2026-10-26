@@ -1,6 +1,6 @@
 # Deploy with an existing PostgreSQL server
 
-The application can run separately from PostgreSQL 17. This path starts no database container and creates no database volume. Your PostgreSQL administrator retains responsibility for backups, server upgrades, availability and source permissions. Use a dedicated database for the initial deployment.
+The application can run separately from PostgreSQL 14–17 using current `main`. This path starts no database container and creates no database volume. Your PostgreSQL administrator retains responsibility for backups, server upgrades, availability and source permissions. Use a dedicated database for the initial deployment.
 
 The HTTP workspace requires the Python application and application catalog. The [guided portable setup](EASY_SETUP.md) adds asynchronous SQL jobs without installing extension files on the server. Both installation modes use the same SQL worker. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
 
@@ -12,6 +12,8 @@ cd jev4pg
 ```
 
 Requires Python 3.11+ and Docker Compose v2. Run the remaining commands from that checkout. Back up the target database before migration.
+
+The release above targets PostgreSQL 17. For PostgreSQL 14–16, clone `--branch main` instead; the remaining external deployment commands are identical. Ordinary workspace view attachments require PostgreSQL 15+. See [supported capabilities](INSTALLATION.md#postgresql-versions).
 
 ## Configure the connection
 
@@ -116,6 +118,6 @@ Imported `sdd_data` tables and saved application state can be restored together.
 
 ## Development checks
 
-`python deploy/check_compose.py` validates the resolved bundled, native and external service definitions without starting containers. `python deploy/verify_external.py --postgres-bin /path/to/postgresql17/bin` starts a disposable TLS server, tests bounded pools and certificate failures, and exercises an authenticated HTTP workspace through a database restart. Add `--full-suite` to run all Python regressions against that TLS server. It requires OpenSSL, the application dependencies and the SQL extension files in that PostgreSQL installation. Run it as a non-root user on Unix. It deletes only its own temporary files after stopping the test services.
+`python deploy/check_compose.py` validates the resolved bundled, native and external service definitions without starting containers. `python deploy/verify_external.py --postgres-bin /path/to/postgresql/bin` starts a disposable TLS server, tests bounded pools and certificate failures, and exercises an authenticated HTTP workspace through a database restart. Add `--full-suite` to run all Python regressions against that TLS server. It requires OpenSSL, the application dependencies and the SQL extension files in that PostgreSQL installation. Run it as a non-root user on Unix. It deletes only its own temporary files after stopping the test services.
 
 These checks establish configuration and execution behavior. They do not certify a cloud provider, container host, high-availability topology or production workload capacity.

@@ -1,10 +1,12 @@
 # Combined application and native deployment
 
-The native stack builds an optimized Rust extension into PostgreSQL 17 and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
+The native stack builds an optimized Rust extension into the selected PostgreSQL major (17 by default) and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
 
 Use this deployment when you want the workspace and natural-language planning with native semantic reads. For SQL-only use without the Python application, follow the [native build guide](../native/README.md#build). For maintained semantic features or semantic write review, use the [Python application deployment](INSTALLATION.md#docker-compose).
 
 The release commands below use application v0.8.0, catalog schema 4 and native preview 0.3.0. Current `main` uses native preview 0.4.0. Build PostgreSQL, the application and workers from the same checkout; see [component compatibility](INSTALLATION.md#upgrade).
+
+For PostgreSQL 14, 15 or 16, clone `main` and set `SDD_POSTGRES_MAJOR` in `.env` before building. Current development supports all four majors through 17; the release commands below retain PostgreSQL 17. See [version selection and data-volume upgrades](INSTALLATION.md#postgresql-versions).
 
 ## Start
 

@@ -4,6 +4,8 @@ Install the Python application beside an existing PostgreSQL server. It supplies
 
 This guide uses v0.8.0 and PostgreSQL 17. Follow all steps for queued operators, or complete the connection profile and migration, then jump to [the workspace](#add-the-workspace). Source tables stay in PostgreSQL. For synchronous SQL execution without a Python service, use the [native Rust extension](../native/README.md).
 
+For PostgreSQL 14–16, install the Python package from current `main` using the [version setup](INSTALLATION.md#postgresql-versions), then continue here at `jev4pg setup`. On PostgreSQL 14, attach tables rather than ordinary views.
+
 ## Choose a path
 
 | You want | Use |
@@ -39,7 +41,7 @@ Setup creates local files only. It never connects to the database, overwrites an
 
 ## 2. Install and grant access
 
-Use PostgreSQL 17 and back up the target before its first migration. The installation owner needs permission to create the application schemas and their objects, create the restricted runtime role if absent, and assign the `sdd_data` schema to that role. A DBA can preprovision roles and their required memberships. The runtime login must be separate from the installation owner.
+Back up the target before its first migration. Use PostgreSQL 17 with the release package, or 14–17 with current development. The installation owner needs permission to create the application schemas and their objects, create the restricted runtime role if absent, and assign the `sdd_data` schema to that role. A DBA can preprovision roles and their required memberships. The runtime login must be separate from the installation owner.
 
 ```bash
 jev4pg --env-file admin.env migrate --check --sql-interface portable

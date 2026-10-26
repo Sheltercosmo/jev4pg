@@ -17,7 +17,9 @@ The Python application and Rust extension serve different jobs. PostgreSQL remai
 | Named-question embeddings and local distance | Can use the native engine through PostgreSQL. | Builds probability matrices and compares compatible stored embeddings without new inference. |
 | Maintained features and semantic write review | Supported with the Python semantic engine. | Use the Python engine for these workflows. |
 | Hosted or local JEV models | Compatible HTTP endpoints or in-process Python adapters. | Compatible HTTP endpoints; local models need an HTTP interface. |
-| Server installation | Runs beside PostgreSQL; portable setup needs schema and role permissions. | Requires native extension files on a supported PostgreSQL 17 Linux server. |
+| Server installation | Runs beside PostgreSQL 14–17; portable setup needs schema and role permissions. | Build the matching extension for PostgreSQL 14–17 on Linux. |
+
+PostgreSQL 14–17 support uses current `main`. Ordinary view attachments require PostgreSQL 15+; table attachments and row security work across all four majors. [Version selection](INSTALLATION.md#postgresql-versions).
 
 Choose the Python application for analyst tools, document intake, reusable semantic definitions and product APIs. It keeps model adapters and application workflows outside the PostgreSQL process and is the easiest path when you cannot install server libraries.
 

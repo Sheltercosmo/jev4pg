@@ -68,7 +68,7 @@ Foreign keys connect attached targets in the same tenant. Composite relationship
 
 ## Views and snapshots
 
-Tables, partitioned tables, local views and materialized views are supported. Every ordinary view in the dependency chain must use `security_invoker=true`, so PostgreSQL checks the invoking user's permissions and row-security policies. See [PostgreSQL view security](https://www.postgresql.org/docs/17/sql-createview.html).
+Tables, partitioned tables and materialized views are supported on PostgreSQL 14–17. Ordinary view attachments require PostgreSQL 15+ and `security_invoker=true` on every view in the dependency chain, so PostgreSQL checks the invoking user's permissions and row-security policies. On PostgreSQL 14, attach the underlying tables instead. See [PostgreSQL view security](https://www.postgresql.org/docs/15/sql-createview.html).
 
 ```sql
 CREATE VIEW business.public_messages

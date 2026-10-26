@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -9,7 +10,10 @@ import subprocess
 def check(compose):
     root = Path(__file__).resolve().parent.parent
 
-    def resolve(*arguments):
+    def resolve(*arguments, postgres_major=None):
+        environment = os.environ.copy()
+        if postgres_major is not None:
+            environment["SDD_POSTGRES_MAJOR"] = str(postgres_major)
         result = subprocess.run(
             [
                 *compose,
@@ -21,6 +25,7 @@ def check(compose):
                 "json",
             ],
             cwd=root,
+            env=environment,
             check=True,
             capture_output=True,
             text=True,
@@ -83,7 +88,13 @@ def check(compose):
             assert "postgres_password" not in {secret["source"] for secret in service["secrets"]}
     assert enabled["services"]["migrate"]["command"] == ["migrate"]
     assert Path(enabled["services"]["app"]["build"]["context"]).resolve() == root
-    print("Bundled, native and external Compose contracts passed")
+    for major in (14, 15, 16, 17):
+        for files in (("compose.yaml",), ("compose.yaml", "compose.native.yaml")):
+            arguments = [argument for file in files for argument in ("-f", file)]
+            target = resolve(*arguments, postgres_major=major)
+            actual = target["services"]["postgres"]["build"]["args"]["POSTGRES_MAJOR"]
+            assert str(actual) == str(major)
+    print("Bundled, native and external Compose contracts passed for PostgreSQL 14-17")
 
 
 if __name__ == "__main__":

@@ -20,18 +20,19 @@ See [execution optimization](../docs/NATIVE_OPTIMIZATION.md) for shared caching,
 
 For a complete container installation, use the [native Compose stack](../docs/NATIVE_DEPLOYMENT.md). The following commands install the extension on an existing server.
 
-Build from the repository's `v0.8.0` tag for native preview 0.3.0, or `main` for ongoing development. The current target is PostgreSQL 17 on Linux, with its development headers, Rust 1.96 and libclang installed. The default Compose image does not include this extension. From the repository root:
+Build from `main` for PostgreSQL 14–17 support. The fixed `v0.8.0` tag targets PostgreSQL 17 with native preview 0.3.0. Install the matching Linux server development headers, Rust 1.96 and libclang. The default Compose image does not include this extension. From the repository root, choose your server major:
 
 ```sh
 cargo install --locked cargo-pgrx --version 0.19.2
-cargo pgrx init --pg17 /usr/lib/postgresql/17/bin/pg_config
+PG_MAJOR=17
+cargo pgrx init --pg${PG_MAJOR} /usr/lib/postgresql/${PG_MAJOR}/bin/pg_config
 cd native
 cargo test -p jev-executor
 cd pg
-cargo pgrx install --sudo --pg-config /usr/lib/postgresql/17/bin/pg_config
+cargo pgrx install --sudo --no-default-features --features pg${PG_MAJOR} --pg-config /usr/lib/postgresql/${PG_MAJOR}/bin/pg_config
 ```
 
-The native CI workflow builds the extension and exercises it against a disposable PostgreSQL server. A deterministic HTTP fixture verifies transport and database behavior; it does not measure natural-language accuracy.
+Set `PG_MAJOR` to 14, 15, 16 or 17. Select exactly one Cargo feature and build separately for each server major; the compiled library is not portable between majors. The [pgrx version features](https://docs.rs/crate/pgrx/0.19.2/features) select the matching PostgreSQL API. CI builds and exercises all four targets with deterministic HTTP fixtures.
 
 ## Configure
 

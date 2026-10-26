@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* PostgreSQL 14–17 builds for the Python deployment and native extension. `SDD_POSTGRES_MAJOR` selects matching container images, development headers and Rust features. CI covers application installation, native execution, upgrades and container recovery on each major. Ordinary view attachments continue to require PostgreSQL 15+; table access and row security remain available on 14. See [version setup](docs/INSTALLATION.md#postgresql-versions).
+
 * Batch evidence reads and linear payload sizing across the shared HTTP operator runtime.
 
 * Native 0.4.0 improves shared scan, plan and embedding execution with bounded least-recently-used caching, policy-aware replay, one-pass response validation and one-time request serialization. Cached frontiers bypass the scheduler and registry lookups.
