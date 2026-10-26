@@ -1,10 +1,10 @@
 # Native semantic execution
 
-Native preview 0.4.0 of `jev_native`, a Rust PostgreSQL extension. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the application's asynchronous `jev.*` queue interface.
+Native preview 0.4.0 of `jev_native`, a Rust extension for PostgreSQL 14–17 on Linux. It evaluates typed questions over an explicit SQL source and returns relational results without a Python worker. The query service can also use it to execute `SEMANTIC` predicates in direct or generated SQL. It is separate from the application's asynchronous `jev.*` queue interface.
 
 Use this component for SQL-driven applications, bounded semantic scans, parallel stage plans and named-question embeddings. It reads physical PostgreSQL tables under the caller's privileges without application dataset registration. The [Python application](../README.md#python-application) supplies natural-language planning, the workspace, all 41 operators, maintained features and semantic write review. You can use either component independently or [combine the application with native semantic reads](../docs/NATIVE_DEPLOYMENT.md).
 
-This guide describes current development. The v0.8.0 project release includes native preview 0.3.0; use that tag for a fixed installation. Native 0.4.0 adds batch embedding distances and shared executor optimizations.
+This guide uses current `main`. Native 0.4.0 adds batch embedding distances and shared executor optimizations. [Component versions and upgrades](../docs/INSTALLATION.md#upgrade).
 
 PostgreSQL filters, projects and joins source data. A cursor supplies bounded batches to Rust. Questions about one context share a request; independent contexts run concurrently. PostgreSQL receives the original projected row and its typed decisions.
 
@@ -20,7 +20,7 @@ See [execution optimization](../docs/NATIVE_OPTIMIZATION.md) for shared caching,
 
 For a complete container installation, use the [native Compose stack](../docs/NATIVE_DEPLOYMENT.md). The following commands install the extension on an existing server.
 
-Build from `main` for PostgreSQL 14–17 support. The fixed `v0.8.0` tag targets PostgreSQL 17 with native preview 0.3.0. Install the matching Linux server development headers, Rust 1.96 and libclang. The default Compose image does not include this extension. From the repository root, choose your server major:
+Build from `main`. Install the development headers for your PostgreSQL major, Rust 1.96 and libclang on Linux. The default Compose image does not include this extension. From the repository root, set `PG_MAJOR` to your server version (14, 15, 16 or 17):
 
 ```sh
 cargo install --locked cargo-pgrx --version 0.19.2

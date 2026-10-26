@@ -2,9 +2,9 @@
 
 Install the Python application beside an existing PostgreSQL server. It supplies the workspace, natural-language planning and operator API. Its portable SQL interface lets SQL clients submit operators to a Python worker using ordinary PostgreSQL tables and functions. No native libraries, Rust compiler or PostgreSQL restart are required.
 
-This guide uses v0.8.0 and PostgreSQL 17. Follow all steps for queued operators, or complete the connection profile and migration, then jump to [the workspace](#add-the-workspace). Source tables stay in PostgreSQL. For synchronous SQL execution without a Python service, use the [native Rust extension](../native/README.md).
+This guide installs current `main` for PostgreSQL 14–17. Follow all steps for queued operators, or complete the connection profile and migration, then jump to [the workspace](#add-the-workspace). Source tables stay in PostgreSQL. For synchronous SQL execution without a Python service, use the [native Rust extension](../native/README.md).
 
-For PostgreSQL 14–16, install the Python package from current `main` using the [version setup](INSTALLATION.md#postgresql-versions), then continue here at `jev4pg setup`. On PostgreSQL 14, attach tables rather than ordinary views.
+Table attachments and row-level security work on all four majors. Ordinary view attachments require PostgreSQL 15+; on 14, attach the underlying tables. [Version compatibility](INSTALLATION.md#postgresql-versions).
 
 ## Choose a path
 
@@ -19,15 +19,15 @@ The portable interface runs asynchronous jobs. Your server must permit schema cr
 
 ## 1. Create a connection profile
 
-Use Python 3.11+ on the machine that will run the worker. Install the release package:
+Use Python 3.11+ on the machine that will run the worker. Install from the current source archive:
 
 ```bash
-python -m pip install https://github.com/Sheltercosmo/jev4pg/releases/download/v0.8.0/jev4pg-0.8.0-py3-none-any.whl
+python -m pip install https://github.com/Sheltercosmo/jev4pg/archive/refs/heads/main.zip
 jev4pg setup
 cd jev4pg-local
 ```
 
-The wizard asks for the installation owner's PostgreSQL connection URL, a separate runtime login and password, and an optional TypeSafe key. Credentials are entered without terminal echo. For a new runtime login, leave its password blank to generate one. For an existing login, enter its current password; migration does not rotate it.
+The wizard asks for the installation owner's PostgreSQL connection URL, a separate runtime login and password, and an optional TypeSafe key. Use your existing PostgreSQL 14–17 server; no container version selector is needed. Credentials are entered without terminal echo. For a new runtime login, leave its password blank to generate one. For an existing login, enter its current password; migration does not rotate it.
 
 For a remote database, include `sslmode=verify-full` and configure a trusted CA, for example `sslrootcert=/path/to/ca.pem`. URL-encode special characters in URL passwords and paths. Local loopback connections can use the local server's TLS settings.
 
@@ -41,7 +41,7 @@ Setup creates local files only. It never connects to the database, overwrites an
 
 ## 2. Install and grant access
 
-Back up the target before its first migration. Use PostgreSQL 17 with the release package, or 14–17 with current development. The installation owner needs permission to create the application schemas and their objects, create the restricted runtime role if absent, and assign the `sdd_data` schema to that role. A DBA can preprovision roles and their required memberships. The runtime login must be separate from the installation owner.
+Back up the target before its first migration. The installation owner needs permission to create the application schemas and their objects, create the restricted runtime role if absent, and assign the `sdd_data` schema to that role. A DBA can preprovision roles and their required memberships. The runtime login must be separate from the installation owner.
 
 ```bash
 jev4pg --env-file admin.env migrate --check --sql-interface portable

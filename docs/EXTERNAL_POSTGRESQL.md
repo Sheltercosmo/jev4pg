@@ -4,16 +4,16 @@ The application can run separately from PostgreSQL 14–17 using current `main`.
 
 The HTTP workspace requires the Python application and application catalog. The [guided portable setup](EASY_SETUP.md) adds asynchronous SQL jobs without installing extension files on the server. Both installation modes use the same SQL worker. Native Rust execution has its own [installation procedure](NATIVE_DEPLOYMENT.md).
 
-Use the [README quick start](../README.md#quick-start) for a new bundled database. To connect an existing server, start from the released source:
+Use the [README quick start](../README.md#quick-start) for a new bundled database. To connect an existing PostgreSQL 14–17 server, start from current `main`:
 
 ```bash
-git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch main https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 ```
 
 Requires Python 3.11+ and Docker Compose v2. Run the remaining commands from that checkout. Back up the target database before migration.
 
-The release above targets PostgreSQL 17. For PostgreSQL 14–16, clone `--branch main` instead; the remaining external deployment commands are identical. Ordinary workspace view attachments require PostgreSQL 15+. See [supported capabilities](INSTALLATION.md#postgresql-versions).
+Use the same commands for all four majors; `SDD_POSTGRES_MAJOR` only selects bundled database images and is not needed here. Ordinary workspace view attachments require PostgreSQL 15+. See [supported capabilities](INSTALLATION.md#postgresql-versions).
 
 ## Configure the connection
 

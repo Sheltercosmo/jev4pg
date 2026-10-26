@@ -5,11 +5,11 @@ Evaluate distinct semantic inputs, then map their decisions back to the original
 Two interfaces are available:
 
 * Existing native SQL can evaluate a distinct projected relation and join its results back. The [SQL example](../examples/operators/native_dictionary.sql) uses `jev_native.scan`.
-* Native preview 0.3.0 adds `jev_native.scan_mapped`, using the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. Install from the application tag `v0.8.0`, which includes native preview 0.3.0.
+* `jev_native.scan_mapped` uses the Rust `record_map::Session` to combine independent questions across records and reuse individual judgments across cursor windows. Existing `scan` and application-planner behavior remain unchanged. Use current `main` with native preview 0.4.0 for PostgreSQL 14–17.
 
 ## Direct PostgreSQL usage
 
-After [building and installing](../native/README.md#build) the current extension, run `CREATE EXTENSION jev_native` for a new installation. Existing 0.1.0 or 0.2.0 installations can use `ALTER EXTENSION jev_native UPDATE TO '0.3.0'`. Grant the new function explicitly:
+After [building and installing](../native/README.md#build) the extension for your server major, run `CREATE EXTENSION jev_native` for a new installation. Existing 0.1.0, 0.2.0 or 0.3.0 installations can follow the [native update procedure](NATIVE_DEPLOYMENT.md#updates-and-backups) and use `ALTER EXTENSION jev_native UPDATE TO '0.4.0'`. Grant the function explicitly:
 
 ```sql
 GRANT EXECUTE ON FUNCTION jev_native.scan_mapped(text,jsonb,jsonb,jsonb) TO analyst;

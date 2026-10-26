@@ -1,26 +1,29 @@
 # Combined application and native deployment
 
-The native stack builds an optimized Rust extension into the selected PostgreSQL major (17 by default) and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
+The native stack builds an optimized Rust extension for PostgreSQL 14, 15, 16 or 17 and enables it for the query API. It also creates a dedicated evidence-registry login. Python provides planning, the workspace and queued operators; native semantic reads and probability embeddings execute inside PostgreSQL.
 
 Use this deployment when you want the workspace and natural-language planning with native semantic reads. For SQL-only use without the Python application, follow the [native build guide](../native/README.md#build). For maintained semantic features or semantic write review, use the [Python application deployment](INSTALLATION.md#docker-compose).
 
-The release commands below use application v0.8.0, catalog schema 4 and native preview 0.3.0. Current `main` uses native preview 0.4.0. Build PostgreSQL, the application and workers from the same checkout; see [component compatibility](INSTALLATION.md#upgrade).
-
-For PostgreSQL 14, 15 or 16, clone `main` and set `SDD_POSTGRES_MAJOR` in `.env` before building. Current development supports all four majors through 17; the release commands below retain PostgreSQL 17. See [version selection and data-volume upgrades](INSTALLATION.md#postgresql-versions).
+The commands below use `main`, catalog schema 4 and native preview 0.4.0. Build PostgreSQL, the application and workers from the same checkout; see [component compatibility](INSTALLATION.md#upgrade).
 
 ## Start
 
-Use Docker Compose v2 and Python 3.11+. Clone the tagged source, then configure and start it:
+Use Docker Compose v2 and Python 3.11+. Clone and configure the source:
 
 ```bash
-git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch main https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py --native
+```
+
+Create or edit `.env` in the checkout and set `SDD_POSTGRES_MAJOR` to 14, 15, 16 or 17. The default is 17. The selected major controls the image, server headers and native library build. For example, `SDD_POSTGRES_MAJOR=14` builds the PostgreSQL 14 stack. Then start it:
+
+```bash
 docker compose -f compose.yaml -f compose.native.yaml build
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait
 ```
 
-For an existing checkout, run the configuration and Compose commands from its root. To evaluate current development, clone `--branch main` instead of `--branch v0.8.0`. The first build compiles Rust and pgrx. Later builds can reuse Docker's build cache. The runtime PostgreSQL image contains that checkout's native library and SQL files; it does not contain the Rust toolchain.
+For an existing checkout, run the configuration and Compose commands from its root and retain its existing PostgreSQL major. Changing the selector does not migrate a database volume; follow the [major-version upgrade procedure](INSTALLATION.md#postgresql-versions). The first build compiles Rust and pgrx. Later builds can reuse Docker's build cache. The runtime PostgreSQL image contains that checkout's native library and SQL files; it does not contain the Rust toolchain.
 
 The native Compose project is named `jevsd-pg-native`, with a separate database volume from the default stack. Both use the same default host ports. Set `SDD_HTTP_PORT` and `SDD_POSTGRES_PORT` in `.env` when running them together. Use the same two Compose files for later commands.
 
@@ -68,7 +71,7 @@ docker compose -f compose.yaml -f compose.native.yaml run --rm migrate
 docker compose -f compose.yaml -f compose.native.yaml up -d --wait
 ```
 
-Migration targets the native version in the selected checkout. Release v0.8.0 upgrades native 0.1.0 or 0.2.0 to 0.3.0; current development upgrades 0.1.0, 0.2.0 or 0.3.0 to 0.4.0. These updates are transactional and preserve stored data and grants. Other mismatched versions are rejected. Restart PostgreSQL when replacing the shared library so existing backends cannot retain an older binary. Native extension updates need installation files and the matching library on the server.
+Current `main` upgrades native 0.1.0, 0.2.0 or 0.3.0 to 0.4.0 on PostgreSQL 14–17. These updates are transactional and preserve stored data and grants. Other mismatched versions are rejected. Restart PostgreSQL when replacing the shared library so existing backends cannot retain an older binary. Native extension updates need installation files and a library built for that server major. [Historical component versions](INSTALLATION.md#upgrade).
 
 Use the [backup commands](INSTALLATION.md#backup-and-restore) with `-f compose.yaml -f compose.native.yaml` added after `docker compose`. Restore into an empty database on a server with the matching extension files and original roles. Save role credentials and secret files separately. Restored vectors can be compared locally; registry evidence remains historical data. A new database or cluster identity prevents it from being silently reused as a new source's observation.
 
@@ -78,4 +81,4 @@ Unfinished request attempts retain their state and admission counters after rest
 
 ## Validation
 
-The [native deployment workflow](../.github/workflows/native-deployment.yml) builds the optimized image and runs disposable HTTP and PostgreSQL checks. It covers migration, restricted access, Chinese text, duplicate and NULL handling, probability storage, restart reuse and backup restoration. Its synthetic provider verifies the execution contract, not model quality or production throughput.
+The [native deployment workflow](../.github/workflows/native-deployment.yml) builds the optimized image and runs disposable HTTP and PostgreSQL checks on each major from 14 through 17. It covers migration, restricted access, Chinese text, duplicate and NULL handling, probability storage, restart reuse and backup restoration. Its synthetic provider verifies the execution contract, not model quality or production throughput.

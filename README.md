@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Sheltercosmo/jev4pg/releases/tag/v0.8.0"><img src="https://img.shields.io/badge/release-0.8.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Release 0.8.0" /></a>
+  <a href="docs/INSTALLATION.md#postgresql-versions"><img src="https://img.shields.io/badge/PostgreSQL-14%E2%80%9317-336791?style=flat-square&amp;labelColor=52525b" alt="PostgreSQL 14–17" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-18181b?style=flat-square&amp;labelColor=52525b" alt="Apache 2.0 license" /></a>
 </p>
 
@@ -29,7 +30,7 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-jev4pg brings semantic intelligence to PostgreSQL with **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
+jev4pg brings semantic intelligence to PostgreSQL 14–17 with **41 JEV operators** for filtering, extraction, ranking, matching and verification. Build semantic search, document workflows and analyst tools on your existing data, with natural-language queries in English and Simplified Chinese.
 
 **Higher accuracy, lower latency.** In our paired semantic-filtering benchmark, jev4pg reached **98% accuracy versus 92%, with 36% lower median latency** than pg-jev's request path. Current development also delivers **20.4× faster cached operator lookups**, **3× faster request packing** and **3.7× faster native probability-matrix projection** against v0.8.0 in paired local microbenchmarks. Shared execution improvements support filtering, extraction, ranking, matching and verification by reducing evidence reads, repeated computation and request preparation. [Performance highlights](#performance-highlights).
 
@@ -110,7 +111,7 @@ PostgreSQL stores your data and executes relational SQL in every setup. jev4pg a
 
 | Component | Use it for | Where it runs |
 | --- | --- | --- |
-| **Python application** | Natural-language queries, the web workspace, HTTP APIs, all 41 operators, reviewed features and query history | Beside PostgreSQL; no custom server extension required. |
+| **Python application** | Natural-language queries, the web workspace, HTTP APIs, all 41 operators, reviewed features and query history | Beside PostgreSQL 14–17; no custom server extension required. |
 | **Native Rust extension** | Synchronous semantic SQL, parallel stage plans, repeated-context reuse and explainable embeddings | Inside PostgreSQL 14–17 on Linux; works directly from SQL without Python. |
 | **Combined deployment** | The workspace and natural-language planning with native semantic reads | Python plans and manages the workflow; Rust executes supported semantic stages in PostgreSQL. |
 
@@ -118,18 +119,21 @@ Use Python when you want a complete application or need to integrate with an exi
 
 `JEV` and `Hybrid` are **planning modes** in the application, independent of the execution engine. Hybrid adds LLM generation. The native extension consumes explicit SQL and typed questions; natural-language planning comes from the application.
 
-The commands below use the **v0.8.0 release**, which includes native preview 0.3.0. Current `main` includes native preview 0.4.0. See [component compatibility](docs/INSTALLATION.md#upgrade) before upgrading.
-
-**PostgreSQL 14–17:** use current `main` and select your major with `SDD_POSTGRES_MAJOR`. The release commands below retain PostgreSQL 17. Tables and row-level security work across all four majors; workspace view attachments require PostgreSQL 15+. [Version setup](docs/INSTALLATION.md#postgresql-versions).
+The commands below install current `main`, tested on **PostgreSQL 14, 15, 16 and 17**, with native preview 0.4.0. Tables and row-level security work across all four majors; workspace view attachments require PostgreSQL 15+. [Version compatibility and upgrades](docs/INSTALLATION.md#upgrade).
 
 ### Python application
 
 For a complete local workspace, install Python 3.11+ and Docker Compose v2:
 
 ```bash
-git clone --branch v0.8.0 https://github.com/Sheltercosmo/jev4pg.git
+git clone --branch main https://github.com/Sheltercosmo/jev4pg.git
 cd jev4pg
 python deploy/configure.py
+```
+
+PostgreSQL 17 is the default. To use 14, 15 or 16, create or edit `.env` in the checkout and set `SDD_POSTGRES_MAJOR` to that major, for example `SDD_POSTGRES_MAJOR=14`. Then start the stack:
+
+```bash
 docker compose build
 docker compose up -d --wait
 python deploy/configure.py --show-token
@@ -157,10 +161,10 @@ Browser imports support 5 MB and 10,000 rows. For larger data, load it with Post
 
 ### Use an existing PostgreSQL database
 
-Run the Python application beside your PostgreSQL 17 server. With Python 3.11+, install the release package and create a connection profile:
+Run the Python application beside your PostgreSQL 14–17 server. With Python 3.11+, install from `main` and create a connection profile:
 
 ```bash
-python -m pip install https://github.com/Sheltercosmo/jev4pg/releases/download/v0.8.0/jev4pg-0.8.0-py3-none-any.whl
+python -m pip install https://github.com/Sheltercosmo/jev4pg/archive/refs/heads/main.zip
 jev4pg setup
 cd jev4pg-local
 jev4pg --env-file admin.env migrate --check --sql-interface portable
@@ -168,7 +172,7 @@ jev4pg --env-file admin.env migrate --sql-interface portable
 jev4pg serve
 ```
 
-The wizard creates separate installation and runtime credentials. Migration adds the application catalog and portable SQL queue using ordinary PostgreSQL objects; it needs an owner with migration permissions. Open the workspace on port 8000 and use the token stored in `.secrets/api-tokens.json`. Grant the runtime login access to your source tables, then [attach them](docs/EXISTING_DATA.md).
+The wizard creates separate installation and runtime credentials. No `SDD_POSTGRES_MAJOR` setting is needed for an existing server. Migration adds the application catalog and portable SQL queue using ordinary PostgreSQL objects; it needs an owner with migration permissions. Open the workspace on port 8000 and use the token stored in `.secrets/api-tokens.json`. Grant the runtime login access to your source tables, then [attach them](docs/EXISTING_DATA.md).
 
 For asynchronous operators from psql or DBeaver, [grant a SQL login and start `jev4pg sql-worker`](docs/EASY_SETUP.md#2-install-and-grant-access). For **Run in background** in the workspace, start a separate [query worker](docs/QUERY_JOBS.md#start-a-worker). The foreground workspace does not require either worker.
 
@@ -178,7 +182,7 @@ For asynchronous operators from psql or DBeaver, [grant a SQL login and start `j
 
 For a SQL-only application, [build and configure `jev_native`](native/README.md#build) on your PostgreSQL 14–17 Linux server, then enable it with `CREATE EXTENSION jev_native` and grant function and source access. Call it from psql, a SQL editor or any PostgreSQL driver. No Python service or application dataset registration is required. [First native SQL query](#native-semantic-sql).
 
-For the **combined workspace and native deployment**, use the v0.8.0 checkout above and run these commands instead of the default Compose commands:
+For the **combined workspace and native deployment**, use the `main` checkout above, select your PostgreSQL major in `.env`, and run these commands instead of the default Compose commands:
 
 ```bash
 python deploy/configure.py --native

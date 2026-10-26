@@ -9,7 +9,7 @@ Start with the [quick start](../README.md#quick-start), then choose the guide fo
 | Synchronous semantic SQL without a Python service | [Native Rust extension](../native/README.md) |
 | The workspace with native semantic reads | [Combined Compose deployment](NATIVE_DEPLOYMENT.md) |
 
-The [capability map](CAPABILITIES.md#python-and-native-roles) explains each component's role. PostgreSQL stores data and executes relational SQL in every setup. [Installation](INSTALLATION.md) covers prerequisites, credentials and upgrades.
+These guides use current `main` for PostgreSQL 14–17. The [capability map](CAPABILITIES.md#python-and-native-roles) explains each component's role. PostgreSQL stores data and executes relational SQL in every setup. [Installation](INSTALLATION.md) covers version selection, prerequisites, credentials and upgrades.
 
 ## Use the database
 

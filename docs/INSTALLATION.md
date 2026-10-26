@@ -13,11 +13,11 @@ Start with the [quick start](../README.md#quick-start) for a first query. This g
 
 The default Compose stack uses the Python semantic engine. Native execution is an explicit choice, not a requirement for the application. Maintained semantic features and semantic write review use the Python engine. See the [capability map](CAPABILITIES.md#python-and-native-roles) for interface boundaries and use cases.
 
-The released `v0.8.0` checkout includes native preview 0.3.0; current `main` includes native preview 0.4.0. Use a release tag for a fixed deployment and keep all components on that checkout. See [version compatibility](#upgrade) before changing an existing installation.
+These instructions use current `main`, with native preview 0.4.0. Keep all components on the same checkout and record its commit SHA when deploying. See [version compatibility](#upgrade) before changing an existing installation.
 
 ## PostgreSQL versions
 
-Current `main` supports PostgreSQL 14, 15, 16 and 17 for the Python application, queued SQL interface and native Rust extension. The published v0.8.0 deployment remains configured for PostgreSQL 17. Use `main` for the version selector and older-major native builds.
+PostgreSQL 14, 15, 16 and 17 are supported by the Python application, queued SQL interface and native Rust extension on `main`.
 
 | Capability | PostgreSQL 14 | PostgreSQL 15–17 |
 | --- | --- | --- |
@@ -29,7 +29,15 @@ Current `main` supports PostgreSQL 14, 15, 16 and 17 for the Python application,
 
 The experimental remote-source protocol remains qualified on PostgreSQL 17 only. It validates stored PostgreSQL expression layouts and is separate from local source attachments.
 
-For a new PostgreSQL 14 deployment, clone current development:
+For a bundled database, set `SDD_POSTGRES_MAJOR` in the checkout's `.env` before building. Choose 14, 15, 16 or 17; the default is 17. The [native Compose stack](NATIVE_DEPLOYMENT.md) uses the same selector for its headers, library paths and Rust feature. Source builds use the corresponding `pg14`, `pg15`, `pg16` or `pg17` Cargo feature.
+
+For an existing server, follow [guided setup](EASY_SETUP.md). The connection URL selects your PostgreSQL instance; no server version selector is needed.
+
+Changing `SDD_POSTGRES_MAJOR` does not upgrade a database volume. Keep it fixed for an existing deployment. To change majors, use PostgreSQL's `pg_upgrade` or a dump/restore into a new volume, install the matching extension binary and validate the application before switching traffic. Never mount an old-major data directory under a different major's image.
+
+## Docker Compose
+
+Install Docker with Compose v2 and Python 3.11 or newer. Clone current `main` and configure credentials:
 
 ```bash
 git clone --branch main https://github.com/Sheltercosmo/jev4pg.git
@@ -37,18 +45,15 @@ cd jev4pg
 python deploy/configure.py
 ```
 
-Add `SDD_POSTGRES_MAJOR=14` to the checkout's `.env`, then run `docker compose build` and `docker compose up -d --wait`. Choose 14, 15, 16 or 17; the default is 17. For native execution, configure with `--native` and use both Compose files as in the [combined deployment guide](NATIVE_DEPLOYMENT.md). The same selector controls headers, library paths and the Rust feature for that major.
+Create or edit `.env` in the checkout to select a PostgreSQL major, for example:
 
-For an existing PostgreSQL 14–17 server, install the application from this checkout (`python -m pip install .`), then follow [guided setup](EASY_SETUP.md) starting at `jev4pg setup`. No server version selector is needed for an external connection.
+```dotenv
+SDD_POSTGRES_MAJOR=14
+```
 
-Changing `SDD_POSTGRES_MAJOR` does not upgrade a database volume. Keep it fixed for an existing deployment. To change majors, use PostgreSQL's `pg_upgrade` or a dump/restore into a new volume, install the matching extension binary and validate the application before switching traffic. Never mount an old-major data directory under a different major's image.
-
-## Docker Compose
-
-Install Docker with Compose v2 and Python 3.11 or newer. Use the `v0.8.0` tag for the released deployment, or `main` to develop the application. From that checkout:
+Use 14, 15, 16 or 17, or omit the setting for 17. Then build and start:
 
 ```bash
-python deploy/configure.py
 docker compose build
 docker compose up -d --wait
 ```
@@ -73,7 +78,7 @@ Use `docker compose ps` to inspect health. `/health` is process liveness; `/read
 
 For an application-only deployment with verified TLS and explicit migration control, follow [external PostgreSQL deployment](EXTERNAL_POSTGRESQL.md). It includes connection sizing and an optional SQL worker. The process-supervisor installation below remains available.
 
-Use PostgreSQL 14–17 with current development and a dedicated database. Install the Python package:
+Use a dedicated PostgreSQL 14–17 database. From the `main` checkout, install the Python package:
 
 ```bash
 python -m venv .venv
@@ -113,7 +118,7 @@ Run these as separate processes. On Windows choose a writable heartbeat path, su
 
 ## Native preview
 
-The [native Compose guide](NATIVE_DEPLOYMENT.md) installs the combined application and native engine. Its release commands use `v0.8.0` with native 0.3.0; use one `main` checkout for all components when evaluating native 0.4.0 development.
+The [native Compose guide](NATIVE_DEPLOYMENT.md) installs the application and native 0.4.0 engine from `main` on PostgreSQL 14–17. Use the same checkout for all components.
 
 For SQL-only use on an existing server, follow the [native build guide](../native/README.md#build), configure `JEV_NATIVE_CONFIG_FILE` in the PostgreSQL server environment and grant SQL callers access. Direct SQL use does not require the Python application, its catalog or its workers.
 
@@ -154,7 +159,9 @@ Application, catalog and extension compatibility:
 | Released `v0.6.0` tag | 0.6.0 | 1 | Not included |
 | Released `v0.7.0` tag | 0.7.0 | 4 | 0.2.0 preview |
 | Released `v0.8.0` tag | 0.8.0 | 4 | 0.3.0 preview |
-| Development checkout | 0.8.0 | 4 | 0.4.0 preview |
+| Current `main` | 0.8.0 | 4 | 0.4.0 preview |
+
+PostgreSQL 14–17 support and the `SDD_POSTGRES_MAJOR` selector are available on current `main`. The published v0.8.0 wheel and tagged deployment predate that qualification and target PostgreSQL 17. The installation commands in this guide use `main`; older tags retain their original instructions and component versions.
 
 The Python distribution was renamed from `jevsd-pg` to `jev4pg`. For installations outside Compose, create a fresh virtual environment and install the new wheel or source checkout there; do not install both distributions over one another. They share the `sdd` import namespace. Point the existing service supervisor at the new environment after migration. The `jevsd-pg` and `sdd` command aliases remain available.
 
