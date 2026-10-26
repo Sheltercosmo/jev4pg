@@ -437,6 +437,7 @@ def main():
                     host="127.0.0.1", port=port, dbname="postgres", autocommit=True
                 ) as connection:
                     result = verify(connection, config)
+                    result["postgres_version"] = connection.execute("SHOW server_version").fetchone()[0]
                 (ROOT / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
                 print(json.dumps(result, indent=2))
             except BaseException:

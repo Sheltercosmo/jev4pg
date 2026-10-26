@@ -105,11 +105,12 @@ def test_installation_coexists_with_public_objects_and_runtime_shadow_tables(tar
         with pytest.raises(ValueError, match="internal"):
             catalog.attach("tenant-a", "private", "sdd_catalog", "dataset_catalog")
         with engine.begin() as connection:
+            options = "WITH (security_invoker=true)" if connection.dialect.server_version_info >= (15,) else ""
             connection.exec_driver_sql(
-                'CREATE VIEW "业务".metadata_proxy WITH (security_invoker=true) AS SELECT * FROM sdd_catalog.dataset_catalog'
+                f'CREATE VIEW "业务".metadata_proxy {options} AS SELECT * FROM sdd_catalog.dataset_catalog'
             )
             connection.exec_driver_sql(f'GRANT SELECT ON "业务".metadata_proxy TO "{role}"')
-        with pytest.raises(ValueError, match="internal"):
+        with pytest.raises(ValueError, match="internal|security_invoker"):
             catalog.attach("tenant-a", "private_view", "业务", "metadata_proxy")
         with runtime.transaction("tenant-a") as connection:
             connection.exec_driver_sql("CREATE TEMP TABLE dataset_catalog(id integer)")

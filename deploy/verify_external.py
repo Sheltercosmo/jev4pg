@@ -1,8 +1,9 @@
-"""Test TLS and the application against a disposable external PostgreSQL 17 server."""
+"""Test TLS and the application against a disposable PostgreSQL 14-17 server."""
 
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import socket
@@ -36,8 +37,9 @@ def verify(postgres_bin, openssl, full_suite=False):
         return subprocess.run(command, check=True, cwd=root, **windows, **kwargs)
 
     version = run([str(pg / ("postgres" + suffix)), "--version"], capture_output=True, text=True)
-    if "(PostgreSQL) 17." not in version.stdout:
-        raise ValueError("This verification requires PostgreSQL 17")
+    major = re.search(r"\(PostgreSQL\) (\d+)\.", version.stdout)
+    if not major or int(major[1]) not in range(14, 18):
+        raise ValueError("This verification requires PostgreSQL 14-17")
     print("Preparing a disposable PostgreSQL TLS server", flush=True)
     with tempfile.TemporaryDirectory(prefix="external-tls-", dir=runtime) as temporary:
         directory = Path(temporary).resolve()

@@ -10,7 +10,13 @@ permissions:
 jobs:
   native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [14, 15, 16, 17]
+    env:
+      PG_BIN: /usr/lib/postgresql/${{ matrix.postgres }}/bin
     steps:
       - uses: actions/checkout@v4
       - name: Install PostgreSQL headers
@@ -23,7 +29,7 @@ jobs:
           sudo curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 60 https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
           echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y postgresql-17 postgresql-server-dev-17 libclang-dev pkg-config
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y postgresql-${{ matrix.postgres }} postgresql-server-dev-${{ matrix.postgres }} libclang-dev pkg-config
       - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
@@ -35,10 +41,10 @@ jobs:
             ~/.cargo/git
             ~/.cargo/bin/cargo-pgrx
             native/target
-          key: native-pg17-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-${{ github.run_id }}
+          key: native-pg${{ matrix.postgres }}-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-${{ github.run_id }}
           restore-keys: |
-            native-pg17-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-
-            native-pg17-rust196-pgrx0192-
+            native-pg${{ matrix.postgres }}-rust196-pgrx0192-${{ hashFiles('native/**/Cargo.toml', 'native/Cargo.lock') }}-
+            native-pg${{ matrix.postgres }}-rust196-pgrx0192-
       - name: Check core execution
         working-directory: native
         run: |
@@ -51,8 +57,8 @@ jobs:
           if ! cargo pgrx --version | grep -q '0.19.2'; then
             cargo install --locked cargo-pgrx --version 0.19.2
           fi
-          cargo pgrx init --pg17 /usr/lib/postgresql/17/bin/pg_config
-          cargo pgrx install --sudo --pg-config /usr/lib/postgresql/17/bin/pg_config
+          cargo pgrx init --pg${{ matrix.postgres }} /usr/lib/postgresql/${{ matrix.postgres }}/bin/pg_config
+          cargo pgrx install --sudo --no-default-features --features pg${{ matrix.postgres }} --pg-config /usr/lib/postgresql/${{ matrix.postgres }}/bin/pg_config
       - uses: actions/checkout@v4
         with:
           repository: Sheltercosmo/jev4pg
@@ -64,8 +70,10 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/native/target
           PGRX_BUILD_FLAGS: --locked
         run: |
-          cargo pgrx schema --pg-config /usr/lib/postgresql/17/bin/pg_config --out /tmp/jev_native--0.1.0.sql
-          sudo install -m 644 /tmp/jev_native--0.1.0.sql /usr/share/postgresql/17/extension/
+          # The historical baseline predates our build flags for older majors.
+          sed -i '/^pg17 =/i pg14 = ["pgrx/pg14"]\npg15 = ["pgrx/pg15"]\npg16 = ["pgrx/pg16"]' Cargo.toml
+          cargo pgrx schema --no-default-features --features pg${{ matrix.postgres }} --pg-config /usr/lib/postgresql/${{ matrix.postgres }}/bin/pg_config --out /tmp/jev_native--0.1.0.sql
+          sudo install -m 644 /tmp/jev_native--0.1.0.sql /usr/share/postgresql/${{ matrix.postgres }}/extension/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -79,7 +87,7 @@ jobs:
           python -m venv .runtime/release-venv
           .runtime/release-venv/bin/python -m pip install -r .application-baseline/requirements.lock.txt
           .runtime/release-venv/bin/python -m pip install --no-deps .application-baseline
-          sudo install -m 644 .application-baseline/sdd/postgres/jevsd_pg* /usr/share/postgresql/17/extension/
+          sudo install -m 644 .application-baseline/sdd/postgres/jevsd_pg* /usr/share/postgresql/${{ matrix.postgres }}/extension/
       - name: Verify direct PostgreSQL execution
         env:
           SDD_TEST_NATIVE_UPGRADE: '1'
@@ -99,7 +107,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: native-verification
+          name: native-verification-pg${{ matrix.postgres }}
           path: |
             native/Cargo.lock
             native/core/src/

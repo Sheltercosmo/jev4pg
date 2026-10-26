@@ -63,6 +63,9 @@ def test_preview_apply_repeat_and_tenant_rows(source, name):
 
 
 def test_preview_and_apply_do_not_evaluate_source_rows(source):
+    with source["owner"].engine.connect() as connection:
+        if connection.dialect.server_version_info < (15,):
+            pytest.skip("Invoker views require PostgreSQL 15+")
     name, role = source["schema"], source["roles"][0]
     with source["owner"].engine.begin() as connection:
         connection.exec_driver_sql(f'''CREATE FUNCTION "{name}".row_probe(text) RETURNS text

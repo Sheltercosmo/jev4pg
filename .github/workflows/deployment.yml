@@ -10,8 +10,13 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [14, 15, 16, 17]
     env:
+      SDD_POSTGRES_MAJOR: ${{ matrix.postgres }}
       SDD_HTTP_PORT: "18000"
       SDD_POSTGRES_PORT: "15432"
     steps:

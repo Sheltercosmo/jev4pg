@@ -10,8 +10,13 @@ permissions:
 jobs:
   native-deploy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [14, 15, 16, 17]
     env:
+      SDD_POSTGRES_MAJOR: ${{ matrix.postgres }}
       SDD_TEST_NATIVE: '1'
       SDD_HTTP_PORT: '18000'
       SDD_POSTGRES_PORT: '15432'
@@ -44,10 +49,11 @@ jobs:
         with:
           context: .
           file: deploy/native.Dockerfile
+          build-args: POSTGRES_MAJOR=${{ matrix.postgres }}
           load: true
           tags: jev4pg-native-postgres:local
-          cache-from: type=gha,scope=native-postgres
-          cache-to: type=gha,scope=native-postgres,mode=max
+          cache-from: type=gha,scope=native-postgres-${{ matrix.postgres }}
+          cache-to: type=gha,scope=native-postgres-${{ matrix.postgres }},mode=max
       - name: Start native deployment
         run: docker compose -f compose.yaml -f compose.native.yaml -f deploy/compose.test.yaml up -d --no-build --wait --wait-timeout 180
       - name: Verify deployment and persistence

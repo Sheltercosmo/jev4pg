@@ -108,6 +108,13 @@ def test_attachment_keeps_rls_for_each_tenant_and_invoker_view(source):
         connection.exec_driver_sql(
             f'CREATE VIEW "{name}".unsafe AS SELECT id,note FROM "{name}".records'
         )
+        connection.exec_driver_sql(f'GRANT SELECT ON "{name}".unsafe TO "{role}"')
+        supports_invoker = connection.dialect.server_version_info >= (15,)
+    with pytest.raises(ValueError, match="security_invoker"):
+        catalog.attach("tenant-a", "bad_view", name, "unsafe")
+    if not supports_invoker:
+        return
+    with source["owner"].engine.begin() as connection:
         connection.exec_driver_sql(
             f'CREATE VIEW "{name}".safe WITH (security_invoker=true) AS SELECT id,note FROM "{name}".records'
         )
@@ -396,6 +403,9 @@ def test_indirect_source_guard_blocks_refresh_and_releases_after_error(source):
 
 
 def test_nested_views_require_invoker_security_and_definition_identity(source):
+    with source["owner"].engine.connect() as connection:
+        if connection.dialect.server_version_info < (15,):
+            pytest.skip("Invoker views require PostgreSQL 15+")
     name, role = source["schema"], source["roles"][0]
     with source["owner"].engine.begin() as connection:
         connection.exec_driver_sql(

@@ -14,6 +14,8 @@ services:
     build:
       context: .
       dockerfile: deploy/postgres.Dockerfile
+      args:
+        POSTGRES_MAJOR: ${SDD_POSTGRES_MAJOR:-17}
     environment:
       POSTGRES_DB: sdd
       POSTGRES_USER: sdd_admin
